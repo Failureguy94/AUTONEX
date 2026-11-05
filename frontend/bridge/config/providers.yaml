@@ -8,6 +8,14 @@ global:
   max_wait_s: 180          # queue wait before the caller gets 429 + Retry-After (GatewayBusy)
   safety: 0.9              # use 90 % of any configured rate
 
+zg_compute:                # 0G Private Computer (Router API)
+  base_url: https://router-api.0g.ai/v1
+  key_env: ZG_API_KEY
+  trust_mode: verified     # standard | verified | private (TEE)
+  rpm: 60
+  concurrency: 4
+  scope: per_key
+
 groq:
   base_url: https://api.groq.com/openai/v1
   key_env: GROQ_API_KEY            # `keys: [ENV1, ENV2]` pool is supported but ONLY for legitimate cases (consenting teammate / separate paid project)

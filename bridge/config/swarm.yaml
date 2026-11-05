@@ -87,6 +87,7 @@ privacy:
     - "**/id_rsa*"
   pseudonymize: true
   egress_allowlist_hosts:
+    - router-api.0g.ai
     - api.groq.com
     - api.cerebras.ai
     - integrate.api.nvidia.com

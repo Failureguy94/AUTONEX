@@ -175,11 +175,16 @@ Final Answer: <Complete summary of what was accomplished, files created, and how
 
   const maxSteps = 15;
   for (let step = 1; step <= maxSteps; step++) {
-    emitEvent(run, 'llm.call_started', agent.id, undefined, { call_id: `step_${step}`, agent_id: agent.id, model: 'qwen3.8-27b', role: 'engineer' });
-
     let response = '';
     try {
-      response = await callLLM(conversation, systemPrompt);
+      response = await callLLM(conversation, systemPrompt, {
+        run: run as any,
+        agentId: agent.id,
+        agentName: agent.name,
+        task: 'agent',
+        role: 'engineer',
+        callId: `step_${step}`
+      });
     } catch (e: any) {
       emitEvent(run, 'blackboard.note', agent.id, undefined, {
         id: `note_${Date.now()}`,
@@ -190,8 +195,6 @@ Final Answer: <Complete summary of what was accomplished, files created, and how
       });
       break;
     }
-
-    emitEvent(run, 'llm.call_finished', agent.id, undefined, { call_id: `step_${step}`, tokens_in: 600, tokens_out: 400, latency_ms: 1200 });
 
     // Extract Thought
     const thoughtMatch = response.match(/Thought:\s*([\s\S]*?)(?=Action:|Final Answer:|$)/i);

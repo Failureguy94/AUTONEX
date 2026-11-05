@@ -190,6 +190,7 @@ set +u
 source "$ENV_FILE"
 set -u
 CONFIGURED_PROVIDERS=()
+[ -n "${ZG_API_KEY:-}" ]        && CONFIGURED_PROVIDERS+=("0g")
 [ -n "${GO_API_KEY:-}" ]        && CONFIGURED_PROVIDERS+=("go")
 [ -n "${GROQ_API_KEY:-}" ]      && CONFIGURED_PROVIDERS+=("groq")
 [ -n "${NVIDIA_API_KEY:-}" ]    && CONFIGURED_PROVIDERS+=("nvidia")
@@ -206,6 +207,15 @@ echo -e "${GREEN}[OK] Active providers: ${CONFIGURED_PROVIDERS[*]}${NC}"
 # Resolve smart model shorthands
 if [ -n "$MODEL_OVERRIDE" ]; then
   case "$MODEL_OVERRIDE" in
+    0g|zg)
+      MODEL_OVERRIDE="0g/glm-5.3-flash"
+      ;;
+    coder)
+      MODEL_OVERRIDE="0g/qwen3-coder-flash"
+      ;;
+    fast|instant)
+      MODEL_OVERRIDE="0g/qwen-flash"
+      ;;
     groq)
       MODEL_OVERRIDE="groq/llama-3.3-70b-versatile"
       ;;

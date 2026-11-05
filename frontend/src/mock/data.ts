@@ -16,7 +16,7 @@ const NAMES = [
   'Sameer', 'Divya', 'Karan', 'Pooja', 'Yash', 'Sneha', 'Aditya', 'Lata',
 ];
 
-const llmBig = { kind: 'llm' as const, label: 'llm:gemma-4-31b-it (manager)' };
+const llmBig = { kind: 'llm' as const, label: '0G · glm-5.3-flash (manager)' };
 
 function wsChair(bay: string, i: number): string {
   // bays are physical wings: map a run department's wing -> that wing's workstation chairs
@@ -77,8 +77,14 @@ export function deskOf(id: string, org: AgentDef[]): { x: number; z: number } {
 }
 
 // Model roster = the RealGravity free-tier mesh (whitepaper §4). Context windows are real:
-// Groq's 8k matters (it limits which roles may run on it).
+// 0G Private Computer (Router: https://router-api.0g.ai/v1) & Fallbacks
 export const MODELS: ModelInfo[] = [
+  { id: '0g/glm-5.3-flash', label: '0G Private Computer · GLM 5.3 Flash (manager default)', provider: '0g', context_tokens: 1179648 },
+  { id: '0g/qwen3-coder-flash', label: '0G Private Computer · Qwen 3 Coder Flash (engineer)', provider: '0g', context_tokens: 1000000 },
+  { id: '0g/kimi-k2.7-code', label: '0G Private Computer · Kimi K2.7 Code (QA / verifier)', provider: '0g', context_tokens: 262144 },
+  { id: '0g/deepseek-v4.1-flash', label: '0G Private Computer · DeepSeek V4.1 Flash', provider: '0g', context_tokens: 1441792 },
+  { id: '0g/qwen3.7-flash', label: '0G Private Computer · Qwen 3.7 Flash (swarm divergence)', provider: '0g', context_tokens: 1000000 },
+  { id: '0g/qwen-flash', label: '0G Private Computer · Qwen Flash (quorum voting)', provider: '0g', context_tokens: 1000000 },
   { id: 'openrouter/google/gemma-4-31b-it:free', label: 'OpenRouter · Gemma 4 31B (manager default)', provider: 'openrouter', context_tokens: 128000 },
   { id: 'openrouter/qwen/qwen3.8-27b:free', label: 'OpenRouter · Qwen 3.8 27B (coder)', provider: 'openrouter', context_tokens: 128000 },
   { id: 'openrouter/cohere/north-mini-code:free', label: 'OpenRouter · Cohere North Mini Code', provider: 'openrouter', context_tokens: 32000 },

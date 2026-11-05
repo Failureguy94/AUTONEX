@@ -10,6 +10,7 @@ import { triage } from '../../src/mock/triage';
 import { buildScript } from '../../src/mock/simulator';
 import { executeRealRun, loadEnv, callLLM } from './realRunner';
 import { executeSwarmRun } from './swarmRunner';
+import { zgClient, TASK_MODEL_ROUTING } from './zgClient';
 
 loadEnv();
 
@@ -179,6 +180,12 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
           version: '2.0.0',
           mode: 'real_gravity',
           providers: {
+            zg_compute: {
+              active: true,
+              live: zgClient.hasApiKey(),
+              base_url: zgClient.getBaseURL(),
+              primary_model: 'glm-5.3-flash'
+            },
             groq: !!process.env.GROQ_API_KEY,
             gemini: !!process.env.GEMINI_API_KEY,
             nvidia_nim: !!process.env.NVIDIA_API_KEY,
@@ -188,6 +195,8 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
           endpoints: {
             health: '/api/health',
             models: '/api/models',
+            zg_requests: '/api/zg/requests',
+            zg_models: '/api/zg/models',
             runs: '/api/runs',
             tasks: '/api/tasks',
             ws: 'ws://localhost:8000/ws/events',
@@ -202,11 +211,32 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
           model_loaded: true,
           queue_depth: 0,
           providers: {
+            zg_compute: {
+              active: true,
+              live: zgClient.hasApiKey(),
+              base_url: zgClient.getBaseURL()
+            },
             groq: !!process.env.GROQ_API_KEY,
             gemini: !!process.env.GEMINI_API_KEY,
             nvidia: !!process.env.NVIDIA_API_KEY,
             openrouter: !!process.env.OPENROUTER_API_KEY
           }
+        });
+      }
+
+      if (p === '/api/zg/requests' && req.method === 'GET') {
+        const records = zgClient.getRequestLog();
+        return json(res, 200, {
+          count: records.length,
+          last_request_id: zgClient.getLastRequestId(),
+          records
+        });
+      }
+
+      if (p === '/api/zg/models' && req.method === 'GET') {
+        return json(res, 200, {
+          task_model_routing: TASK_MODEL_ROUTING,
+          catalog: MODELS.filter((m) => m.provider === '0g')
         });
       }
 
@@ -315,13 +345,22 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
 
       if (p === '/api/org') return json(res, 200, { manager: null, leads: [], workers: [], desks: [], zones: [] });
 
-      // Live Diya Manager Reasoning Chat
+      // Live Diya Manager Reasoning Chat via 0G Private Computer
       if (p === '/api/llm/chat' && req.method === 'POST') {
         const b = await readBody(req);
         try {
           const system = b.system || 'You are Diya, Lead Engineering Manager of GravityDesk. Provide crisp, technically deep, and professional responses.';
-          const reply = await callLLM(b.prompt || 'Hello', system);
-          return json(res, 200, { reply });
+          const reply = await callLLM(b.prompt || 'Hello', system, { task: 'chat', role: 'manager', model: b.model });
+          const lastReq = zgClient.getRequestLog().slice(-1)[0];
+          return json(res, 200, {
+            reply,
+            request_id: lastReq?.requestId || zgClient.getLastRequestId(),
+            model: lastReq?.model || 'glm-5.3-flash',
+            trust_mode: lastReq?.trustMode || 'verified',
+            tokens_in: lastReq?.tokensIn || 0,
+            tokens_out: lastReq?.tokensOut || 0,
+            latency_ms: lastReq?.latencyMs || 0
+          });
         } catch (err: any) {
           return json(res, 200, { reply: 'Reasoning exception: ' + (err?.message || String(err)) });
         }

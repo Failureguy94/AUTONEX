@@ -134,13 +134,17 @@ $ResolvedPath = (Resolve-Path $TargetDir).Path
 # Resolve model shorthands
 if ($Model) {
     switch ($Model.ToLower()) {
+        '0g'          { $Model = '0g/glm-5.3-flash' }
+        'zg'          { $Model = '0g/glm-5.3-flash' }
+        '0g-code'     { $Model = '0g/qwen3-coder-flash' }
+        '0g-qa'       { $Model = '0g/kimi-k2.7-code' }
+        'coder'       { $Model = '0g/qwen3-coder-flash' }
         'groq'        { $Model = 'groq/openai/gpt-oss-120b' }
         '120b'        { $Model = 'groq/openai/gpt-oss-120b' }
-        'qwen'        { $Model = 'groq/qwen/qwen3.8-27b' }
-        'coder'       { $Model = 'openrouter/qwen/qwen3.8-27b:free' }
+        'qwen'        { $Model = '0g/qwen3-coder-flash' }
         'openrouter'  { $Model = 'openrouter/qwen/qwen3.8-27b:free' }
-        'fast'        { $Model = 'groq/openai/gpt-oss-20b' }
-        'instant'     { $Model = 'groq/openai/gpt-oss-20b' }
+        'fast'        { $Model = '0g/qwen-flash' }
+        'instant'     { $Model = '0g/qwen-flash' }
     }
 }
 

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
 import type { WebSocket } from 'ws';
+import { zgClient, ZGTask } from './zgClient';
 
 export interface RunState {
   id: string;
@@ -17,31 +18,9 @@ export interface RunState {
   alwaysAllowed: Set<string>;
 }
 
-// 1. Ensure Environment Variables are Loaded
-export function loadEnv() {
-  const envPaths = [
-    'D:\\GravityDesk\\.env',
-    'D:\\GravityDesk\\frontend\\.env',
-    path.resolve(process.cwd(), '.env')
-  ];
-  for (const ep of envPaths) {
-    if (fs.existsSync(ep)) {
-      const content = fs.readFileSync(ep, 'utf-8');
-      for (const rawLine of content.split(/\r?\n/)) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith('#')) continue;
-        const eq = line.indexOf('=');
-        if (eq > 0) {
-          const k = line.slice(0, eq).trim();
-          const v = line.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
-          if (v) {
-            process.env[k] = v;
-          }
-        }
-      }
-    }
-  }
-}
+import { loadEnv } from './env';
+export { loadEnv };
+
 loadEnv();
 
 export function emitEvent(run: RunState, type: string, agent_id: string | undefined, task_id: string | undefined, payload: any) {
@@ -67,15 +46,17 @@ export function emitEvent(run: RunState, type: string, agent_id: string | undefi
   return ev;
 }
 
-interface LLMMeta {
+export interface LLMMeta {
   run?: RunState;
   agentId?: string;
   agentName?: string;
   callId?: string;
   role?: string;
+  task?: ZGTask;
+  model?: string;
 }
 
-// 2. High-Performance Multi-Model Pipeline with Rate Limit Fallback
+// 2. High-Performance 0G Private Computer Router
 export async function callLLM(
   prompt: string,
   systemPrompt = 'You are an expert AI software architect and senior developer.',
@@ -83,152 +64,36 @@ export async function callLLM(
 ): Promise<string> {
   if (meta?.run?.done) throw new Error('Execution cancelled by operator');
   loadEnv();
-  const groqKey = process.env.GROQ_API_KEY;
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
 
-  // Ordered by parameter size & reasoning power
-  // Ordered by speed, responsiveness & reasoning capability
-  const modelCandidates = [
-    // 1. High-Speed DeepSeek V3 (Sub-3s latency, top-tier coding)
-    { provider: 'openrouter', model: 'deepseek/deepseek-chat', maxTokens: 4096, displayName: 'DeepSeek-V3 (OpenRouter)' },
-    // 2. Deep Reasoning DeepSeek R1 (Full Chain-of-Thought)
-    { provider: 'openrouter', model: 'deepseek/deepseek-r1', maxTokens: 4096, displayName: 'DeepSeek-R1 (OpenRouter)' },
-    // 3. Coding Specialist Qwen 2.5 Coder
-    { provider: 'openrouter', model: 'qwen/qwen-2.5-coder-32b-instruct', maxTokens: 4096, displayName: 'Qwen-2.5-Coder (OpenRouter)' },
-    // 4. Llama 3.3 70B
-    { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct', maxTokens: 3500, displayName: 'Llama-3.3-70B (OpenRouter)' },
-    // 5. Direct DeepSeek API (if DEEPSEEK_API_KEY is configured)
-    { provider: 'deepseek', model: 'deepseek-chat', maxTokens: 4096, displayName: 'DeepSeek-V3 (Direct)' },
-    { provider: 'deepseek', model: 'deepseek-reasoner', maxTokens: 4096, displayName: 'DeepSeek-R1 (Direct)' },
-    // 6. Groq Fallbacks
-    { provider: 'groq', model: 'llama-3.3-70b-versatile', maxTokens: 3500, displayName: 'Llama-3.3-70B (Groq)' }
-  ];
-
-  let lastError: any = null;
-
-  for (let mIdx = 0; mIdx < modelCandidates.length; mIdx++) {
-    const candidate = modelCandidates[mIdx];
-    const isGroq = candidate.provider === 'groq';
-    const isDeepSeek = candidate.provider === 'deepseek';
-    const apiKey = isDeepSeek ? deepseekKey : (isGroq ? groqKey : openRouterKey);
-
-    if (!apiKey) continue;
-
-    // Announce active model in UI & telemetry
-    if (meta?.run && meta?.agentId) {
-      emitEvent(meta.run, 'llm.call_started', meta.agentId, undefined, {
-        call_id: meta.callId || `call_${Date.now()}`,
-        agent_id: meta.agentId,
-        model: candidate.displayName,
-        role: meta.role || 'engineer'
-      });
-    }
-
-    const maxAttempts = isGroq ? 2 : 1;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const endpoint = isDeepSeek
-          ? 'https://api.deepseek.com/chat/completions'
-          : (isGroq
-            ? 'https://api.groq.com/openai/v1/chat/completions'
-            : 'https://openrouter.ai/api/v1/chat/completions');
-
-        const headers: Record<string, string> = {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'GravityDesk/1.0'
-        };
-
-        if (!isGroq) {
-          headers['HTTP-Referer'] = 'http://localhost:5173';
-          headers['X-Title'] = 'GravityDesk';
-        }
-
-        const t0 = Date.now();
-        const resp = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          signal: AbortSignal.timeout(65000),
-          body: JSON.stringify({
-            model: candidate.model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.1,
-            max_tokens: candidate.maxTokens
-          })
-        });
-
-        // 429 Rate Limit Handling
-        if (resp.status === 429) {
-          const retryHeader = resp.headers.get('retry-after');
-          const waitSec = retryHeader ? Math.min(Number(retryHeader), 4) : 2;
-          console.warn(`[RateLimit 429] ${candidate.displayName} hit rate limit ceiling.`);
-
-          if (attempt < maxAttempts) {
-            console.log(`[Backoff] Waiting ${waitSec}s before retrying ${candidate.model}...`);
-            if (meta?.run && meta?.agentId) {
-              emitEvent(meta.run, 'agent.break_start', meta.agentId, undefined, { kind: 'coffee' });
-            }
-            await new Promise(r => setTimeout(r, waitSec * 1000));
-            if (meta?.run && meta?.agentId) {
-              emitEvent(meta.run, 'agent.break_end', meta.agentId, undefined, {});
-            }
-            continue;
-          }
-
-          // If rate limit window exhausted, fall through to next model
-          const nextModel = modelCandidates[mIdx + 1];
-          if (nextModel && meta?.run) {
-            emitEvent(meta.run, 'blackboard.note', meta.agentId || 'M0', undefined, {
-              id: `note_${Date.now()}`,
-              author_agent_id: meta.agentId || 'M0',
-              topic: 'RATE_LIMIT_FALLBACK',
-              note: `⚡ ${candidate.displayName} rate-limited. Auto-switched to fallback model: ${nextModel.displayName}.`,
-              ts: '09:08'
-            });
-          }
-          break; // Try next candidate model
-        }
-
-        if (resp.ok) {
-          const data: any = await resp.json();
-          const latency = Date.now() - t0;
-          const choice = data.choices?.[0]?.message;
-          let content = choice?.content;
-
-          // If content is empty or null (e.g. reasoning models), extract from reasoning
-          if (!content && choice?.reasoning) {
-            content = choice.reasoning;
-          }
-
-          if (content && typeof content === 'string' && content.trim().length > 0) {
-            if (meta?.run && meta?.agentId) {
-              emitEvent(meta.run, 'llm.call_finished', meta.agentId, undefined, {
-                call_id: meta.callId || `call_${Date.now()}`,
-                model: candidate.displayName,
-                tokens_in: data.usage?.prompt_tokens || 800,
-                tokens_out: data.usage?.completion_tokens || 600,
-                latency_ms: latency
-              });
-            }
-            return content;
-          }
-        } else {
-          const errText = await resp.text();
-          console.warn(`[LLM Error ${resp.status}] ${candidate.displayName}: ${errText.slice(0, 200)}`);
-          lastError = new Error(`HTTP ${resp.status}: ${errText.slice(0, 100)}`);
-        }
-      } catch (e: any) {
-        console.warn(`[LLM Exception] ${candidate.displayName}:`, e.message);
-        lastError = e;
-      }
-    }
+  // Deduce task for 0G task-based model router
+  let inferredTask: ZGTask = meta?.task || 'general';
+  if (!meta?.task) {
+    const role = (meta?.role || '').toLowerCase();
+    const callId = (meta?.callId || '').toLowerCase();
+    if (callId.includes('plan')) inferredTask = 'planning';
+    else if (callId.includes('frame')) inferredTask = 'framing';
+    else if (callId.includes('div')) inferredTask = 'divergence';
+    else if (callId.includes('crit')) inferredTask = 'critique';
+    else if (callId.includes('syn')) inferredTask = 'synthesis';
+    else if (role === 'qa' || callId.includes('qa') || callId.includes('test')) inferredTask = 'qa';
+    else if (role === 'backend' || role === 'frontend' || callId.includes('code')) inferredTask = 'code';
+    else if (role === 'manager') inferredTask = 'planning';
   }
 
-  throw new Error(`All LLM models failed or rate limited: ${lastError?.message || 'Check API keys'}`);
+  // Centralized 0G Private Computer Client Dispatch
+  const zgRes = await zgClient.call({
+    task: inferredTask,
+    model: meta?.model,
+    prompt,
+    systemPrompt,
+    meta
+  });
+
+  if (zgRes && zgRes.content) {
+    return zgRes.content;
+  }
+
+  throw new Error(`0G Private Computer inference failed (Request ID: ${zgRes?.requestId || 'none'})`);
 }
 
 // 3. Permission Gate Handler (Interactive UI approval)
@@ -304,10 +169,10 @@ export async function executeRealRun(run: RunState) {
 
     // Hire Core Team
     const team = [
-      { id: 'M0', name: 'Diya', role: 'manager' as const, department: 'management', avatar_seed: 1, desk: { x: 0, z: 0 } },
-      { id: 'W_backend_0', name: 'Rohan', role: 'worker' as const, department: 'engineering', avatar_seed: 2, desk: { x: 4, z: 8 } },
-      { id: 'W_frontend_0', name: 'Kabir', role: 'worker' as const, department: 'engineering', avatar_seed: 3, desk: { x: 6, z: 8 } },
-      { id: 'W_qa_0', name: 'Nisha', role: 'worker' as const, department: 'engineering', avatar_seed: 4, desk: { x: 8, z: 8 } },
+      { id: 'M0', name: 'Diya', role: 'manager' as const, department: 'management', avatar_seed: 1, desk: { x: 0, z: 0 }, model: '0G · glm-5.3-flash', contextMax: 1179648 },
+      { id: 'W_backend_0', name: 'Rohan', role: 'worker' as const, department: 'engineering', avatar_seed: 2, desk: { x: 4, z: 8 }, model: '0G · qwen3-coder-flash', contextMax: 1000000 },
+      { id: 'W_frontend_0', name: 'Kabir', role: 'worker' as const, department: 'engineering', avatar_seed: 3, desk: { x: 6, z: 8 }, model: '0G · qwen3-coder-flash', contextMax: 1000000 },
+      { id: 'W_qa_0', name: 'Nisha', role: 'worker' as const, department: 'engineering', avatar_seed: 4, desk: { x: 8, z: 8 }, model: '0G · kimi-k2.7-code', contextMax: 262144 },
     ];
     for (const a of team) {
       emitEvent(run, 'worker.hired', a.id, undefined, {
@@ -317,11 +182,11 @@ export async function executeRealRun(run: RunState) {
           role: a.role,
           department: a.department,
           parent_id: null,
-          engine: { kind: 'llm' as const, label: 'gpt-oss-120b' },
+          engine: { kind: 'llm' as const, label: a.model },
           status: 'ASSIGNED',
           energy: 100,
           context_tokens: 0,
-          context_max: 32768,
+          context_max: a.contextMax,
           current_task_id: null,
           avatar_seed: a.avatar_seed
         },
@@ -402,7 +267,7 @@ Format your answer strictly as a JSON object:
     const planRaw = await callLLM(
       planPrompt,
       'You are an autonomous engineering orchestrator. Output ONLY raw valid JSON, no markdown blocks, no text.',
-      { run, agentId: 'M0', agentName: 'Diya', callId: 'plan_1', role: 'manager' }
+      { run, agentId: 'M0', agentName: 'Diya', callId: 'plan_1', role: 'manager', task: 'planning' }
     );
 
     let plan: any;
@@ -530,7 +395,14 @@ Return ONLY raw code (no markdown quotes, no conversational filler).`;
       const rawCode = await callLLM(
         codePrompt,
         'You are a principal engineer writing production-grade code. Return code only.',
-        { run, agentId, agentName, callId: `code_${task.id}`, role: task.owner_role }
+        {
+          run,
+          agentId,
+          agentName,
+          callId: `code_${task.id}`,
+          role: task.owner_role,
+          task: task.owner_role === 'qa' ? 'qa' : 'code'
+        }
       );
 
       const cleanCode = rawCode.replace(/^```[a-zA-Z]*\n/g, '').replace(/\n```$/g, '').trim();

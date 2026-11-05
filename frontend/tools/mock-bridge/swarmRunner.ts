@@ -59,7 +59,7 @@ export async function executeSwarmRun(run: SwarmRunState, goal: string, swarmSiz
       id: `init_${Date.now()}`,
       author_agent_id: 'M0',
       topic: 'SWARM_CONVENED',
-      note: `Swarm Hall mobilized with ${n} specialized engineering agents. Active LLM: DeepSeek-R1 (OpenRouter).`,
+      note: `Swarm Hall mobilized with ${n} specialized engineering agents on 0G Private Computer (GLM-5.3 Flash / Qwen 3.7 Flash).`,
       ts: '10:00'
     });
 
@@ -71,7 +71,7 @@ export async function executeSwarmRun(run: SwarmRunState, goal: string, swarmSiz
         role: 'manager',
         department: 'moderator',
         parent_id: null,
-        engine: { kind: 'llm', label: 'deepseek/deepseek-r1' },
+        engine: { kind: 'llm', label: '0G · glm-5.3-flash' },
         status: 'ASSIGNED',
         energy: 100,
         context_tokens: 0,
@@ -98,7 +98,7 @@ export async function executeSwarmRun(run: SwarmRunState, goal: string, swarmSiz
           role: 'worker',
           department: roleId,
           parent_id: 'M0',
-          engine: { kind: 'llm', label: 'deepseek/deepseek-r1' },
+          engine: { kind: 'llm', label: '0G · qwen3.7-flash' },
           status: 'ASSIGNED',
           energy: 95,
           context_tokens: 0,
@@ -158,7 +158,13 @@ export async function executeSwarmRun(run: SwarmRunState, goal: string, swarmSiz
 
     let generatedIdeas: { id: string; agentId: string; tag: string; text: string }[] = [];
     try {
-      const rawRes = await callLLM(proposalPrompt, 'Output ONLY valid JSON.', { run: run as any, agentId: 'M0', agentName: 'Diya' });
+      const rawRes = await callLLM(proposalPrompt, 'Output ONLY valid JSON.', {
+        run: run as any,
+        agentId: 'M0',
+        agentName: 'Diya',
+        task: 'divergence',
+        role: 'moderator'
+      });
       const clean = rawRes.replace(/```(?:json)?/gi, '').trim();
       const parsed = JSON.parse(clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1));
       if (Array.isArray(parsed.proposals) && parsed.proposals.length > 0) {
@@ -251,7 +257,13 @@ export async function executeSwarmRun(run: SwarmRunState, goal: string, swarmSiz
 
     let critiques: { stance: 'support' | 'challenge'; text: string }[] = [];
     try {
-      const rawC = await callLLM(critiquePrompt, 'Output ONLY valid JSON.', { run: run as any, agentId: 'S1', agentName: cohort[1]?.name });
+      const rawC = await callLLM(critiquePrompt, 'Output ONLY valid JSON.', {
+        run: run as any,
+        agentId: 'S1',
+        agentName: cohort[1]?.name,
+        task: 'critique',
+        role: 'reviewer'
+      });
       const cleanC = rawC.replace(/```(?:json)?/gi, '').trim();
       const parsed = JSON.parse(cleanC.slice(cleanC.indexOf('{'), cleanC.lastIndexOf('}') + 1));
       critiques = parsed.critiques || [];
@@ -373,7 +385,13 @@ export async function executeSwarmRun(run: SwarmRunState, goal: string, swarmSiz
       const rawSyn = await callLLM(
         codeSynthesisPrompt,
         'You are a ruthless Staff Systems Engineer. Output complete production files with ### FILE: <filename> headers.',
-        { run: run as any, agentId: 'M0', agentName: 'Diya' }
+        {
+          run: run as any,
+          agentId: 'M0',
+          agentName: 'Diya',
+          task: 'synthesis',
+          role: 'staff_engineer'
+        }
       );
       
       const fileRegex = /###\s*(?:FILE:\s*)?([a-zA-Z0-9_\-./\\]+)\s*[\r\n]+```[a-zA-Z0-9_-]*[\r\n]+([\s\S]*?)```/gi;
