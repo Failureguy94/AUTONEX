@@ -11,6 +11,7 @@ import { RABDI_EXPLORER_URL, RABDI_FAUCET_URL, fetchTglmBalance, formatArkivErro
 import { rabdiChain, switchOrAddRabdiNetwork, ensureRabdiWalletClient } from '@/config/chain';
 import { CheckpointSummaryView } from './CheckpointSummaryView';
 import { generateCheckpointSummary, formatCheckpointSummaryMarkdown, type CheckpointSummary } from '@/services/checkpointSummary';
+import { apiUrl } from '@/api/client';
 
 function Md({ text }: { text: string }) {
   const lines = text.split('\n');
@@ -127,7 +128,7 @@ export function ReportView() {
 
   useEffect(() => {
     if (!open || !localOutputDir) return;
-    fetch(`http://localhost:8000/api/deliverables?dir=${encodeURIComponent(localOutputDir)}`)
+    fetch(apiUrl(`/api/deliverables?dir=${encodeURIComponent(localOutputDir)}`))
       .then(r => r.json())
       .then(d => {
         if (d.files && Object.keys(d.files).length > 0) {
@@ -780,7 +781,9 @@ export function ReportView() {
 
                   {storageError && (
                     <div className="p-3 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs font-mono">
-                      {storageError}
+                      {typeof storageError === 'string' && storageError !== '[object Object]'
+                        ? storageError
+                        : 'Wallet operation error. Please ensure Rabdi DB-Chain (Chain ID 7794095) is approved in your wallet.'}
                     </div>
                   )}
 

@@ -63,7 +63,7 @@ export function Toolbar() {
           <span className="opacity-40">·</span>
           <span className="font-semibold uppercase">
             {s.iai?.stakingStatus === 'verified'
-              ? `${s.iai.indicativeDailyCredits.toFixed(1)} cr/d`
+              ? `${(s.iai?.indicativeDailyCredits ?? 0).toFixed(1)} cr/d`
               : s.zgConnection?.isVerified
               ? (s.zgConnection.maskedKey ? s.zgConnection.maskedKey : 'Verified')
               : 'Config'}
@@ -270,10 +270,11 @@ export function Toolbar() {
 
         {USE_MOCK ? (
           <span
-            className="text-[9.5px] font-mono px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-50 text-amber-700 font-medium"
-            title="Running in local contract simulation"
+            className="text-[9.5px] font-mono px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-50 text-emerald-700 font-medium flex items-center gap-1"
+            title="Interactive 3D Multi-Agent Office Mesh"
           >
-            MOCK
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            3D MESH
           </span>
         ) : (
           <span
