@@ -61,7 +61,8 @@ interface Store {
   metrics: Metrics; gate: GateState; llmByRole: Record<string, number>; llmByModel: Record<string, number>;
   terminal: Record<string, string[]>;
   report: FinalResult | null; replanCount: number; planOutline: string[];
-  selected: string | null; inspectorOpen: boolean; drawerOpen: boolean; settingsOpen: boolean; reportOpen: boolean;
+  selected: string | null; inspectorOpen: boolean; drawerOpen: boolean; settingsOpen: boolean; reportOpen: boolean; arkivHistoryOpen: boolean;
+  arkivActiveTab: 'public' | 'user' | 'swarm_context' | 'lookup';
   followId: string | null; toast: string | null; offline: boolean; demoMode: boolean;
   replayIdx: number; replayPlaying: boolean; notePulse: number;
   appMode: 'office' | 'swarm';
@@ -118,7 +119,8 @@ export const useStore = create<Store>((set, get) => ({
   metrics: { llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 }, gate: { in_flight: 0, limit: 4, queue_depth: 0, backoff_active: false },
   llmByRole: {}, llmByModel: {}, terminal: {},
   report: null, replanCount: 0, planOutline: [],
-  selected: null, inspectorOpen: false, drawerOpen: false, settingsOpen: false, reportOpen: false,
+  selected: null, inspectorOpen: false, drawerOpen: false, settingsOpen: false, reportOpen: false, arkivHistoryOpen: false,
+  arkivActiveTab: 'public',
   followId: null, toast: null, offline: false, demoMode: true,
   replayIdx: 0, replayPlaying: true, notePulse: 0,
   appMode: 'office',

@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useAccount, useWalletClient } from 'wagmi';
 import { useStore } from '@/state/store';
 import { Icon, I } from './Icons';
 import { fmtEffort } from '@/state/events';
 import { jsPDF } from 'jspdf';
 import { generateProjectFiles, downloadProjectZip, downloadMarkdownReport, downloadSingleFile } from '@/services/projectBundle';
+import { uploadContextWorkflow, retrieveContextWorkflow } from '@/services/storageWorkflow';
+import { RABDI_EXPLORER_URL, formatArkivError } from '@/services/arkiv/balance';
 
 function Md({ text }: { text: string }) {
   const lines = text.split('\n');
@@ -32,6 +35,9 @@ function inline(s: string) {
 }
 
 export function ReportView() {
+  const { address, isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient();
+
   const open = useStore((s) => s.reportOpen);
   const report = useStore((s) => s.report);
   const goal = useStore((s) => s.goal) || 'Build a real-time crypto price tracker in React with the name of project as "CRYPTracker"';
@@ -39,11 +45,18 @@ export function ReportView() {
   const tasks = useStore((s) => s.tasks);
   const departments = useStore((s) => s.departments);
 
-  const [activeTab, setActiveTab] = useState<'report' | 'files'>('report');
+  const [activeTab, setActiveTab] = useState<'report' | 'files' | 'storage'>('report');
   const [selectedFile, setSelectedFile] = useState<string>('src/App.tsx');
   const [copied, setCopied] = useState(false);
   const [building, setBuilding] = useState(0);
   const [zipping, setZipping] = useState(false);
+
+  // Decentralized Swarm + Arkiv Storage State
+  const [uploadingStorage, setUploadingStorage] = useState(false);
+  const [storageResult, setStorageResult] = useState<any | null>(null);
+  const [storageError, setStorageError] = useState<string | null>(null);
+  const [verifyingSwarm, setVerifyingSwarm] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<string | null>(null);
 
   const dirMatch = report?.report_markdown?.match(/\*\*Output Directory:\*\*\s*`([^`]+)`/);
   const localOutputDir = dirMatch
@@ -87,6 +100,59 @@ export function ReportView() {
     navigator.clipboard.writeText(localOutputDir);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleStoreOnSwarmAndArkiv = async () => {
+    if (!walletClient) {
+      setStorageError('Please connect your Web3 wallet first in the top toolbar.');
+      return;
+    }
+    setUploadingStorage(true);
+    setStorageError(null);
+    try {
+      const payload = JSON.stringify(
+        {
+          goal,
+          report: report.report_markdown,
+          files,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2
+      );
+
+      const res = await uploadContextWorkflow(walletClient, payload, {
+        projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        userId: address || 'user-1',
+        fileName: `${projectName.toLowerCase()}-bundle.json`,
+        contentType: 'application/json',
+        summary: `Full deliverable and report for ${goal.slice(0, 50)}...`,
+      });
+
+      setStorageResult(res);
+    } catch (err: any) {
+      setStorageError(formatArkivError(err));
+    } finally {
+      setUploadingStorage(false);
+    }
+  };
+
+  const handleVerifySwarmIntegrity = async () => {
+    if (!storageResult?.reportId) return;
+    setVerifyingSwarm(true);
+    setVerifyStatus(null);
+    try {
+      const check = await retrieveContextWorkflow(storageResult.reportId, storageResult.entityKey);
+      if (check.verified) {
+        setVerifyStatus('✓ Cryptographic SHA-256 Verified! Swarm content matches on-chain Arkiv record bit-for-bit.');
+      } else {
+        setVerifyStatus('⚠ Warning: Hash mismatch detected between Swarm and Arkiv.');
+      }
+    } catch (err: any) {
+      setVerifyStatus(`Verification failed: ${err.message}`);
+    } finally {
+      setVerifyingSwarm(false);
+    }
   };
 
   const exportPdf = async () => {
@@ -231,11 +297,161 @@ export function ReportView() {
             <Icon d={I.layers} size={13} />
             Project Deliverables & Source Code ({fileKeys.length} files)
           </button>
+          <button
+            onClick={() => setActiveTab('storage')}
+            className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'storage' ? 'border-[var(--accent)] text-ink font-bold' : 'border-transparent text-ink/50 hover:text-ink'
+            }`}
+          >
+            <Icon d={I.database} size={13} />
+            Decentralized Storage (Swarm + Arkiv)
+          </button>
         </div>
 
         {/* Tab Content Body */}
         <div className="flex-1 overflow-y-auto px-8 py-5">
-          {activeTab === 'report' ? (
+          {activeTab === 'storage' ? (
+            <div className="space-y-5 max-w-2xl py-2">
+              <div className="space-y-1">
+                <h3 className="font-heading font-bold text-base text-ink">
+                  Decentralized Context & Deliverable Storage
+                </h3>
+                <p className="text-xs font-body text-ink/70 leading-relaxed">
+                  Store large report context and synthesized source bundles on <strong>Ethereum Swarm</strong> content-addressed storage while anchoring ownership, timestamps, and cryptographic SHA-256 integrity hashes on the <strong>Arkiv Rabdi DB-Chain</strong>.
+                </p>
+              </div>
+
+              {storageResult ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-heading font-bold text-emerald-800">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Successfully Anchored to Ethereum Swarm & Arkiv Rabdi DB-Chain!</span>
+                    </div>
+                    <p className="text-[11px] font-mono text-emerald-700">
+                      File payload was content-addressed and pinned to Swarm. Authoritative pointer record registered on Arkiv.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="p-3 rounded-lg bg-ink/3 border border-ink/10 space-y-1">
+                      <span className="text-[10px] text-ink/40 uppercase">Swarm BZZ Reference</span>
+                      <div className="font-bold text-ink truncate" title={storageResult.swarmReference}>
+                        {storageResult.swarmReference}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-ink/3 border border-ink/10 space-y-1">
+                      <span className="text-[10px] text-ink/40 uppercase">SHA-256 Hash</span>
+                      <div className="font-bold text-ink truncate" title={storageResult.contentHash}>
+                        {storageResult.contentHash}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-ink/3 border border-ink/10 space-y-1">
+                      <span className="text-[10px] text-ink/40 uppercase">Arkiv Entity Key</span>
+                      <a
+                        href={`${RABDI_EXPLORER_URL}/entity/${storageResult.entityKey}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-emerald-700 hover:underline truncate block"
+                        title={storageResult.entityKey}
+                      >
+                        {storageResult.entityKey.slice(0, 16)}... ↗
+                      </a>
+                    </div>
+                    <div className="p-3 rounded-lg bg-ink/3 border border-ink/10 space-y-1">
+                      <span className="text-[10px] text-ink/40 uppercase">Rabdi Transaction Hash</span>
+                      <a
+                        href={`${RABDI_EXPLORER_URL}/tx/${storageResult.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-emerald-700 hover:underline truncate block"
+                        title={storageResult.txHash}
+                      >
+                        {storageResult.txHash.slice(0, 16)}... ↗
+                      </a>
+                    </div>
+                  </div>
+
+                  {verifyStatus && (
+                    <div className={`p-3 rounded-lg text-xs font-mono ${
+                      verifyStatus.startsWith('✓') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+                    }`}>
+                      {verifyStatus}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={handleVerifySwarmIntegrity}
+                      disabled={verifyingSwarm}
+                      className="px-4 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow-xs transition-opacity hover:opacity-90 disabled:opacity-50"
+                      style={{ background: 'var(--accent)' }}
+                    >
+                      {verifyingSwarm ? 'Fetching from Swarm...' : '✓ Verify Swarm Integrity'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        useStore.setState({
+                          arkivHistoryOpen: true,
+                          reportOpen: false,
+                          arkivActiveTab: 'swarm_context',
+                        });
+                      }}
+                      className="px-4 py-2 rounded-xl text-xs font-heading bg-ink/5 hover:bg-ink/10 text-ink/80 transition-colors"
+                    >
+                      Open in Arkiv Ledger ↗
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-ink/3 border border-ink/10 space-y-2 text-xs font-mono text-ink/75">
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Target Project:</span>
+                      <span className="font-semibold">{projectName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Files in Bundle:</span>
+                      <span className="font-semibold">{fileKeys.length} files</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Network:</span>
+                      <span className="font-semibold text-emerald-700">Arkiv Rabdi DB-Chain (7794095) + Ethereum Swarm</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Signer Wallet:</span>
+                      <span className="font-semibold truncate max-w-[200px]">{address || 'Wallet not connected'}</span>
+                    </div>
+                  </div>
+
+                  {storageError && (
+                    <div className="p-3 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs font-mono">
+                      {storageError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleStoreOnSwarmAndArkiv}
+                    disabled={uploadingStorage}
+                    className="w-full py-3 px-4 rounded-xl text-xs font-heading font-bold text-white shadow-md transition-all hover:opacity-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: 'var(--accent)' }}
+                  >
+                    {uploadingStorage ? (
+                      <>
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        <span>Uploading to Swarm & Signing with Wallet on Arkiv...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon d={I.database} size={14} />
+                        <span>Store Deliverable on Swarm & Anchor to Arkiv</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : activeTab === 'report' ? (
             <div>
               <Md text={report.report_markdown} />
               {report.sources.length > 0 && (

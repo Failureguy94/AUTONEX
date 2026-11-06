@@ -6,6 +6,11 @@ import { validateLayout } from '@/nav/validate';
 import { GRID } from '@/nav/grid';
 import { initMaterials } from '@/three/materials';
 import { primeCache } from '@/nav/astar';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { wagmiConfig } from '@/config/chain';
+
+const queryClient = new QueryClient();
 
 // The layout validator runs at startup — a bad layout fails loudly, not silently.
 const errs = validateLayout(GRID);
@@ -21,6 +26,10 @@ primeCache();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </WagmiProvider>
   </React.StrictMode>,
 );

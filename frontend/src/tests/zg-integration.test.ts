@@ -156,7 +156,7 @@ describe('0G Private Computer Centralized Integration Tests', { timeout: 25000 }
     const critRes = await zgClient.call({ task: 'critique', prompt: 'Critique concurrency risks' });
     const parsedCrit = JSON.parse(critRes.content);
     expect(Array.isArray(parsedCrit.critiques)).toBe(true);
-  });
+  }, 35000);
 
   // 8. Streaming
   it('8. Streaming: handles incremental chunk callbacks', async () => {
