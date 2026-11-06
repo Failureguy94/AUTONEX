@@ -753,7 +753,9 @@ export function ReportView() {
 
                   {storageError && (
                     <div className="p-3 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs font-mono">
-                      {storageError}
+                      {typeof storageError === 'string' && storageError !== '[object Object]'
+                        ? storageError
+                        : 'Wallet operation error. Please ensure Rabdi DB-Chain (Chain ID 7794095) is approved in your wallet.'}
                     </div>
                   )}
 

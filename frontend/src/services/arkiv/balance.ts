@@ -42,35 +42,85 @@ export async function assertSufficientTglm(
  * User-friendly parser for Web3 and Arkiv RPC transaction errors
  */
 export function formatArkivError(error: unknown): string {
-  const msg = String(error instanceof Error ? error.message : error);
+  if (!error) return 'An unexpected error occurred.';
+
+  let msg = '';
+  if (typeof error === 'string') {
+    msg = error;
+  } else if (typeof error === 'object') {
+    const err = error as any;
+    msg =
+      err.shortMessage ||
+      err.details ||
+      err.reason ||
+      err.message ||
+      err.data?.message ||
+      err.error?.message ||
+      err.cause?.shortMessage ||
+      err.cause?.message ||
+      '';
+
+    if (!msg || msg === '[object Object]') {
+      if (typeof err.toString === 'function') {
+        const s = err.toString();
+        if (s && s !== '[object Object]') {
+          msg = s;
+        }
+      }
+    }
+
+    if (!msg || msg === '[object Object]') {
+      try {
+        msg = JSON.stringify(error);
+      } catch {
+        msg = 'An error occurred during wallet operation';
+      }
+    }
+  } else {
+    msg = String(error);
+  }
+
+  const lower = msg.toLowerCase();
 
   if (
-    msg.includes('User rejected') ||
-    msg.includes('ACTION_REJECTED') ||
-    msg.includes('denied transaction') ||
-    msg.includes('user rejected action')
+    lower.includes('user rejected') ||
+    lower.includes('action_rejected') ||
+    lower.includes('denied transaction') ||
+    lower.includes('rejected the request') ||
+    lower.includes('cancelled') ||
+    lower.includes('canceled') ||
+    (typeof error === 'object' && (error as any)?.code === 4001)
   ) {
     return 'Transaction cancelled by user in wallet.';
   }
-  if (msg.includes('insufficient funds') || msg.includes('Insufficient tGLM')) {
+  if (lower.includes('insufficient funds') || lower.includes('insufficient tglm')) {
     return 'Insufficient tGLM balance for storage fee. Claim tokens from hub.arkiv.network.';
   }
   if (
-    msg.includes('ChainMismatchError') ||
-    msg.includes('wrong chain') ||
-    msg.includes('Wrong network') ||
-    /switch to the rabdi/i.test(msg) ||
-    /wallet switch required/i.test(msg) ||
-    /unrecognized chain/i.test(msg)
+    lower.includes('chainmismatcherror') ||
+    lower.includes('wrong chain') ||
+    lower.includes('wrong network') ||
+    lower.includes('switch to the rabdi') ||
+    lower.includes('wallet switch required') ||
+    lower.includes('unrecognized chain') ||
+    lower.includes('chain not found') ||
+    lower.includes('0x76ee8f') ||
+    lower.includes('7794095')
   ) {
     return 'Please switch your wallet to the Rabdi DB-Chain Testnet (Chain ID 7794095).';
   }
-  if (msg.includes('MissingAccessKeyError') || msg.includes('rate limit')) {
+  if (lower.includes('missingaccesskeyerror') || lower.includes('rate limit')) {
     return 'Arkiv RPC rate limit reached. Configure VITE_ARKIV_ACCESS_KEY in .env.local.';
   }
-  if (msg.includes('EntityTooLargeError') || msg.includes('MAX_ENTITY_BYTES')) {
+  if (lower.includes('entitytoolargeerror') || lower.includes('max_entity_bytes')) {
     return 'Payload exceeds Arkiv limit of 128 KiB per entity.';
   }
-  return msg.slice(0, 160);
+
+  if (msg.includes('[object Object]')) {
+    return 'Wallet operation failed. Please check your wallet connection and try again.';
+  }
+
+  return msg.slice(0, 180);
 }
+
 

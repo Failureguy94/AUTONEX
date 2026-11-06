@@ -71,16 +71,22 @@ export async function switchOrAddRabdiNetwork(): Promise<void> {
       params: [{ chainId: chainIdHex }],
     });
   } catch (switchError: any) {
-    const msg = switchError?.message || '';
+    const msg = (switchError?.message || '').toLowerCase();
     if (msg.includes('already') || msg.includes('current')) {
       return;
     }
+    // If user explicitly rejected the switch prompt in their wallet, re-throw
     if (
-      switchError?.code === 4902 ||
-      msg.includes('unrecognized') ||
-      msg.includes('Unknown chain') ||
-      switchError?.data?.originalError?.code === 4902
+      switchError?.code === 4001 ||
+      msg.includes('user rejected') ||
+      msg.includes('action_rejected') ||
+      msg.includes('rejected the request')
     ) {
+      throw switchError;
+    }
+
+    // For any other error (chain not added, 4902, -32603, unrecognized in Rabby, etc.), prompt to add Rabdi DB-Chain
+    try {
       await eth.request({
         method: 'wallet_addEthereumChain',
         params: [
@@ -93,8 +99,8 @@ export async function switchOrAddRabdiNetwork(): Promise<void> {
           },
         ],
       });
-    } else {
-      throw switchError;
+    } catch (addError: any) {
+      throw addError;
     }
   }
 }
