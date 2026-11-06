@@ -52,6 +52,45 @@ export class Director {
 
   constructor() { for (const d of LAYOUT.doors) this.doors.set(d.id, { users: new Set(), queue: [] }); }
 
+  /**
+   * Keep the desktop view populated before a real run has hired agents.
+   * These are visual workers only and are removed as soon as live agents spawn.
+   */
+  spawnDesktopCrew() {
+    if (this.runtimes.some((rt) => rt.id.startsWith('DESKTOP_'))) return;
+    const chairs = LAYOUT.items.filter((item) => item.type === 'wchair' && item.data?.wsId).slice(0, 6);
+    const crew = [
+      ['DESKTOP_AANYA', 'Aanya', 'engineering', 'type'],
+      ['DESKTOP_ROHAN', 'Rohan', 'frontend', 'type'],
+      ['DESKTOP_MEERA', 'Meera', 'research', 'think'],
+      ['DESKTOP_KABIR', 'Kabir', 'data', 'review'],
+      ['DESKTOP_ISHA', 'Isha', 'content', 'type'],
+      ['DESKTOP_VIKRAM', 'Vikram', 'backend', 'type'],
+    ] as const;
+    crew.slice(0, chairs.length).forEach(([id, name, department, activity], index) => {
+      this.spawn({
+        id,
+        name,
+        role: 'worker',
+        department,
+        parent_id: null,
+        engine: { kind: 'llm', label: '0G · desktop crew' },
+        avatar_seed: 100 + index,
+        chairId: chairs[index].id,
+      }, true);
+      this.setActivityFor(id, activity);
+    });
+  }
+
+  private removeDesktopCrew() {
+    const desktop = this.runtimes.filter((rt) => rt.id.startsWith('DESKTOP_'));
+    for (const rt of desktop) {
+      this.byId.delete(rt.id);
+      this.chairOffsets.delete(rt.def.chairId);
+    }
+    this.runtimes = this.runtimes.filter((rt) => !rt.id.startsWith('DESKTOP_'));
+  }
+
   reset() {
     this.runtimes = []; this.byId.clear(); this.chairOffsets.clear(); this.slotsUsed.clear();
     for (const d of this.doors.values()) { d.users.clear(); d.queue = []; }
@@ -79,6 +118,7 @@ export class Director {
 
   // ---- Commands (called by the event reducer) ----
   spawn(def: AgentDef, instant = false) {
+    if (!def.id.startsWith('DESKTOP_')) this.removeDesktopCrew();
     const off = this.spawnCount++;
     const rt: RT = {
       id: def.id, def, x: LAYOUT.entrance.x + (off % 3) * 0.7 - 0.7,

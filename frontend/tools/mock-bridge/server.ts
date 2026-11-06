@@ -353,7 +353,7 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
             prompt,
             model,
             task: 'general',
-            maxTokens: 15
+            maxTokens: b.maxTokens || 15
           });
           return json(res, 200, {
             ok: true,

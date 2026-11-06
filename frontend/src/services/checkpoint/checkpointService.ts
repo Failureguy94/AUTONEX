@@ -26,6 +26,9 @@ import { decryptAndValidateContext, applyRestoredContextToStore } from './contex
 import { SwarmStorageProvider } from '../swarm/beeProvider';
 import { calculateSHA256 } from './crypto';
 import type { CheckpointManifest } from './types';
+import type { ArkivCheckpointRecord } from '../arkiv/operations';
+import JSZip from 'jszip';
+import { useStore } from '@/state/store';
 
 export interface CreateCheckpointParams {
   projectId: string;
@@ -48,6 +51,22 @@ export interface RestoreCheckpointParams {
   targetWorkspaceDir: string;
   createSafetyBackup?: boolean;
   decryptionKey?: Buffer | Uint8Array | string;
+}
+
+export interface BrowserRestoreCheckpointParams {
+  checkpointId: string;
+  requestingUserId: string;
+  workspaceHandle: any;
+  decryptionKey?: Buffer | Uint8Array | string;
+}
+
+export interface BrowserStateRestoreResult {
+  checkpointId: string;
+  projectId: string;
+  files: Record<string, string>;
+  restoredFilesCount: number;
+  activeObjective: string;
+  completedAt: string;
 }
 
 export interface CheckpointComparisonResult {
@@ -106,6 +125,114 @@ export class CheckpointService {
 
   public getSwarmProvider(): SwarmStorageProvider {
     return this.swarmProvider;
+  }
+
+  public setActiveCheckpoint(projectId: string, checkpointId: string): void {
+    const checkpoint = this.getCheckpoint(checkpointId);
+    if (checkpoint.projectId !== projectId) {
+      throw new Error('Cannot activate a checkpoint from another project.');
+    }
+    this.db.setActiveCheckpoint(projectId, checkpointId);
+  }
+
+  public getActiveCheckpoint(projectId: string): string | null {
+    return this.db.getActiveCheckpoint(projectId);
+  }
+
+  public async restoreCheckpointToBrowserState(
+    checkpointId: string,
+    requestingUserId: string
+  ): Promise<BrowserStateRestoreResult> {
+    const checkpoint = this.getCheckpoint(checkpointId, requestingUserId);
+    if (checkpoint.lifecycleStatus !== 'COMPLETED') {
+      throw new Error(`Cannot restore checkpoint in status "${checkpoint.lifecycleStatus}". Must be "COMPLETED".`);
+    }
+    if (!checkpoint.archiveSwarmRef || !checkpoint.contextSwarmRef) {
+      throw new Error('Checkpoint is missing Swarm references required for restoration.');
+    }
+    const manifest: CheckpointManifest = checkpoint.manifestJson
+      ? JSON.parse(checkpoint.manifestJson)
+      : ({} as CheckpointManifest);
+    if (manifest.archiveFormat !== 'zip') {
+      throw new Error('This checkpoint uses the legacy TAR/Zstandard format. Browser state restore supports ZIP deliverable checkpoints.');
+    }
+
+    const files = await this.getCheckpointFiles(checkpointId, requestingUserId);
+    const textFiles = Object.fromEntries(
+      files.filter((file) => !file.isBinary && file.content !== undefined)
+        .map((file) => [file.path, file.content || ''])
+    );
+    const contextDownload = await this.swarmProvider.downloadBinary(checkpoint.contextSwarmRef);
+    let activeObjective = 'Restored Codebase';
+    if (manifest.metadata?.contextFormat === 'plain-json') {
+      const document = JSON.parse(new TextDecoder().decode(contextDownload.data));
+      if (document.context && typeof document.context === 'object') {
+        useStore.setState({
+          ...document.context,
+          restoredWorkspaceFiles: textFiles,
+          restoredCheckpointId: checkpointId,
+          toast: `Restored checkpoint context: ${checkpointId}`,
+        });
+        activeObjective = String(document.goal || activeObjective);
+      }
+    }
+    this.db.setActiveCheckpoint(checkpoint.projectId, checkpointId);
+    useStore.setState({
+      restoredWorkspaceFiles: textFiles,
+      restoredCheckpointId: checkpointId,
+    });
+    return {
+      checkpointId,
+      projectId: checkpoint.projectId,
+      files: textFiles,
+      restoredFilesCount: files.length,
+      activeObjective,
+      completedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Hydrates the local SQLite index from immutable Arkiv metadata. Existing local
+   * records are never replaced, so a failed network read cannot erase history.
+   */
+  public importArkivCheckpoints(records: ArkivCheckpointRecord[]): number {
+    let imported = 0;
+    for (const record of records) {
+      if (!record.checkpointId || !record.archiveSwarmRef || !record.contextSwarmRef) continue;
+      if (this.db.getCheckpointById(record.checkpointId)) continue;
+      let encryptionMetadataJson: string | null = null;
+      if (record.encryptionIv || record.cipherAuthTag) {
+        encryptionMetadataJson = JSON.stringify({
+          archiveIV: record.encryptionIv,
+          contextIV: record.contextEncryptionIv || record.encryptionIv,
+          archiveAuthTag: record.cipherAuthTag,
+          contextAuthTag: record.contextAuthTag || record.cipherAuthTag,
+        });
+      }
+      this.db.importCheckpoint({
+        checkpointId: record.checkpointId,
+        projectId: record.projectId,
+        parentCheckpointId: record.parentCheckpointId ?? null,
+        agentTaskId: record.agentTaskId ?? null,
+        ownerUserId: record.owner,
+        description: record.description || `Arkiv checkpoint ${record.checkpointId}`,
+        createdAt: record.createdAt,
+        executionStatus: (record.status as CheckpointExecutionStatus) || 'Completed',
+        lifecycleStatus: (record.lifecycleStatus as CheckpointLifecycleStatus) || 'COMPLETED',
+        archiveSwarmRef: record.archiveSwarmRef,
+        contextSwarmRef: record.contextSwarmRef,
+        archiveChecksum: record.archiveSha256,
+        contextChecksum: record.contextSha256,
+        archiveSize: record.archiveBytesSize,
+        fileCount: record.fileCount,
+        manifestJson: record.manifestJson || null,
+        storageProvider: record.storageProvider || 'swarm',
+        schemaVersion: record.schemaVersion || '2.0.0',
+        encryptionMetadataJson,
+      });
+      imported++;
+    }
+    return imported;
   }
 
   /**
@@ -308,6 +435,10 @@ export class CheckpointService {
     };
   }
 
+  public listAllCheckpoints(options?: ListCheckpointsOptions): PaginatedCheckpoints {
+    return this.db.listAllCheckpoints(options);
+  }
+
   /**
    * 4. Get Detailed Checkpoint View (including parsed Manifest & Lineage)
    */
@@ -457,6 +588,7 @@ export class CheckpointService {
     if (checkpoint.lifecycleStatus !== 'COMPLETED') {
       throw new Error(`Cannot restore checkpoint in status "${checkpoint.lifecycleStatus}". Must be "COMPLETED".`);
     }
+
     if (!checkpoint.archiveSwarmRef || !checkpoint.contextSwarmRef) {
       throw new Error('Checkpoint is missing Swarm references required for restoration.');
     }
@@ -541,13 +673,15 @@ export class CheckpointService {
         ? JSON.parse(checkpoint.manifestJson)
         : { version: '2.0.0', checkpointId, files: [] };
 
-      const extractResult = await extractWorkspaceSnapshot({
-        archiveBytes: archiveDownload.data,
-        targetDir: stagingDir,
-        manifest,
-        decryptionKey,
-        allowOverwrite: true,
-      });
+      const extractResult = manifest.archiveFormat === 'zip'
+        ? await this.extractZipSnapshot(archiveDownload.data, stagingDir, manifest)
+        : await extractWorkspaceSnapshot({
+            archiveBytes: archiveDownload.data,
+            targetDir: stagingDir,
+            manifest,
+            decryptionKey,
+            allowOverwrite: true,
+          });
 
       // 5. Step 6: Workspace Replacement with Atomic Fallback & Rollback
       try {
@@ -587,14 +721,30 @@ export class CheckpointService {
 
       let rehydration: any = { activeObjective: 'Restored Codebase', activeTaskId: null };
       try {
-        const restoredContext = decryptAndValidateContext(encryptedContextPayload, decryptionKey);
-        rehydration = applyRestoredContextToStore(restoredContext);
+        if (manifest.metadata?.contextFormat === 'plain-json') {
+          const document = JSON.parse(new TextDecoder().decode(contextDownload.data));
+          if (!document.context || typeof document.context !== 'object') {
+            throw new Error('Context snapshot is missing its state payload.');
+          }
+          useStore.setState({
+            ...document.context,
+            toast: `Restored checkpoint context: ${checkpointId}`,
+          });
+          rehydration = {
+            activeObjective: String(document.goal || 'Restored Codebase'),
+            activeTaskId: null,
+          };
+        } else {
+          const restoredContext = decryptAndValidateContext(encryptedContextPayload, decryptionKey);
+          rehydration = applyRestoredContextToStore(restoredContext);
+        }
       } catch (contextErr: any) {
         console.error(`[CheckpointService] Codebase restored, but context restoration failed: ${contextErr?.message}`);
       }
 
       // 7. Step 8 & 9: Mark COMPLETED in DB & Complete restore operation
       const completedAt = Date.now();
+      this.db.setActiveCheckpoint(checkpoint.projectId, checkpointId);
       this.db.updateRestoreOp(restoreId, 'COMPLETED', {
         completedAt,
         restoredFilesCount: extractResult.restoredFilesCount,
@@ -619,6 +769,103 @@ export class CheckpointService {
     } finally {
       this.activeRestoreLocks.delete(checkpoint.projectId);
     }
+  }
+
+  /**
+   * Restores ZIP deliverable checkpoints through the browser File System Access
+   * API. Browser code cannot use the Node filesystem implementation above.
+   */
+  public async restoreCheckpointInBrowser(
+    params: BrowserRestoreCheckpointParams
+  ): Promise<RestoreCheckpointResult> {
+    const checkpoint = this.getCheckpoint(params.checkpointId, params.requestingUserId);
+    if (checkpoint.lifecycleStatus !== 'COMPLETED') {
+      throw new Error(`Cannot restore checkpoint in status "${checkpoint.lifecycleStatus}". Must be "COMPLETED".`);
+    }
+    if (!checkpoint.archiveSwarmRef || !checkpoint.contextSwarmRef) {
+      throw new Error('Checkpoint is missing Swarm references required for restoration.');
+    }
+    if (!params.workspaceHandle?.values || !params.workspaceHandle.getFileHandle) {
+      throw new Error('Select an active workspace folder before restoring.');
+    }
+
+    const manifest: CheckpointManifest = checkpoint.manifestJson
+      ? JSON.parse(checkpoint.manifestJson)
+      : { version: '2.0.0', checkpointId: params.checkpointId, files: [] } as unknown as CheckpointManifest;
+    if (manifest.archiveFormat !== 'zip') {
+      throw new Error('This checkpoint uses the legacy TAR/Zstandard format and requires the AUTONEX bridge for browser restore.');
+    }
+
+    const archiveDownload = await this.swarmProvider.downloadBinary(
+      checkpoint.archiveSwarmRef,
+      checkpoint.archiveChecksum || undefined
+    );
+    const contextDownload = await this.swarmProvider.downloadBinary(checkpoint.contextSwarmRef);
+    const files = await this.readZipFiles(archiveDownload.data);
+    const restoreId = `rst_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const backupHandle = await params.workspaceHandle.getDirectoryHandle(
+      `.autonex-restore-backup-${restoreId}`,
+      { create: true }
+    );
+
+    const copyDirectory = async (source: any, destination: any): Promise<void> => {
+      for await (const entry of source.values()) {
+        if (entry.name.startsWith('.autonex-restore-backup-')) continue;
+        if (entry.kind === 'directory') {
+          await copyDirectory(entry, await destination.getDirectoryHandle(entry.name, { create: true }));
+        } else {
+          const sourceFile = await entry.getFile();
+          const writer = await (await destination.getFileHandle(entry.name, { create: true })).createWritable();
+          await writer.write(await sourceFile.arrayBuffer());
+          await writer.close();
+        }
+      }
+    };
+    await copyDirectory(params.workspaceHandle, backupHandle);
+
+    let restoredFilesCount = 0;
+    for (const file of manifest.files) {
+      if (file.type === 'directory') continue;
+      const relative = file.path.replace(/\\/g, '/').replace(/^\/+/, '');
+      const content = files.get(relative);
+      if (!content) throw new Error(`Archive is missing expected file "${relative}".`);
+      if (calculateSHA256(content) !== file.sha256) {
+        throw new Error(`File hash mismatch for "${relative}".`);
+      }
+      const parts = relative.split('/');
+      const fileName = parts.pop()!;
+      let directory = params.workspaceHandle;
+      for (const part of parts) {
+        directory = await directory.getDirectoryHandle(part, { create: true });
+      }
+      const writable = await (await directory.getFileHandle(fileName, { create: true })).createWritable();
+      await writable.write(content);
+      await writable.close();
+      restoredFilesCount++;
+    }
+
+    if (manifest.metadata?.contextFormat === 'plain-json') {
+      const document = JSON.parse(new TextDecoder().decode(contextDownload.data));
+      if (document.context && typeof document.context === 'object') {
+        useStore.setState({
+          ...document.context,
+          toast: `Restored checkpoint context: ${params.checkpointId}`,
+        });
+      }
+    }
+
+    this.db.setActiveCheckpoint(checkpoint.projectId, params.checkpointId);
+
+    return {
+      restoreId,
+      checkpointId: params.checkpointId,
+      safetyCheckpointId: null,
+      restoredFilesCount,
+      workspacePath: params.workspaceHandle.name || 'Selected workspace',
+      activeObjective: 'Restored Codebase',
+      activeTaskId: null,
+      completedAt: new Date().toISOString(),
+    };
   }
 
   /**
@@ -652,13 +899,11 @@ export class CheckpointService {
 
     const manifest: CheckpointManifest = record.manifestJson ? JSON.parse(record.manifestJson) : { files: [] };
     const swarmRes = await this.swarmProvider.downloadBinary(record.archiveSwarmRef, record.archiveChecksum || undefined);
-    const filesMap = await readArchiveFiles({
-      archiveBytes: swarmRes.data,
-      manifest,
-      decryptionKey,
-    });
+    const filesMap = manifest.archiveFormat === 'zip'
+      ? await this.readZipFiles(swarmRes.data)
+      : await readArchiveFiles({ archiveBytes: swarmRes.data, manifest, decryptionKey });
 
-    const isBinaryBuffer = (buf: Buffer) => {
+    const isBinaryBuffer = (buf: Uint8Array) => {
       const len = Math.min(buf.length, 1024);
       for (let i = 0; i < len; i++) {
         if (buf[i] === 0) return true;
@@ -669,17 +914,66 @@ export class CheckpointService {
     const result = [];
     for (const file of manifest.files) {
       if (file.type === 'directory') continue;
-      const buf = filesMap.get(file.path) || Buffer.alloc(0);
+      const buf = filesMap.get(file.path) || new Uint8Array();
       const isBinary = isBinaryBuffer(buf);
       result.push({
         path: file.path,
         size: file.size,
         sha256: file.sha256,
         isBinary,
-        content: isBinary ? undefined : buf.toString('utf-8'),
+        content: isBinary ? undefined : new TextDecoder().decode(buf),
       });
     }
     return result;
+  }
+
+  private async readZipFiles(archiveBytes: Uint8Array): Promise<Map<string, Uint8Array>> {
+    const zip = await JSZip.loadAsync(archiveBytes);
+    const files = new Map<string, Uint8Array>();
+    for (const [filePath, entry] of Object.entries(zip.files)) {
+      if (entry.dir) continue;
+      const bytes = await entry.async('uint8array');
+      files.set(filePath.replace(/\\/g, '/'), bytes);
+    }
+    return files;
+  }
+
+  private async extractZipSnapshot(
+    archiveBytes: Uint8Array,
+    targetDir: string,
+    manifest: CheckpointManifest
+  ) {
+    const files = await this.readZipFiles(archiveBytes);
+    const root = path.resolve(targetDir);
+    let restoredFilesCount = 0;
+    let totalBytesExtracted = 0;
+    const restoredPaths: string[] = [];
+    for (const file of manifest.files) {
+      if (file.type === 'directory') continue;
+      const relative = file.path.replace(/\\/g, '/').replace(/^\/+/, '');
+      const destination = path.resolve(root, relative);
+      if (!destination.startsWith(root + path.sep)) {
+        throw new Error(`Security Alert: Blocked path traversal attempt in "${file.path}".`);
+      }
+      const content = files.get(relative);
+      if (!content) throw new Error(`Archive is missing expected file "${relative}".`);
+      const actualHash = calculateSHA256(content);
+      if (actualHash !== file.sha256) {
+        throw new Error(`File hash mismatch for "${relative}": expected ${file.sha256}, got ${actualHash}.`);
+      }
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, content);
+      restoredFilesCount++;
+      totalBytesExtracted += content.byteLength;
+      restoredPaths.push(relative);
+    }
+    return {
+      restoredFilesCount,
+      restoredDirectoriesCount: 0,
+      totalBytesExtracted,
+      verifiedFileHashes: true,
+      restoredPaths,
+    };
   }
 
   /**

@@ -63,6 +63,7 @@ The AUTONEX Checkpoint Engine has completed Phases 1 through 9. It provides an i
 | `VITE_SWARM_GATEWAY_URL` | `https://api.gateway.ethswarm.org` | Official Bee node endpoint / Swarm gateway. |
 | `VITE_SWARM_POSTAGE_BATCH_ID` | `""` (Optional on public gateway) | 64-hex Swarm postage stamp batch ID. Required for private Bee nodes. |
 | `VITE_SWARM_TIMEOUT_MS` | `15000` | Network request timeout for Swarm binary upload/download operations. |
+| `VITE_AUTONEX_WORKSPACE_DIR` | unset | Absolute active project directory used for checkpoint capture and restore. Required for Save / Upload and Restore. |
 
 ---
 
@@ -75,4 +76,3 @@ The AUTONEX Checkpoint Engine has completed Phases 1 through 9. It provides an i
 
 ## 5. Deployment Acceptance
 The AUTONEX Checkpoint Engine satisfies all 10 Global Development Rules and is ready for production merge.
-

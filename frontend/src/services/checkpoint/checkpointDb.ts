@@ -89,14 +89,19 @@ export class CheckpointDatabase {
   // In-memory fallback maps
   private memCheckpoints = new Map<string, CheckpointRecord>();
   private memRestoreOps = new Map<string, RestoreOperationRecord>();
+  private activeCheckpoints = new Map<string, { checkpointId: string; updatedAt: number }>();
 
   constructor(dbPath: string = ':memory:') {
-    this.dbPath = dbPath;
+    const configuredPath =
+      dbPath === ':memory:' && typeof process !== 'undefined'
+        ? (process.env?.AUTONEX_CHECKPOINT_DB_PATH || ':memory:')
+        : dbPath;
+    this.dbPath = configuredPath;
     const nodeSqlite = getNodeSqlite();
 
     if (nodeSqlite && nodeSqlite.DatabaseSync) {
-      if (dbPath !== ':memory:') {
-        const dir = path.dirname(dbPath);
+      if (configuredPath !== ':memory:') {
+        const dir = path.dirname(configuredPath);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
@@ -156,7 +161,36 @@ export class CheckpointDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_restore_chk 
         ON restore_operations(checkpoint_id);
+
+      CREATE TABLE IF NOT EXISTS active_checkpoints (
+        project_id TEXT PRIMARY KEY,
+        checkpoint_id TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `);
+  }
+
+  public setActiveCheckpoint(projectId: string, checkpointId: string): void {
+    const updatedAt = Date.now();
+    if (this.db) {
+      this.db.prepare(`
+        INSERT INTO active_checkpoints (project_id, checkpoint_id, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(project_id) DO UPDATE SET checkpoint_id = excluded.checkpoint_id, updated_at = excluded.updated_at
+      `).run(projectId, checkpointId, updatedAt);
+      return;
+    }
+    this.activeCheckpoints.set(projectId, { checkpointId, updatedAt });
+  }
+
+  public getActiveCheckpoint(projectId: string): string | null {
+    if (this.db) {
+      const row = this.db.prepare(
+        'SELECT checkpoint_id FROM active_checkpoints WHERE project_id = ?'
+      ).get(projectId) as { checkpoint_id?: string } | undefined;
+      return row?.checkpoint_id || null;
+    }
+    return this.activeCheckpoints.get(projectId)?.checkpointId || null;
   }
 
   /**
@@ -279,7 +313,14 @@ export class CheckpointDatabase {
       const row = stmt.get(checkpointId) as any;
       if (row) return this.mapRowToCheckpoint(row);
     }
+
     return this.memCheckpoints.get(checkpointId) || null;
+  }
+
+  /** Imports an Arkiv record without replacing an existing local historical version. */
+  public importCheckpoint(record: CheckpointRecord): void {
+    if (this.getCheckpointById(record.checkpointId)) return;
+    this.insertCheckpoint(record);
   }
 
   /**
@@ -354,6 +395,26 @@ export class CheckpointDatabase {
       limit,
       totalPages: Math.ceil(total / limit) || 1,
     };
+  }
+
+  public listAllCheckpoints(options?: ListCheckpointsOptions): PaginatedCheckpoints {
+    const page = Math.max(1, options?.page || 1);
+    const limit = Math.min(100, Math.max(1, options?.limit || 20));
+    const offset = (page - 1) * limit;
+    const where = options?.lifecycleStatus ? ' WHERE lifecycle_status = ?' : '';
+    const params = options?.lifecycleStatus ? [options.lifecycleStatus] : [];
+
+    if (this.db) {
+      const totalRow = this.db.prepare(`SELECT COUNT(*) AS total FROM checkpoints${where}`).get(...params) as any;
+      const rows = this.db.prepare(`SELECT * FROM checkpoints${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as any[];
+      const total = Number(totalRow?.total || 0);
+      return { checkpoints: rows.map((row) => this.mapRowToCheckpoint(row)), total, page, limit, totalPages: Math.ceil(total / limit) || 1 };
+    }
+
+    const all = Array.from(this.memCheckpoints.values())
+      .filter((c) => !options?.lifecycleStatus || c.lifecycleStatus === options.lifecycleStatus)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    return { checkpoints: all.slice(offset, offset + limit), total: all.length, page, limit, totalPages: Math.ceil(all.length / limit) || 1 };
   }
 
   /**

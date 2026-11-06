@@ -29,6 +29,14 @@ export class SwarmStorageProvider implements StorageProvider {
     this.bee = new Bee(this.config.gatewayUrl);
   }
 
+  private usesPublicGateway(): boolean {
+    try {
+      return new URL(this.config.gatewayUrl).hostname.endsWith('ethswarm.org');
+    } catch {
+      return false;
+    }
+  }
+
   public getState(): StorageProviderState {
     return this.state;
   }
@@ -94,7 +102,7 @@ export class SwarmStorageProvider implements StorageProvider {
 
     // If no batch is configured, check if endpoint is a public test gateway allowing zero-stamp writes
     if (!targetBatch) {
-      const isPublicGateway = this.config.gatewayUrl.includes('ethswarm.org');
+      const isPublicGateway = this.usesPublicGateway();
       if (isPublicGateway) {
         return {
           batchId: 'public-gateway-zero-stamp',
@@ -170,16 +178,29 @@ export class SwarmStorageProvider implements StorageProvider {
     const contentHash = calculateSHA256(data);
     const byteSize = data.byteLength;
     const contentType = options?.contentType || 'application/octet-stream';
+    const timeoutMs = this.config.timeoutMs || 15000;
 
     // Determine batch ID to use
     let batchId = (options?.postageBatchId || this.config.postageBatchId || '').trim();
     if (!batchId) {
-      // Default to null stamp when using public gateway
-      batchId = '0000000000000000000000000000000000000000000000000000000000000000';
+      if (!this.usesPublicGateway()) {
+        this.state = 'POSTAGE_BATCH_INVALID';
+        throw new Error(
+          `Swarm uploads to "${this.config.gatewayUrl}" require VITE_SWARM_POSTAGE_BATCH_ID. ` +
+          'Use the public ethSwarm gateway for no-postage development uploads or configure a funded Bee postage batch.'
+        );
+      }
+      // The official public gateway accepts the null batch for development uploads.
+      batchId = '0'.repeat(64);
     }
 
     try {
-      const uploadRes = await this.bee.data.upload(batchId as any, data);
+      const uploadRes = await Promise.race([
+        this.bee.data.upload(batchId as any, data),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Upload timed out after ${timeoutMs}ms.`)), timeoutMs)
+        ),
+      ]);
       const reference = String(
         (uploadRes.reference as any)?.toHex ? (uploadRes.reference as any).toHex() : uploadRes.reference
       );
@@ -213,8 +234,14 @@ export class SwarmStorageProvider implements StorageProvider {
     }
 
     this.state = 'DOWNLOADING';
+    const timeoutMs = this.config.timeoutMs || 15000;
     try {
-      const swarmBytes = await this.bee.data.download(cleanRef);
+      const swarmBytes = await Promise.race([
+        this.bee.data.download(cleanRef),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Download timed out after ${timeoutMs}ms.`)), timeoutMs)
+        ),
+      ]);
       const data = swarmBytes.toUint8Array();
       const actualHash = calculateSHA256(data);
 

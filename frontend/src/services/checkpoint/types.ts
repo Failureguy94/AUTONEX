@@ -34,8 +34,8 @@ export interface CheckpointManifest {
   checkpointId: string;
   projectId: string;
   createdAt: string;
-  archiveFormat: 'tar';
-  compressionFormat: 'zstd';
+  archiveFormat: 'tar' | 'zip';
+  compressionFormat: 'zstd' | 'deflate';
   compressionLevel: number;
   encryption: EncryptionMetadata;
   files: ManifestFileEntry[];
@@ -87,4 +87,3 @@ export interface ExtractionResult {
   verifiedFileHashes: boolean;
   restoredPaths: string[];
 }
-

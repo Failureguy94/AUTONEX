@@ -101,6 +101,10 @@ interface Store {
   checkpoint: { branch: string; start_commit: string } | null;
   checkpointModalOpen: boolean;
   selectedCheckpointId: string | null;
+  restoredWorkspaceFiles: Record<string, string> | null;
+  restoredCheckpointId: string | null;
+  editorOpenRequested: boolean;
+  openProjectEditor: (mode: 'office' | 'swarm') => void;
   setCheckpointModalOpen: (open: boolean, checkpointId?: string | null) => void;
   settings: Settings;
   zgConnection: ZGConnectionState;
@@ -124,7 +128,7 @@ interface Store {
   verifyWalletSignature: (signature: string, message: string, nonce: string) => Promise<{ verified: boolean; message: string }>;
   refreshIAIStatus: (address?: string) => Promise<void>;
   refreshIAIUsage: () => Promise<void>;
-  runTestInference: (prompt?: string) => Promise<{ ok: boolean; status: string; result?: any; error?: string }>;
+  runTestInference: (prompt?: string, options?: { maxTokens?: number; model?: string }) => Promise<{ ok: boolean; status: string; result?: any; error?: string }>;
   set: (p: Partial<Store>) => void;
   resetRun: (goal: string) => void;
 }
@@ -162,6 +166,14 @@ export const useStore = create<Store>((set, get) => ({
   checkpoint: null,
   checkpointModalOpen: false,
   selectedCheckpointId: null,
+  restoredWorkspaceFiles: null,
+  restoredCheckpointId: null,
+  editorOpenRequested: false,
+  openProjectEditor: (mode) => set({
+    appMode: mode,
+    reportOpen: true,
+    editorOpenRequested: true,
+  }),
   setCheckpointModalOpen: (open: boolean, checkpointId?: string | null) =>
     set({ checkpointModalOpen: open, selectedCheckpointId: checkpointId ?? null }),
   settings: { shadows: 'med', post: true, lodDist: 26, sound: true, reducedMotion: false, concurrency: 4, pricePerM: 0.6, showPaidCost: false },
@@ -603,12 +615,12 @@ export const useStore = create<Store>((set, get) => ({
       }
     } catch {}
   },
-  runTestInference: async (prompt = 'Say hello in 3 words') => {
+  runTestInference: async (prompt = 'Say hello in 3 words', options = {}) => {
     try {
       const res = await fetch('http://localhost:8000/api/zg/test-inference', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, model: 'glm-5.3-flash' })
+        body: JSON.stringify({ prompt, model: options.model || 'glm-5.3-flash', maxTokens: options.maxTokens || 15 })
       });
       const data = await res.json();
       if (data.ok) {

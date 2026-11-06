@@ -133,11 +133,12 @@ export const CheckpointV2Schema = defineSchema('autonex.checkpoint_v2', {
   context_bytes_size: u64(),
   encryption_iv: str().optional(),
   cipher_auth_tag: str().optional(),
+  context_encryption_iv: str().optional(),
+  context_auth_tag: str().optional(),
   file_count: u64(),
   storage_provider: str().indexed(),
   schema_version: str(),
   description: str().optional(),
   manifest_json: bytes().optional(),
 });
-
 

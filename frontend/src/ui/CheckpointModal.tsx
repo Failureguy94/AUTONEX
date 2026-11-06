@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
+import { useAccount, useWalletClient } from 'wagmi';
 import { useStore } from '@/state/store';
 import { Icon, I } from './Icons';
 import {
@@ -9,6 +9,11 @@ import {
   type CheckpointDetails,
   type CheckpointVerificationResult,
 } from '@/services/checkpoint';
+import { getAllArkivCheckpoints, saveArkivCheckpoint } from '@/services/arkiv/operations';
+import { saveDeliverableCheckpoint } from '@/services/deliverableCheckpointWorkflow';
+import { CodeEditor } from './CodeEditor';
+
+const sharedCheckpointService = new CheckpointService();
 
 interface CheckpointModalProps {
   open?: boolean;
@@ -45,7 +50,9 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
   const activeCheckpointId = useStore((s) => s.selectedCheckpointId);
   const setStoreOpen = useStore((s) => s.setCheckpointModalOpen);
   const goal = useStore((s) => s.goal) || 'AUTONEX Project';
+  const report = useStore((s) => s.report);
   const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
   const isOpen = propsOpen !== undefined ? propsOpen : storeOpen;
   const handleClose = () => {
@@ -53,9 +60,32 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
     else setStoreOpen(false, null);
   };
 
-  const service = useMemo(() => new CheckpointService(), []);
+  const service = useMemo(() => sharedCheckpointService, []);
   const userId = address || '0xAUTONEX-ACTIVE-USER';
   const projectId = goal.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 32) || 'autonex-project';
+  const inferredWorkspaceDir = useMemo(() => {
+    const configured = (import.meta as any).env?.VITE_AUTONEX_WORKSPACE_DIR as string | undefined;
+    if (configured?.trim()) return configured.trim();
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('autonex_workspace_dir');
+      if (saved?.trim()) return saved.trim();
+    }
+    const outputMatch = report?.report_markdown?.match(/\*\*Output Directory:\*\*\s*`([^`]+)`/);
+    if (outputMatch?.[1]) return outputMatch[1].trim();
+    const sourceUrl = report?.sources?.[0]?.url;
+    if (sourceUrl?.startsWith('file://')) {
+      return sourceUrl.replace(/^file:\/\/\/?/, '').replace(/[/\\][^/\\]+$/, '');
+    }
+    return '';
+  }, [report]);
+  const [workspaceDir, setWorkspaceDir] = useState('');
+  const [workspaceHandle, setWorkspaceHandle] = useState<any>(null);
+
+  useEffect(() => {
+    if (inferredWorkspaceDir && !workspaceDir) {
+      setWorkspaceDir(inferredWorkspaceDir);
+    }
+  }, [inferredWorkspaceDir, workspaceDir]);
 
   // Checkpoint list & filtering
   const [checkpoints, setCheckpoints] = useState<CheckpointRecord[]>([]);
@@ -77,6 +107,11 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
   const [isBinaryFile, setIsBinaryFile] = useState(false);
   const [fileMeta, setFileMeta] = useState<{ size: number; sha256: string } | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
+  const [snapshotFiles, setSnapshotFiles] = useState<Record<string, string>>({});
+  const [editedFiles, setEditedFiles] = useState<Record<string, string>>({});
+  const [sourceChanged, setSourceChanged] = useState(false);
+  const [savingSource, setSavingSource] = useState(false);
+  const [sourceLoadError, setSourceLoadError] = useState<string | null>(null);
 
   // Diff viewer
   const [diffMode, setDiffMode] = useState<DiffMode>('split');
@@ -90,10 +125,14 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
   // Restoration flow
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [restoreDiffLoading, setRestoreDiffLoading] = useState(false);
+  const [restoreDiff, setRestoreDiff] = useState<any | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreStage, setRestoreStage] = useState<number>(0);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreSuccess, setRestoreSuccess] = useState<any | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Sync selectedId with activeCheckpointId from store
   useEffect(() => {
@@ -104,21 +143,30 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
   }, [activeCheckpointId]);
 
   // Load checkpoint list
-  const loadCheckpoints = () => {
+  const loadCheckpoints = async () => {
     setLoadingList(true);
     try {
-      const res = service.listCheckpoints(projectId, userId, {
+      const arkivRecords = await getAllArkivCheckpoints(100);
+      service.importArkivCheckpoints(arkivRecords);
+      // Arkiv is the authoritative shared history. Do not hide checkpoints
+      // merely because they were created under another project label.
+      const res = service.listAllCheckpoints({
         page,
         limit: 15,
       });
       setCheckpoints(res.checkpoints || []);
       setTotalPages(res.totalPages || 1);
-      if (!selectedId && res.checkpoints.length > 0) {
+      const selectedStillExists = selectedId
+        ? res.checkpoints.some((checkpoint) => checkpoint.checkpointId === selectedId)
+        : false;
+      if ((!selectedStillExists || !selectedId) && res.checkpoints.length > 0) {
         setSelectedId(res.checkpoints[0].checkpointId);
       }
-    } catch {
-      // In-memory or empty state
-      setCheckpoints([]);
+    } catch (err: any) {
+      const local = service.listAllCheckpoints({ page, limit: 15 });
+      setCheckpoints(local.checkpoints || []);
+      setTotalPages(local.totalPages || 1);
+      useStore.setState({ toast: `Checkpoint history unavailable: ${err?.message || 'Arkiv query failed'}` });
     } finally {
       setLoadingList(false);
     }
@@ -141,38 +189,92 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
     setFileContent(null);
     setDiffData(null);
     setVerificationResult(null);
+    setSnapshotFiles({});
+    setEditedFiles({});
+    setSourceChanged(false);
+    setSourceLoadError(null);
 
-    try {
-      const d = service.getCheckpointDetails(selectedId, userId);
-      setDetails(d);
-      if (d.manifest && d.manifest.files.length > 0) {
-        const firstFile = d.manifest.files.find((f) => f.type === 'file');
-        if (firstFile) {
-          loadFilePreview(selectedId, firstFile.path);
-        }
+    const loadDetails = async () => {
+      let checkpointDetails: CheckpointDetails;
+      try {
+        checkpointDetails = service.getCheckpointDetails(selectedId);
+        setDetails(checkpointDetails);
+      } catch (error: any) {
+        setDetails(null);
+        setSourceLoadError(error?.message || 'Unable to load checkpoint metadata.');
+        setLoadingDetails(false);
+        return;
       }
-    } catch {
-      setDetails(null);
-    } finally {
-      setLoadingDetails(false);
-    }
+
+      try {
+        const files = await service.getCheckpointFiles(selectedId);
+        const textFiles = Object.fromEntries(
+          files.filter((file) => !file.isBinary && file.content !== undefined)
+            .map((file) => [file.path, file.content || ''])
+        );
+        setSnapshotFiles(textFiles);
+        setEditedFiles(textFiles);
+        const firstFile = checkpointDetails.manifest?.files.find((f) => f.type === 'file' && textFiles[f.path] !== undefined);
+        if (firstFile) {
+          await loadFilePreview(selectedId, firstFile.path, textFiles);
+        } else if (checkpointDetails.manifest) {
+          const first = checkpointDetails.manifest.files.find((f) => f.type === 'file');
+          if (first) await loadFilePreview(selectedId, first.path);
+        }
+      } catch (error: any) {
+        setSourceLoadError(error?.message || 'Unable to retrieve checkpoint source from Swarm.');
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+    void loadDetails();
   }, [selectedId]);
 
   // Load file preview
-  const loadFilePreview = async (checkpointId: string, filePath: string) => {
+  const loadFilePreview = async (checkpointId: string, filePath: string, localFiles?: Record<string, string>) => {
     setSelectedFilePath(filePath);
     setLoadingFile(true);
     setFileContent(null);
     setIsBinaryFile(false);
     try {
-      const res = await service.getCheckpointFileContent(checkpointId, filePath, userId);
+      const res = await service.getCheckpointFileContent(checkpointId, filePath);
       setIsBinaryFile(res.isBinary);
-      setFileContent(res.content);
+      setFileContent(localFiles?.[filePath] ?? res.content);
       setFileMeta({ size: res.size, sha256: res.sha256 });
     } catch (err: any) {
       setFileContent(`// Error loading file: ${err.message}`);
     } finally {
       setLoadingFile(false);
+    }
+  };
+
+  const saveEditedCheckpoint = async () => {
+    if (!selectedChk || !walletClient || !sourceChanged) return;
+    setSavingSource(true);
+    try {
+      const allFiles = { ...editedFiles };
+      const result = await saveDeliverableCheckpoint({
+        walletClient,
+        userId: userId,
+        projectId: selectedChk.projectId,
+        projectName: selectedChk.projectId,
+        goal,
+        files: allFiles,
+        parentCheckpointId: selectedChk.checkpointId,
+        aiContext: { store: useStore.getState() },
+        reportMarkdown: `Edited from checkpoint ${selectedChk.checkpointId}`,
+      });
+      setSnapshotFiles(allFiles);
+      setSourceChanged(false);
+      const refreshedRecords = await getAllArkivCheckpoints(100);
+      service.importArkivCheckpoints(refreshedRecords);
+      await loadCheckpoints();
+      setSelectedId(result.checkpointId);
+      useStore.setState({ toast: `New checkpoint ${result.checkpointId} saved from edited source.` });
+    } catch (error: any) {
+      useStore.setState({ toast: error?.message || 'Could not save edited checkpoint.' });
+    } finally {
+      setSavingSource(false);
     }
   };
 
@@ -186,7 +288,7 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
         setDiffData({ noParent: true });
         return;
       }
-      const diff = await service.getCheckpointDetailedDiff(parentId, details.checkpoint.checkpointId, userId);
+      const diff = await service.getCheckpointDetailedDiff(parentId, details.checkpoint.checkpointId);
       setDiffData(diff);
       const firstChanged = diff.filesModified[0]?.path || diff.filesAdded[0]?.path || diff.filesRemoved[0]?.path;
       if (firstChanged) {
@@ -228,6 +330,26 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
     }
   };
 
+  const openRestoreConfirmation = async () => {
+    if (!details) return;
+    setRestoreDiffLoading(true);
+    setRestoreDiff(null);
+    try {
+      const parentId = details.checkpoint.parentCheckpointId;
+      if (parentId) {
+        setRestoreDiff(await service.getCheckpointDetailedDiff(parentId, details.checkpoint.checkpointId));
+      } else {
+        setRestoreDiff({ noParent: true });
+      }
+      setConfirmDialogOpen(true);
+    } catch (error: any) {
+      setRestoreDiff({ error: error?.message || 'Unable to calculate checkpoint changes.' });
+      setConfirmDialogOpen(true);
+    } finally {
+      setRestoreDiffLoading(false);
+    }
+  };
+
   // Execute Restoration Workflow
   const handleExecuteRestore = async () => {
     if (!details) return;
@@ -237,24 +359,23 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
     setRestoreError(null);
     setRestoreSuccess(null);
 
-    const targetDir = 'D:\\AUTONEX\\output\\' + (details.checkpoint.projectId || 'ProjectWorkspace');
-
     try {
-      // Step through stages with real operations
-      for (let i = 0; i < 9; i++) {
-        setRestoreStage(i);
-        await new Promise((r) => setTimeout(r, 120));
-      }
+      setRestoreStage(0);
 
-      const res = await service.restoreCheckpoint({
-        checkpointId: details.checkpoint.checkpointId,
-        requestingUserId: userId,
-        targetWorkspaceDir: targetDir,
-        createSafetyBackup: true,
-      });
+      const res = !workspaceHandle
+        ? await service.restoreCheckpointToBrowserState(
+            details.checkpoint.checkpointId,
+            userId
+          )
+        : workspaceHandle
+        ? await service.restoreCheckpointInBrowser({
+            checkpointId: details.checkpoint.checkpointId,
+            requestingUserId: userId,
+            workspaceHandle,
+          })
+        : null;
 
       setRestoreStage(9); // Refreshing editor
-      await new Promise((r) => setTimeout(r, 200));
 
       setRestoreSuccess(res);
       useStore.setState({
@@ -264,6 +385,77 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
       setRestoreError(err.message || 'Restoration failed due to an unexpected error.');
     } finally {
       setRestoring(false);
+    }
+  };
+
+  const continueEditing = (mode: 'office' | 'swarm') => {
+    if (!selectedChk || Object.keys(snapshotFiles).length === 0) {
+      useStore.setState({ toast: 'Source files are still loading. Please wait before opening the editor.' });
+      return;
+    }
+    useStore.setState({
+      restoredWorkspaceFiles: { ...snapshotFiles },
+      restoredCheckpointId: selectedChk.checkpointId,
+    });
+    useStore.getState().openProjectEditor(mode);
+    handleClose();
+  };
+
+  const handleSaveCheckpoint = async () => {
+    const configuredWorkspace = workspaceDir.trim();
+    if (!configuredWorkspace) {
+      setUploadError('Enter the absolute path of the active AUTONEX project directory below before uploading.');
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('autonex_workspace_dir', configuredWorkspace);
+    }
+    if (!walletClient) {
+      setUploadError('Connect a wallet on Arkiv Rabdi DB-Chain before uploading a checkpoint.');
+      return;
+    }
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const current = service.listCheckpoints(projectId, userId, { page: 1, limit: 1 }).checkpoints[0];
+      const record = await service.createCheckpoint({
+        projectId,
+        ownerUserId: userId,
+        workspaceDir: configuredWorkspace,
+        goal,
+        parentCheckpointId: current?.checkpointId ?? null,
+        description: `Manual checkpoint for ${goal}`,
+        stateSnapshot: useStore.getState(),
+      });
+      const encryption = record.encryptionMetadataJson ? JSON.parse(record.encryptionMetadataJson) : {};
+      await saveArkivCheckpoint(walletClient, {
+        checkpointId: record.checkpointId,
+        projectId: record.projectId,
+        parentCheckpointId: record.parentCheckpointId,
+        agentTaskId: record.agentTaskId,
+        status: record.executionStatus,
+        lifecycleStatus: record.lifecycleStatus,
+        createdAt: record.createdAt,
+        archiveSwarmRef: record.archiveSwarmRef!,
+        archiveSha256: record.archiveChecksum!,
+        archiveBytesSize: record.archiveSize,
+        contextSwarmRef: record.contextSwarmRef!,
+        contextSha256: record.contextChecksum!,
+        contextBytesSize: 0,
+        encryptionIv: encryption.archiveIV,
+        cipherAuthTag: encryption.archiveAuthTag,
+        contextEncryptionIv: encryption.contextIV,
+        contextAuthTag: encryption.contextAuthTag,
+        fileCount: record.fileCount,
+        description: record.description,
+        manifestJson: record.manifestJson || undefined,
+      });
+      await loadCheckpoints();
+      useStore.setState({ toast: `Checkpoint ${record.checkpointId} uploaded to Arkiv and Swarm.` });
+    } catch (err: any) {
+      setUploadError(err?.message || 'Checkpoint upload failed. Existing checkpoints were preserved.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -326,6 +518,10 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
   if (!isOpen) return null;
 
   const selectedChk = details?.checkpoint;
+  const latestCheckpointId = service.getActiveCheckpoint(selectedChk?.projectId || projectId)
+    || service.listAllCheckpoints({ page: 1, limit: 100 }).checkpoints[0]?.checkpointId
+    || null;
+  const canRestoreSelected = Boolean(selectedChk && selectedChk.checkpointId !== latestCheckpointId);
 
   return (
     <motion.div
@@ -370,12 +566,24 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
               <Icon d={I.sun} size={14} className={loadingList ? 'animate-spin' : ''} />
             </button>
             <button
+              onClick={handleSaveCheckpoint}
+              disabled={uploading}
+              className="px-2.5 py-1.5 rounded-lg bg-ink text-white text-[11px] font-semibold disabled:opacity-50"
+            >
+              {uploading ? 'Uploading…' : 'Save / Upload'}
+            </button>
+            <button
               onClick={handleClose}
               className="p-1.5 rounded-lg text-ink/40 hover:text-ink hover:bg-ink/5 transition-colors"
             >
               <Icon d={I.x} size={18} />
             </button>
           </div>
+          {uploadError && (
+            <div className="mx-6 mt-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-700">
+              {uploadError}
+            </div>
+          )}
         </div>
 
         {/* Modal Body: Left Sidebar (Timeline) + Right Main (Inspector/Diff/Preview) */}
@@ -491,6 +699,11 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
               </div>
             ) : (
               <>
+                {sourceLoadError && (
+                  <div className="mx-4 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-800">
+                    Source snapshot could not be loaded: {sourceLoadError}
+                  </div>
+                )}
                 {/* Checkpoint Header Info */}
                 <div className="p-4 border-b border-ink/10 bg-[#FAF7F2]/50 flex items-start justify-between gap-4">
                   <div className="space-y-1 min-w-0">
@@ -501,6 +714,11 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                       <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-ink/5 text-ink/70">
                         {selectedChk.checkpointId}
                       </span>
+                      {selectedChk.checkpointId === latestCheckpointId && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700">
+                          Active latest
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 text-xs font-mono text-ink/60 flex-wrap">
@@ -525,6 +743,24 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
                   {/* Actions: Verify & Restore */}
                   <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center rounded-xl border border-ink/15 bg-white/70 p-0.5">
+                      <button
+                        onClick={() => continueEditing('office')}
+                        disabled={!selectedChk || !Object.keys(snapshotFiles).length}
+                        className="px-2.5 py-1 text-[11px] font-heading font-semibold rounded-lg text-ink/75 hover:bg-ink/5 disabled:opacity-40"
+                        title="Continue editing with the 3D desktop workspace"
+                      >
+                        Desktop Editor
+                      </button>
+                      <button
+                        onClick={() => continueEditing('swarm')}
+                        disabled={!selectedChk || !Object.keys(snapshotFiles).length}
+                        className="px-2.5 py-1 text-[11px] font-heading font-semibold rounded-lg text-ink/75 hover:bg-ink/5 disabled:opacity-40"
+                        title="Continue editing with the swarm workspace"
+                      >
+                        Swarm Editor
+                      </button>
+                    </div>
                     <button
                       onClick={handleVerify}
                       disabled={verifying}
@@ -534,13 +770,16 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                       {verifying ? 'Verifying...' : '✓ Verify Integrity'}
                     </button>
 
-                    <button
-                      onClick={() => setConfirmDialogOpen(true)}
-                      className="px-3.5 py-1.5 rounded-xl text-xs font-heading font-bold text-white shadow-xs transition-opacity hover:opacity-95"
-                      style={{ background: 'var(--accent)' }}
-                    >
-                      Restore Checkpoint ↺
-                    </button>
+                    {canRestoreSelected && (
+                      <button
+                        onClick={openRestoreConfirmation}
+                        disabled={restoreDiffLoading}
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-heading font-bold text-white shadow-xs transition-opacity hover:opacity-95 disabled:opacity-50"
+                        style={{ background: 'var(--accent)' }}
+                      >
+                        {restoreDiffLoading ? 'Calculating changes…' : 'Restore Checkpoint ↺'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -589,13 +828,23 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                     <div className="flex-1 flex flex-col min-w-0 bg-white">
                       {selectedFilePath ? (
                         <>
-                          <div className="px-4 py-2 border-b border-ink/10 bg-white/80 flex items-center justify-between text-xs font-mono">
+                            <div className="px-4 py-2 border-b border-ink/10 bg-white/80 flex items-center justify-between text-xs font-mono gap-2">
                             <span className="font-semibold text-ink truncate">{selectedFilePath}</span>
-                            {fileMeta && (
-                              <span className="text-[10px] text-ink/50">
-                                {fileMeta.size} bytes · {fileMeta.sha256.slice(0, 16)}...
-                              </span>
-                            )}
+                              <div className="flex items-center gap-2 shrink-0">
+                                {sourceChanged && <span className="text-[10px] text-amber-700 font-semibold">Unsaved changes</span>}
+                                <button
+                                  onClick={saveEditedCheckpoint}
+                                  disabled={!sourceChanged || savingSource}
+                                  className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-white text-[10px] font-semibold disabled:opacity-40"
+                                >
+                                  {savingSource ? 'Saving…' : 'Create Checkpoint'}
+                                </button>
+                                {fileMeta && (
+                                  <span className="text-[10px] text-ink/50">
+                                    {fileMeta.size} bytes · {fileMeta.sha256.slice(0, 16)}...
+                                  </span>
+                                )}
+                              </div>
                           </div>
 
                           <div className="flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed">
@@ -609,9 +858,23 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                                 </p>
                               </div>
                             ) : (
-                              <pre className="text-ink/90 whitespace-pre font-mono">
-                                {fileContent}
-                              </pre>
+                              <CodeEditor
+                                value={editedFiles[selectedFilePath] ?? fileContent ?? ''}
+                                filePath={selectedFilePath}
+                                onChange={(content) => {
+                                  const next = {
+                                    ...editedFiles,
+                                    [selectedFilePath]: content,
+                                  };
+                                  setEditedFiles(next);
+                                  setFileContent(content);
+                                  setSourceChanged(
+                                    Object.keys(next).some((path) => next[path] !== snapshotFiles[path])
+                                  );
+                                }}
+                                className="h-full min-h-[360px]"
+                                onSave={saveEditedCheckpoint}
+                              />
                             )}
                           </div>
                         </>
@@ -791,8 +1054,47 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
               </div>
 
               <p className="text-xs text-ink/75 font-body leading-relaxed">
-                AUTONEX will replace the current project workspace with the selected checkpoint’s saved project state.
+                AUTONEX will restore the selected checkpoint directly into the browser mini-IDE. Your Arkiv history remains immutable.
               </p>
+
+              <div className="space-y-1.5">
+                <label htmlFor="checkpoint-workspace-dir" className="text-[10px] uppercase tracking-wider font-bold text-ink/50">
+                  Optional local export directory
+                </label>
+                <input
+                  id="checkpoint-workspace-dir"
+                  value={workspaceDir}
+                  onChange={(event) => setWorkspaceDir(event.target.value)}
+                  placeholder="/absolute/path/to/your/project"
+                  className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-xs font-mono text-ink outline-none focus:border-[var(--accent)]"
+                  spellCheck={false}
+                />
+                <p className="text-[10px] text-ink/45">
+                  Not required for database/editor restoration. Select a folder only if you also want to write restored files to disk.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const picker = (window as any).showDirectoryPicker;
+                    if (!picker) {
+                      setRestoreError('This browser does not support folder access. Use a Chromium-based browser or run restore through the AUTONEX bridge.');
+                      return;
+                    }
+                    try {
+                      const handle = await picker({ mode: 'readwrite' });
+                      setWorkspaceHandle(handle);
+                      setWorkspaceDir(handle.name || workspaceDir);
+                    } catch (error: any) {
+                      if (error?.name !== 'AbortError') {
+                        setRestoreError(`Could not access the workspace folder: ${error?.message || 'permission denied'}`);
+                      }
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-ink/15 text-[11px] font-semibold hover:bg-white"
+                >
+                  {workspaceHandle ? `Export folder selected: ${workspaceHandle.name}` : 'Optionally select local export folder'}
+                </button>
+              </div>
 
               <div className="p-3 rounded-xl bg-ink/3 border border-ink/10 space-y-2 text-xs font-mono text-ink/80">
                 <div className="flex justify-between">
@@ -811,6 +1113,36 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                   <span className="text-ink/40">Files in Snapshot:</span>
                   <span className="font-bold text-emerald-700">{selectedChk.fileCount} files</span>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-ink/10 overflow-hidden">
+                <div className="px-3 py-2 bg-ink/5 text-[10px] uppercase tracking-wider font-bold text-ink/50">
+                  Changes in this checkpoint
+                </div>
+                {restoreDiffLoading ? (
+                  <div className="p-3 text-xs text-ink/50">Calculating file changes…</div>
+                ) : restoreDiff?.error ? (
+                  <div className="p-3 text-xs text-rose-700">{restoreDiff.error}</div>
+                ) : restoreDiff?.noParent ? (
+                  <div className="p-3 text-xs text-ink/50">Initial checkpoint; all files are additions.</div>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto divide-y divide-ink/5 text-xs font-mono">
+                    {[
+                      ...(restoreDiff?.filesModified || []).map((file: any) => ({ ...file, marker: '~', label: 'modified', color: 'text-amber-700' })),
+                      ...(restoreDiff?.filesAdded || []).map((file: any) => ({ ...file, marker: '+', label: 'added', color: 'text-emerald-700' })),
+                      ...(restoreDiff?.filesRemoved || []).map((file: any) => ({ ...file, marker: '-', label: 'removed', color: 'text-rose-700' })),
+                    ].map((file: any) => (
+                      <div key={`${file.label}:${file.path}`} className="px-3 py-1.5 flex items-center gap-2">
+                        <span className={`font-bold ${file.color}`}>{file.marker}</span>
+                        <span className="truncate">{file.path}</span>
+                        <span className={`ml-auto text-[10px] ${file.color}`}>{file.label}</span>
+                      </div>
+                    ))}
+                    {!restoreDiff?.filesModified?.length && !restoreDiff?.filesAdded?.length && !restoreDiff?.filesRemoved?.length && (
+                      <div className="p-3 text-xs text-ink/50">No file changes detected.</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 text-xs font-body space-y-1">
@@ -836,7 +1168,7 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                   className="px-4 py-2 rounded-xl text-xs font-heading font-bold text-white shadow-md hover:opacity-95"
                   style={{ background: 'var(--accent)' }}
                 >
-                  Confirm & Restore Workspace
+                  Restore into Mini-IDE
                 </button>
               </div>
             </motion.div>
