@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { type Hex } from 'viem';
+import { ensureRabdiWalletClient } from '@/config/chain';
 import {
   queryPublicRuns,
   queryUserRuns,
@@ -216,11 +217,12 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
 
   // Extend storage expiration
   const handleExtend = async () => {
-    if (!walletClient || !selectedRun?.key) return;
+    if (!selectedRun?.key) return;
     setExtending(true);
     setStatusMsg(null);
     try {
-      const res = await extendArkivEntity(walletClient, selectedRun.key, 90);
+      const client = await ensureRabdiWalletClient(walletClient);
+      const res = await extendArkivEntity(client, selectedRun.key, 90);
       setStatusMsg({
         type: 'success',
         text: `Preserved entity on Arkiv for +90 days! Tx: ${res.txHash.slice(0, 14)}...`,
@@ -234,12 +236,13 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
 
   // Delete entity
   const handleDelete = async () => {
-    if (!walletClient || !selectedRun?.key) return;
+    if (!selectedRun?.key) return;
     if (!confirm('Are you sure you want to permanently prune this entity from Arkiv DB-Chain?')) return;
     setDeleting(true);
     setStatusMsg(null);
     try {
-      const res = await deleteArkivEntity(walletClient, selectedRun.key);
+      const client = await ensureRabdiWalletClient(walletClient);
+      const res = await deleteArkivEntity(client, selectedRun.key);
       setStatusMsg({
         type: 'success',
         text: `Entity deleted from Arkiv DB-Chain. Tx: ${res.txHash.slice(0, 14)}...`,
@@ -317,16 +320,13 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
 
   // Swarm upload & Arkiv record handler
   const handleUploadContext = async () => {
-    if (!walletClient) {
-      setStatusMsg({ type: 'error', text: 'Please connect your Web3 wallet first to write to Arkiv.' });
-      return;
-    }
     setUploadingContext(true);
     setStatusMsg(null);
     try {
-      const res = await uploadContextWorkflow(walletClient, newPayloadText, {
+      const client = await ensureRabdiWalletClient(walletClient);
+      const res = await uploadContextWorkflow(client, newPayloadText, {
         projectId: newProjectId,
-        userId: address || 'user-1',
+        userId: address || client.account?.address || 'user-1',
         fileName: newFileName,
         contentType: newFileName.endsWith('.md') ? 'text/markdown' : 'application/json',
         summary: `Context deliverable for ${newProjectId}`,

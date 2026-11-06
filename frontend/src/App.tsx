@@ -3,6 +3,7 @@ import { useStore } from '@/state/store';
 import { Landing } from '@/ui/Landing';
 import { Workspace } from '@/ui/Workspace';
 import { ArkivHistoryModal } from '@/ui/ArkivHistoryModal';
+import { ErrorCheckpointModal } from '@/ui/ErrorCheckpointModal';
 import { MODELS } from '@/mock/data';
 import { USE_MOCK } from '@/api/client';
 import { setAccent, resetAccentBlend } from '@/three/materials';
@@ -59,6 +60,7 @@ export default function App() {
         open={arkivHistoryOpen}
         onClose={() => useStore.setState({ arkivHistoryOpen: false })}
       />
+      <ErrorCheckpointModal />
     </div>
   );
 }

@@ -373,8 +373,8 @@ export function Landing() {
               </button>
             </div>
 
-            {/* Quick access to decentralized Arkiv + Swarm Ledger */}
-            <div className="flex items-center gap-2 mt-2.5 mb-1">
+            {/* Quick access to decentralized Arkiv + Swarm Ledger & 0G Checkpoint Simulator */}
+            <div className="flex items-center gap-2 mt-2.5 mb-1 flex-wrap">
               <button
                 type="button"
                 onClick={() => useStore.setState({ arkivHistoryOpen: true, arkivActiveTab: 'swarm_context' })}
@@ -383,6 +383,23 @@ export function Landing() {
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Browse Arkiv & Swarm Ledger ↗</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  useStore.getState().triggerErrorCheckpoint({
+                    error: 'Execution halted: 0G Private Computer inference failed (Request ID: 47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5)',
+                    failedAgentId: 'W_backend_0',
+                    recoveryAgentId: 'W_qa_0',
+                    requestId: '47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5'
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs font-mono transition-transform hover:scale-105"
+                title="Test 0G Private Computer Error Checkpoint & Save Context to Arkiv + Swarm"
+              >
+                <Icon d={I.alert} size={11} />
+                <span>Simulate 0G Error Checkpoint</span>
               </button>
             </div>
 

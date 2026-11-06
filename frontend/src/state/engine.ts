@@ -6,6 +6,7 @@ import { useStore } from './store';
 import { director } from '@/sim/director';
 import { triage } from '@/mock/triage';
 import goldenRun from '@/mock/goldenRun.json';
+import { generateCheckpointSummary } from '@/services/checkpointSummary';
 
 export interface RunEngine {
   start(goal: string): Promise<void> | void;
@@ -157,6 +158,9 @@ class LiveEngine implements RunEngine {
       console.error('[LiveEngine] Task execution blocked or failed:', err);
       const msg = err?.message || 'Execution blocked: verification or input required';
       useStore.setState({ toast: msg, offline: false, demoMode: false, executionState: 'failed', executionError: msg });
+      useStore.getState().triggerErrorCheckpoint({
+        error: msg,
+      });
     }
   }
   stop() {
@@ -168,6 +172,10 @@ class LiveEngine implements RunEngine {
     this.stream = null;
     if (useStore.getState().executionState === 'running' || useStore.getState().executionState === 'waiting_0g') {
       useStore.setState({ executionState: 'cancelled' });
+      const summary = generateCheckpointSummary(useStore.getState());
+      if (summary) {
+        useStore.setState({ checkpointSummary: summary });
+      }
     }
   }
   setSpeed(f: number) { this.stream?.setSpeed(f); }
@@ -220,6 +228,11 @@ export async function haltEntireSystem() {
     agents: updatedAgents,
     swarm: { ...s.swarm, speakingId: null },
   });
+
+  const interruptedSummary = generateCheckpointSummary(useStore.getState());
+  if (interruptedSummary) {
+    useStore.setState({ checkpointSummary: interruptedSummary });
+  }
 
   try {
     await fetch('http://localhost:8000/api/tasks/cancel_all', { method: 'POST' });

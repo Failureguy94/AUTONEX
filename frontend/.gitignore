@@ -5,3 +5,5 @@ dist
 *.log
 .DS_Store
 tapes/*.generated.json
+output/
+D:*

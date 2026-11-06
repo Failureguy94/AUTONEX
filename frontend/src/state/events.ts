@@ -9,6 +9,7 @@ import { LAYOUT } from '@/config/layout';
 import { CHAIR_TYPES } from '@/config/furnitureDefs';
 import { swarmDirector } from '@/swarm/directorRef';
 import { voteFx } from '@/swarm/IdeaBoard';
+import { generateCheckpointSummary } from '@/services/checkpointSummary';
 
 const name = (id?: string) => useStore.getState().agents[id ?? '']?.name ?? id ?? '';
 
@@ -130,6 +131,15 @@ export function applyEvent(e: Envelope, instant = false) {
       setAgents(p.agent_id, { status: 'FAILED', failed: (useStore.getState().agents[p.agent_id]?.failed ?? 0) + 1 });
       director.confuse(e.agent_id!);
       pushLog(e, `${name(e.agent_id)} failed ${p.task_id}: ${p.reason}${p.will_retry ? ' (retrying)' : ''}`);
+      if (
+        p.reason?.includes('0G Private Computer inference failed') ||
+        p.reason?.includes('Execution halted')
+      ) {
+        useStore.getState().triggerErrorCheckpoint({
+          error: p.reason,
+          failedAgentId: p.agent_id,
+        });
+      }
       break;
     case 'task.rework':
       setTask(p.task_id, { status: 'running', attempts: (useStore.getState().tasks[p.task_id]?.attempts ?? 0) + 1 });
@@ -183,6 +193,18 @@ export function applyEvent(e: Envelope, instant = false) {
       const notes = [...useStore.getState().notes, { id: p.id, author_agent_id: p.author_agent_id, topic: p.topic, note: p.note, ts: p.ts && p.ts !== '--:--' ? p.ts : e.ts_sim }];
       useStore.setState({ notes, notePulse: useStore.getState().notePulse + 1 });
       pushLog(e, `${name(p.author_agent_id)} pinned a note: "${p.note}"`);
+
+      // Automatically detect 0G Private Computer inference failures or execution halts
+      if (
+        p.topic === 'ERROR' ||
+        p.note.includes('0G Private Computer inference failed') ||
+        p.note.includes('Execution halted:')
+      ) {
+        useStore.getState().triggerErrorCheckpoint({
+          error: p.note,
+          failedAgentId: p.author_agent_id || e.agent_id,
+        });
+      }
       break;
     }
     case 'llm.call_started': {
@@ -261,15 +283,22 @@ export function applyEvent(e: Envelope, instant = false) {
     case 'clock.tick':
       useStore.setState({ simClock: p.sim_time, realElapsed: p.real_elapsed_s });
       break;
-    case 'result.final':
+    case 'result.final': {
+      const finalReport = { report_markdown: p.report_markdown, sources: p.sources, effort_logical_s: p.effort_logical_s, effort_real_s: p.effort_real_s };
       useStore.setState({
-        report: { report_markdown: p.report_markdown, sources: p.sources, effort_logical_s: p.effort_logical_s, effort_real_s: p.effort_real_s },
-        effortLogical: p.effort_logical_s, reportOpen: true,
+        report: finalReport,
+        effortLogical: p.effort_logical_s,
+        reportOpen: true,
       });
+      const summary = generateCheckpointSummary(useStore.getState());
+      if (summary) {
+        useStore.setState({ checkpointSummary: summary });
+      }
       director.celebrate(e.agent_id ?? 'M0');
       sfx.ping();
       pushLog(e, `Final report delivered — organizational effort ${fmtEffort(p.effort_logical_s)} vs real ${(p.effort_real_s / 60).toFixed(1)} min`);
       break;
+    }
     case 'run.error':
       useStore.setState({ toast: p.message });
       pushLog(e, `Run error: ${p.message}`);

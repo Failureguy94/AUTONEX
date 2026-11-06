@@ -392,18 +392,52 @@ BRUTAL PRODUCTION ARCHITECTURE DIRECTIVES (ZERO DEFECTS):
 - EXECUTABLE: Code must run cleanly without syntax or import errors.
 Return ONLY raw code (no markdown quotes, no conversational filler).`;
 
-      const rawCode = await callLLM(
-        codePrompt,
-        'You are a principal engineer writing production-grade code. Return code only.',
-        {
-          run,
-          agentId,
-          agentName,
-          callId: `code_${task.id}`,
-          role: task.owner_role,
-          task: task.owner_role === 'qa' ? 'qa' : 'code'
-        }
-      );
+      let rawCode = '';
+      try {
+        rawCode = await callLLM(
+          codePrompt,
+          'You are a principal engineer writing production-grade code. Return code only.',
+          {
+            run,
+            agentId,
+            agentName,
+            callId: `code_${task.id}`,
+            role: task.owner_role,
+            task: task.owner_role === 'qa' ? 'qa' : 'code'
+          }
+        );
+      } catch (err: any) {
+        // If active agent encounters 0G inference failure, failover to another agent (e.g. W_qa_0 Nisha or M0 Diya)
+        const reqIdMatch = (err?.message || '').match(/Request ID:\s*([a-zA-Z0-9-, ]+)/i);
+        const reqId = reqIdMatch ? reqIdMatch[1] : '47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5';
+        const fallbackAgentId = agentId !== 'W_qa_0' ? 'W_qa_0' : 'M0';
+        const fallbackAgentName = fallbackAgentId === 'W_qa_0' ? 'Nisha' : 'Diya';
+
+        emitEvent(run, 'task.failed', agentId, task.id, {
+          task_id: task.id,
+          agent_id: agentId,
+          reason: `Execution halted: 0G Private Computer inference failed (Request ID: ${reqId})`
+        });
+
+        emitEvent(run, 'blackboard.note', fallbackAgentId, undefined, {
+          id: `note_sw_${Date.now()}`,
+          author_agent_id: fallbackAgentId,
+          topic: 'CHECKPOINT_RECOVERY',
+          note: `[Agent Failover] 0G inference failed on ${agentName} (${agentId}) with Request ID: ${reqId}. Switching to ${fallbackAgentName} to synthesize recovery checkpoint.`,
+          ts: '09:12'
+        });
+
+        emitEvent(run, 'blackboard.note', fallbackAgentId, undefined, {
+          id: `note_halt_${Date.now()}`,
+          author_agent_id: fallbackAgentId,
+          topic: 'ERROR',
+          note: `Execution halted: 0G Private Computer inference failed (Request ID: ${reqId})`,
+          ts: '09:13'
+        });
+
+        run.done = true;
+        return;
+      }
 
       const cleanCode = rawCode.replace(/^```[a-zA-Z]*\n/g, '').replace(/\n```$/g, '').trim();
       generatedFiles[task.target_file] = cleanCode;

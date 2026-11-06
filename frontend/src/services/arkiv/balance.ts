@@ -44,13 +44,25 @@ export async function assertSufficientTglm(
 export function formatArkivError(error: unknown): string {
   const msg = String(error instanceof Error ? error.message : error);
 
-  if (msg.includes('User rejected') || msg.includes('ACTION_REJECTED') || msg.includes('denied transaction')) {
+  if (
+    msg.includes('User rejected') ||
+    msg.includes('ACTION_REJECTED') ||
+    msg.includes('denied transaction') ||
+    msg.includes('user rejected action')
+  ) {
     return 'Transaction cancelled by user in wallet.';
   }
   if (msg.includes('insufficient funds') || msg.includes('Insufficient tGLM')) {
     return 'Insufficient tGLM balance for storage fee. Claim tokens from hub.arkiv.network.';
   }
-  if (msg.includes('chain') || msg.includes('network') || msg.includes('ChainMismatchError')) {
+  if (
+    msg.includes('ChainMismatchError') ||
+    msg.includes('wrong chain') ||
+    msg.includes('Wrong network') ||
+    /switch to the rabdi/i.test(msg) ||
+    /wallet switch required/i.test(msg) ||
+    /unrecognized chain/i.test(msg)
+  ) {
     return 'Please switch your wallet to the Rabdi DB-Chain Testnet (Chain ID 7794095).';
   }
   if (msg.includes('MissingAccessKeyError') || msg.includes('rate limit')) {
