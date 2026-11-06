@@ -213,7 +213,15 @@ function AgentRow({ a, depth, selected }: { a: any; depth: number; selected: str
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1">
-          <span className="text-[11.5px] font-heading font-medium truncate text-ink">{a.name}</span>
+          <div className="min-w-0 flex items-center gap-1">
+            <span className="text-[11.5px] font-heading font-medium truncate text-ink">{a.name}</span>
+            {a.ensIdentity?.ensName && (
+              <span className="max-w-[108px] truncate rounded-full px-1.5 py-0.5 text-[8px] font-mono"
+                style={{ background: 'var(--accent-soft)', color: '#5d4a9d' }} title={a.ensIdentity.ensName}>
+                {a.ensIdentity.ensName}
+              </span>
+            )}
+          </div>
           <span
             className="text-[8.5px] font-mono uppercase px-1 rounded tracking-wider"
             style={{

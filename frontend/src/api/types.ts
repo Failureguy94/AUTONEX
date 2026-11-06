@@ -13,6 +13,13 @@ export const AgentSchema = z.object({
   context_max: z.number().default(65536),
   current_task_id: z.string().nullable().default(null),
   avatar_seed: z.number().default(1),
+  ensIdentity: z.object({
+    ensName: z.string(), parentName: z.string(), walletAddress: z.string(),
+    resolverAddress: z.string(), registryAddress: z.string(), transactionHash: z.string(),
+    chainId: z.number(), createdAt: z.string(),
+    identityStatus: z.enum(['active', 'pending', 'inactive', 'unresolved', 'failed']),
+    description: z.string(), role: z.string(), capabilities: z.string(), endpoint: z.string(), version: z.string(),
+  }).optional(),
 }).passthrough();
 export type Agent = z.infer<typeof AgentSchema>;
 

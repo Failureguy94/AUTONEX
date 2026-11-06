@@ -9,6 +9,8 @@ import { useState } from 'react';
 
 import { roleDef, roleCss } from '@/swarm/roles';
 import { swarmDirector } from '@/swarm/directorRef';
+import { EnsIdentityPanel } from './EnsIdentityPanel';
+import type { EnsAgentIdentity } from '@/ens/types';
 
 const stageColor = (st: number) =>
   ['#e8dfd0', '#f4d58d', '#e8a44d', '#d64545'][Math.min(3, Math.max(0, st))] ?? '#e8dfd0';
@@ -40,6 +42,10 @@ export function Inspector() {
   const energy = a ? Math.round(a.energy) : (swAgent?.energy ?? 100);
   const tired = energy > 75 ? 'Fresh' : energy > 50 ? 'Steady' : energy > 30 ? 'Tired' : 'Needs coffee';
   const stage = a ? contextStages[a.id] : undefined;
+  const updateIdentity = (identity: EnsAgentIdentity) => {
+    if (!a) return;
+    useStore.setState({ agents: { ...useStore.getState().agents, [a.id]: { ...a, ensIdentity: identity } } });
+  };
 
   return (
     <motion.div drag dragMomentum={false}
@@ -183,6 +189,8 @@ export function Inspector() {
               <Meter label="Energy" value={energy} max={100} sub={tired} color="var(--accent)" />
               <Meter label="Context" value={a.context_tokens} max={a.context_max || 32768}
                 sub={`${((a.context_tokens / (a.context_max || 32768)) * 100).toFixed(0)}% used`} color="var(--dept-data)" />
+
+              <EnsIdentityPanel agent={a} onIdentity={updateIdentity} />
 
               {a.role !== 'worker' && (
                 <div>

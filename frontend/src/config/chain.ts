@@ -1,4 +1,5 @@
 import { defineChain } from 'viem';
+import { sepolia } from 'viem/chains';
 import { createConfig, http } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 
@@ -32,10 +33,10 @@ export const rabdiChain = defineChain({
 
 // Wagmi configuration using standard RPC without exposing access keys to the wallet connector
 export const wagmiConfig = createConfig({
-  chains: [rabdiChain],
+  chains: [rabdiChain, sepolia],
   connectors: [injected()],
   transports: {
     [rabdiChain.id]: http(),
+    [sepolia.id]: http(import.meta.env.VITE_ENS_SEPOLIA_RPC_URL || undefined),
   },
 });
-

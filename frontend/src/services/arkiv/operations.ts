@@ -11,6 +11,7 @@ import {
   UserSchema,
   ProjectSchema,
   ContextRefSchema,
+  AgentEnsIdentitySchema,
 } from './schemas';
 
 const encoder = new TextEncoder();
@@ -77,6 +78,19 @@ export interface SaveContextRefInput {
   contentType: string;
   fileSize: number;
   summary?: string;
+}
+
+export interface SaveAgentEnsIdentityInput {
+  agentId: string;
+  ensName: string;
+  parentName: string;
+  walletAddress: string;
+  resolverAddress: string;
+  registryAddress: string;
+  transactionHash: string;
+  chainId: number;
+  createdAt: number;
+  identityStatus: string;
 }
 
 /**
@@ -411,6 +425,35 @@ export async function saveArkivContextRef(walletClient: WalletClient, input: Sav
   return {
     entityKey: result.entityKey as Hex,
     txHash: result.txHash as Hex,
+  };
+}
+
+export async function saveArkivAgentEnsIdentity(
+  walletClient: WalletClient,
+  input: SaveAgentEnsIdentityInput,
+) {
+  if (!walletClient.account) throw new Error('Wallet not connected.');
+  const userAddress = getAddress(walletClient.account.address);
+  await assertSufficientTglm(userAddress);
+  const arkivWallet = getArkivWalletClient(walletClient);
+  const result = await arkivWallet.createEntity(AgentEnsIdentitySchema, {
+    agent_id: input.agentId,
+    ens_name: input.ensName,
+    parent_name: input.parentName,
+    wallet_address: addr(getAddress(input.walletAddress)),
+    resolver_address: addr(getAddress(input.resolverAddress)),
+    registry_address: addr(getAddress(input.registryAddress)),
+    transaction_hash: input.transactionHash,
+    chain_id: u64(BigInt(input.chainId)),
+    created_at: u64(BigInt(input.createdAt)),
+    identity_status: input.identityStatus,
+  }, {
+    expiration: ExpirationTime.fromDays(365),
+  });
+  return {
+    entityKey: result.entityKey as Hex,
+    txHash: result.txHash as Hex,
+    expiresAt: result.expiresAt,
   };
 }
 
@@ -822,4 +865,3 @@ export async function getAllArkivContextRefs(limit = 30) {
     return [];
   }
 }
-

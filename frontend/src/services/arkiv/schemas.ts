@@ -111,4 +111,21 @@ export const ContextRefSchema = defineSchema('autonex.context_ref', {
   summary: str().optional(),
 });
 
+/**
+ * 8. autonex.agent_ens_identity
+ * Stores only the application reference to an authoritative ENSv2 identity.
+ * Resolver records and permissions remain on Ethereum Sepolia.
+ */
+export const AgentEnsIdentitySchema = defineSchema('autonex.agent_ens_identity', {
+  agent_id: str().indexed(),
+  ens_name: str().indexed(),
+  parent_name: str().indexed(),
+  wallet_address: addr().indexed(),
+  resolver_address: addr().indexed(),
+  registry_address: addr().indexed(),
+  transaction_hash: str().indexed(),
+  chain_id: u64().indexed(),
+  created_at: u64().indexed(),
+  identity_status: str().indexed(),
+});
 
