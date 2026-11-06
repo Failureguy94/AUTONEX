@@ -211,6 +211,24 @@ export function Toolbar() {
           label="Arkiv"
         />
 
+        {/* 0G Failure Checkpoint Test Trigger */}
+        <button
+          type="button"
+          onClick={() => {
+            useStore.getState().triggerErrorCheckpoint({
+              error: 'Execution halted: 0G Private Computer inference failed (Request ID: 47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5)',
+              failedAgentId: 'W_backend_0',
+              recoveryAgentId: 'W_qa_0',
+              requestId: '47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5'
+            });
+          }}
+          className="hidden xl:flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-800 text-[10px] font-mono hover:bg-amber-500/20 transition-all shadow-xs"
+          title="Simulate 0G Private Computer Inference Failure & Trigger Checkpoint Flow"
+        >
+          <Icon d={I.alert} size={11} />
+          <span>Sim 0G Error</span>
+        </button>
+
         <ConnectWalletButton />
 
         <ToolbarBtn

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Agent, BlackboardNote, DepartmentDef, Envelope, FinalResult, Metrics, ModelInfo, PermissionRequest, Task, TriageResult, SwarmIdea, SwarmCluster, SwarmCritique } from '@/api/types';
 import { DEFAULT_ACCENT } from '@/config/office';
-import type { CheckpointSummary } from '@/services/checkpointSummary';
+import { generateCheckpointSummary, type CheckpointSummary } from '@/services/checkpointSummary';
 
 export interface AgentUI extends Agent {
   pending: number; done: number; failed: number;
@@ -50,6 +50,17 @@ export interface IAIState {
   lastRequestId: string | null;
 }
 
+export interface ErrorCheckpointData {
+  error: string;
+  failedAgentId?: string;
+  failedAgentName?: string;
+  recoveryAgentId?: string;
+  recoveryAgentName?: string;
+  requestId?: string;
+  timestamp: string;
+  checkpointSummary?: CheckpointSummary | null;
+}
+
 interface Store {
   phase: 'landing' | 'workspace';
   goal: string; modelId: string; models: ModelInfo[]; mode: 'live' | 'replay';
@@ -92,6 +103,10 @@ interface Store {
   zgConnection: ZGConnectionState;
   zgModalOpen: boolean;
   iai: IAIState;
+  errorCheckpointModalOpen: boolean;
+  errorCheckpointData: ErrorCheckpointData | null;
+  setErrorCheckpointModalOpen: (open: boolean) => void;
+  triggerErrorCheckpoint: (info: { error: string; failedAgentId?: string; recoveryAgentId?: string; requestId?: string }) => void;
   executionState: ExecutionState;
   executionError: string | null;
   setExecutionState: (state: ExecutionState, error?: string | null) => void;
@@ -175,6 +190,87 @@ export const useStore = create<Store>((set, get) => ({
     totalTokensUsed: 0,
     totalCostMicroUsd: 0,
     lastRequestId: null
+  },
+  errorCheckpointModalOpen: false,
+  errorCheckpointData: null,
+  setErrorCheckpointModalOpen: (open) => set({ errorCheckpointModalOpen: open }),
+  triggerErrorCheckpoint: (info) => {
+    const s = get();
+    // 1. Resolve failed agent
+    const failedId = info.failedAgentId || s.selected || 'W_backend_0';
+    const failedAgent = s.agents[failedId];
+    const failedName = failedAgent?.name || (failedId.includes('backend') ? 'Rohan' : failedId.includes('qa') ? 'Nisha' : failedId.includes('frontend') ? 'Kabir' : 'Diya');
+
+    // 2. Resolve fallback recovery agent
+    let recoveryId = info.recoveryAgentId;
+    if (!recoveryId || recoveryId === failedId) {
+      if (failedId !== 'W_qa_0' && s.agents['W_qa_0']) {
+        recoveryId = 'W_qa_0';
+      } else if (failedId !== 'M0' && s.agents['M0']) {
+        recoveryId = 'M0';
+      } else if (failedId !== 'W_frontend_0' && s.agents['W_frontend_0']) {
+        recoveryId = 'W_frontend_0';
+      } else {
+        recoveryId = 'M0';
+      }
+    }
+    const recoveryAgent = s.agents[recoveryId];
+    const recoveryName = recoveryAgent?.name || (recoveryId === 'W_qa_0' ? 'Nisha' : 'Diya');
+
+    // 3. Extract Request ID
+    let reqId = info.requestId;
+    if (!reqId) {
+      const match = info.error.match(/Request ID:\s*([a-zA-Z0-9-, ]+)/i);
+      if (match) reqId = match[1].trim();
+      else reqId = '47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5';
+    }
+
+    // 4. Update 3D Director activities if running
+    try {
+      import('@/sim/director').then(({ director }) => {
+        director.confuse(failedId);
+        director.setActivityFor(recoveryId, 'WORKING');
+      }).catch(() => {});
+    } catch {}
+
+    // 5. Generate structured Checkpoint Summary from the frozen execution state
+    const summary = generateCheckpointSummary({
+      ...s,
+      executionState: 'failed',
+      executionError: info.error
+    });
+
+    const checkpointData: ErrorCheckpointData = {
+      error: info.error,
+      failedAgentId: failedId,
+      failedAgentName: failedName,
+      recoveryAgentId: recoveryId,
+      recoveryAgentName: recoveryName,
+      requestId: reqId,
+      timestamp: new Date().toISOString(),
+      checkpointSummary: summary
+    };
+
+    const noteId = `note_err_${Date.now()}`;
+    const newNote = {
+      id: noteId,
+      author_agent_id: recoveryId,
+      topic: 'CHECKPOINT_RECOVERY',
+      note: `Execution halted: 0G Private Computer inference failed (Request ID: ${reqId}). Incident context captured by ${recoveryName}. Ready to anchor to Arkiv + Swarm.`,
+      ts: s.simClock || '09:12'
+    };
+
+    set({
+      executionState: 'failed',
+      executionError: info.error,
+      checkpointSummary: summary,
+      errorCheckpointModalOpen: true,
+      errorCheckpointData: checkpointData,
+      notes: [...s.notes, newNote],
+      notePulse: s.notePulse + 1,
+      selected: recoveryId,
+      followId: recoveryId
+    });
   },
   setZGModalOpen: (open) => set({ zgModalOpen: open }),
   checkZGStatus: async () => {
@@ -544,6 +640,7 @@ export const useStore = create<Store>((set, get) => ({
     metrics: { llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 },
     gate: { in_flight: 0, limit: 4, queue_depth: 0, backoff_active: false },
     llmByRole: {}, llmByModel: {}, terminal: {}, report: null, checkpointSummary: null, replanCount: 0,
+    errorCheckpointModalOpen: false, errorCheckpointData: null,
     planOutline: [], selected: null, inspectorOpen: false, followId: null,
     triage: null, departments: {}, pendingPermissions: [], contextStages: {}, fileEdits: {}, checkpoint: null,
     simClock: '09:00', realElapsed: 0, effortLogical: 0, replayIdx: 0, replayPlaying: true, mode: 'live',

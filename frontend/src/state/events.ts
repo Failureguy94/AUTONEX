@@ -131,6 +131,15 @@ export function applyEvent(e: Envelope, instant = false) {
       setAgents(p.agent_id, { status: 'FAILED', failed: (useStore.getState().agents[p.agent_id]?.failed ?? 0) + 1 });
       director.confuse(e.agent_id!);
       pushLog(e, `${name(e.agent_id)} failed ${p.task_id}: ${p.reason}${p.will_retry ? ' (retrying)' : ''}`);
+      if (
+        p.reason?.includes('0G Private Computer inference failed') ||
+        p.reason?.includes('Execution halted')
+      ) {
+        useStore.getState().triggerErrorCheckpoint({
+          error: p.reason,
+          failedAgentId: p.agent_id,
+        });
+      }
       break;
     case 'task.rework':
       setTask(p.task_id, { status: 'running', attempts: (useStore.getState().tasks[p.task_id]?.attempts ?? 0) + 1 });
@@ -184,6 +193,18 @@ export function applyEvent(e: Envelope, instant = false) {
       const notes = [...useStore.getState().notes, { id: p.id, author_agent_id: p.author_agent_id, topic: p.topic, note: p.note, ts: p.ts && p.ts !== '--:--' ? p.ts : e.ts_sim }];
       useStore.setState({ notes, notePulse: useStore.getState().notePulse + 1 });
       pushLog(e, `${name(p.author_agent_id)} pinned a note: "${p.note}"`);
+
+      // Automatically detect 0G Private Computer inference failures or execution halts
+      if (
+        p.topic === 'ERROR' ||
+        p.note.includes('0G Private Computer inference failed') ||
+        p.note.includes('Execution halted:')
+      ) {
+        useStore.getState().triggerErrorCheckpoint({
+          error: p.note,
+          failedAgentId: p.author_agent_id || e.agent_id,
+        });
+      }
       break;
     }
     case 'llm.call_started': {
