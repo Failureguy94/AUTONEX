@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useStore } from '@/state/store';
 import { Landing } from '@/ui/Landing';
 import { Workspace } from '@/ui/Workspace';
+import { ArkivHistoryModal } from '@/ui/ArkivHistoryModal';
 import { MODELS } from '@/mock/data';
 import { USE_MOCK } from '@/api/client';
 import { setAccent, resetAccentBlend } from '@/three/materials';
@@ -15,6 +16,7 @@ export default function App() {
   const phase = useStore((s) => s.phase);
   const appMode = useStore((s) => s.appMode);
   const swarmSize = useStore((s) => s.swarmSize);
+  const arkivHistoryOpen = useStore((s) => s.arkivHistoryOpen);
 
   useEffect(() => {
     // startup validator — the app refuses to run on an invalid layout
@@ -50,5 +52,13 @@ export default function App() {
     }
   }, []);
 
-  return <div className="h-full w-full">{phase === 'landing' ? <Landing /> : <Workspace />}</div>;
+  return (
+    <div className="h-full w-full">
+      {phase === 'landing' ? <Landing /> : <Workspace />}
+      <ArkivHistoryModal
+        open={arkivHistoryOpen}
+        onClose={() => useStore.setState({ arkivHistoryOpen: false })}
+      />
+    </div>
+  );
 }

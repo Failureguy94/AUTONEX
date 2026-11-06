@@ -5,6 +5,7 @@ import { engine } from '@/state/engine';
 import { LAYOUT } from '@/config/layout';
 import { setAccent, resetAccentBlend } from '@/three/materials';
 import { USE_MOCK } from '@/api/client';
+import { ConnectWalletButton } from './ConnectWalletButton';
 
 const SPEEDS = [1, 10, 60];
 
@@ -200,6 +201,12 @@ export function Toolbar() {
         />
 
         <ToolbarBtn
+          onClick={() => useStore.setState({ arkivHistoryOpen: true })}
+          icon={I.database}
+          label="Arkiv"
+        />
+
+        <ToolbarBtn
           active={s.dev}
           onClick={() => useStore.setState({ dev: !s.dev })}
           icon={I.bug}
@@ -224,6 +231,8 @@ export function Toolbar() {
             </option>
           ))}
         </select>
+
+        <ConnectWalletButton />
 
         {USE_MOCK ? (
           <span

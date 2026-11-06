@@ -10,6 +10,7 @@ import { setAccent, resetAccentBlend } from '@/three/materials';
 import { sfx } from '@/sim/sound';
 import { triage } from '@/mock/triage';
 import { ZGConfigModal } from './ZGConfigModal';
+import { ConnectWalletButton } from './ConnectWalletButton';
 
 const CHIPS = [
   'Compare top 3 open-weight coding models and build a tiny CLI that benchmarks one',
@@ -207,6 +208,20 @@ export function Landing() {
             />
           </label>
 
+          {/* Arkiv & Swarm Ledger */}
+          <button
+            type="button"
+            onClick={() => useStore.setState({ arkivHistoryOpen: true })}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 bg-white/70 hover:bg-white text-xs font-heading text-ink/80 transition-all shadow-xs"
+            title="Browse verified runs and context files stored on Arkiv and Ethereum Swarm"
+          >
+            <Icon d={I.database} size={12} />
+            <span>Arkiv & Swarm</span>
+          </button>
+
+          {/* Connected Web3 Wallet for Arkiv */}
+          <ConnectWalletButton />
+
           {/* Direct Header CTA */}
           <button
             onClick={handleHeaderAction}
@@ -350,6 +365,19 @@ export function Landing() {
                 ) : (
                   <span>{appMode === 'swarm' ? 'Convene swarm' : 'Open the office'}</span>
                 )}
+              </button>
+            </div>
+
+            {/* Quick access to decentralized Arkiv + Swarm Ledger */}
+            <div className="flex items-center gap-2 mt-2.5 mb-1">
+              <button
+                type="button"
+                onClick={() => useStore.setState({ arkivHistoryOpen: true, arkivActiveTab: 'swarm_context' })}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-xs font-mono transition-transform hover:scale-105"
+                title="Browse decentralized simulation runs and context deliverables on Arkiv Rabdi DB-Chain & Swarm"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Browse Arkiv & Swarm Ledger ↗</span>
               </button>
             </div>
 

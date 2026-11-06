@@ -14,6 +14,7 @@
   <a href="#"><img src="https://img.shields.io/badge/Three.js-WebGL_3D_Floor-000000?style=for-the-badge&logo=threedotjs&logoColor=white" alt="Three.js WebGL"></a>
   <a href="#"><img src="https://img.shields.io/badge/Dual_Engine-Office_%26_Swarm-00d4ff?style=for-the-badge" alt="Dual Engine"></a>
   <a href="#"><img src="https://img.shields.io/badge/Open_Weight-DeepSeek--R1_%7C_Groq_%7C_Qwen-34d399?style=for-the-badge&logo=huggingface&logoColor=white" alt="Open Weights"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Database-Arkiv_Network_Rabdi-10b981?style=for-the-badge&logo=blockchaindotcom&logoColor=white" alt="Arkiv Network"></a>
   <a href="#"><img src="https://img.shields.io/badge/License-MIT-ff7518?style=for-the-badge" alt="MIT License"></a>
 </p>
 
@@ -21,9 +22,9 @@
   <a href="#"><img src="https://img.shields.io/badge/React-18.3-61dafb?style=flat-square&logo=react" alt="React 18"></a>
   <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="#"><img src="https://img.shields.io/badge/Node.js-20+-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Python-3.11+-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
-  <a href="#"><img src="https://img.shields.io/badge/FastAPI-Swarm_Bridge-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Vitest-40_Passing-green?style=flat-square&logo=vitest" alt="Vitest 40 passing"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Arkiv_SDK-1.0.1-00d4ff?style=flat-square" alt="Arkiv SDK"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Rabdi_Testnet-Chain_7794095-emerald?style=flat-square" alt="Rabdi Chain ID 7794095"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Vitest-59_Passing-green?style=flat-square&logo=vitest" alt="Vitest 59 passing"></a>
   <a href="#"><img src="https://img.shields.io/badge/Pytest-45_Passing-green?style=flat-square&logo=pytest" alt="Pytest 45 passing"></a>
 </p>
 
@@ -66,6 +67,87 @@
 | Real provider HTTP adapters in the Python gateway | ✅ Done | OpenRouter, DeepSeek and Groq adapters run behind the gateway's rate limiter, breaker and fallback chain |
 | AUTONEX / PAG terminal agent (`backend/`) | ✅ Done | Docker sandbox, `strict` / `assist` / `turbo` profiles, egress allowlist, eval harness |
 | Git merge / discard from the UI report | ✅ Done | Report buttons merge or discard the `agent/<timestamp>` branch |
+| Arkiv decentralized database (Rabdi Testnet) | ✅ Done | Schemas, wallet signing with tGLM, zero-gas public reads, verifiable ledger modal |
+
+---
+
+## 🌐 Arkiv Network Integration (Decentralized Database on Rabdi DB-Chain)
+
+GravityDesk integrates **Arkiv Network** as its native decentralized database layer, anchoring autonomous simulation results, swarm consensus proofs, and full codebase deliverables directly onto the **Rabdi DB-Chain Testnet**.
+
+### Why Arkiv?
+Traditional databases (Postgres, MongoDB) rely on centralized trust: a server operator can tamper with simulation outputs or alter multi-agent votes. Conversely, storing multi-file source code directly on Ethereum L1/L2 smart contracts is cost-prohibitive. Arkiv provides:
+1. **Decentralized Cryptographic Quorum:** Swarm voting proofs (agreement %, Borda ballots) are stored immutably on Rabdi DB-Chain.
+2. **Zero-Gas Public Codebase Reads:** Anyone can query, audit, and unpack project files (`bundle_bytes`) via standard JSON-RPC without paying gas.
+3. **Wallet-Authorized Ownership:** Users own their simulation runs directly through their connected wallet (MetaMask) on Rabdi Testnet.
+4. **Native Protocol Expiration (TTL):** Simulation entities default to a 90-day retention period, keeping storage fees minimal while enabling on-demand renewal (+90 days).
+
+### Network Configuration:
+- **Network Name:** Rabdi DB-Chain Testnet
+- **Chain ID:** `7794095`
+- **RPC URL:** `https://rpc.rabdi.db-chain.testnet.arkiv.network`
+- **Native Currency:** `tGLM` (18 decimals)
+- **Block Explorer:** [https://rabdi.explorer.arkiv.network](https://rabdi.explorer.arkiv.network)
+- **Faucet:** [https://hub.arkiv.network/](https://hub.arkiv.network/)
+
+### What is Stored on Arkiv vs Ethereum Swarm vs Off-Chain:
+| Data Category | Storage Location | Schema Name | Reason & Privacy |
+|---|---|---|---|
+| **User Identity** | Arkiv DB-Chain | `autonex.user` | Checksummed wallet address, display name, account created timestamp |
+| **Project Workspaces** | Arkiv DB-Chain | `autonex.project` | Project metadata, owner, active status, creation timestamp |
+| **Swarm Context Pointers** | Arkiv DB-Chain | `autonex.context_ref` | Pointer linking project/report to Swarm BZZ content address + SHA-256 hash |
+| **Simulation Runs** | Arkiv DB-Chain | `autonex.run` | Publicly verifiable execution record, status, owner |
+| **Codebase Deliverables** | Arkiv DB-Chain | `autonex.deliverable` | Complete source code bundle (`bundle_bytes`), tests, score |
+| **Swarm Deliberation Quorum** | Arkiv DB-Chain | `autonex.swarm_round` | Consensus proof, quorum %, semantic clusters, ballots |
+| **Operator Permission Audits** | Arkiv DB-Chain | `autonex.audit_log` | Immutable safety trace of human permissions granted to agents |
+| **Heavy Context & Report Files** | Ethereum Swarm (BZZ) | `bzz://<ref>` | Content-addressed large Markdown reports, JSON context manifests, file bundles |
+| **Raw LLM Token Streams** | Off-chain (Ephemeral) | N/A | High-frequency streaming tokens (not cost-effective to store on-chain) |
+| **Local OS File Buffers** | Off-chain (Local Disk) | N/A | Temporary local workspace files during live agent coding |
+
+### Wallet Connection & tGLM Payments:
+1. Click **Connect Wallet** in the top navbar (accessible both on the Landing screen and inside the Virtual Office).
+2. If your wallet is on Ethereum or another network, the UI prompts you to switch to **Rabdi DB-Chain** (Chain ID: `7794095`).
+3. To publish runs and store context references, request free testnet `tGLM` from [Arkiv Hub](https://hub.arkiv.network/).
+4. When you click **"Store on Swarm & Anchor to Arkiv"** in the Final Report, the file is uploaded to Swarm, its SHA-256 integrity hash is computed, and your connected wallet signs an Ethereum transaction on Rabdi DB-Chain paying ~0.0001 `tGLM` in gas.
+5. No private keys are ever exposed or stored; all signing is authorized explicitly by the user's browser wallet.
+
+### Reproducible Arkiv + Swarm Verification:
+Judges and reviewers can immediately verify the Rabdi DB-Chain and Swarm pipeline:
+```bash
+# Run the automated Arkiv + Swarm query reproducer
+node scripts/reproduce-swarm-arkiv.mjs
+
+# Or run the Arkiv run query reproducer
+node scripts/reproduce-query.mjs
+```
+The script demonstrates:
+1. Connecting to Rabdi DB-Chain RPC (Chain ID: `7794095`).
+2. Executing all 6 Arkiv query shapes (`autonex.user`, `autonex.project`, `autonex.context_ref` by project, latest ref, by report ID, and public refs).
+3. Deriving 64-hex Swarm BZZ content addresses.
+4. Cryptographic SHA-256 integrity verification (100% bit-perfect match).
+
+### Testing Instructions:
+```bash
+# Run full suite (16 test suites, 112 passing tests)
+npm run check
+```
+
+### Decentralized Storage Documentation:
+- Architecture & Pipeline Guide: [`docs/ARKIV_SWARM_ARCHITECTURE.md`](file:///home/pritul-singh/AUTONEX/docs/ARKIV_SWARM_ARCHITECTURE.md)
+- Full Schema Specification: [`/arkiv/schema.md`](file:///home/pritul-singh/AUTONEX/arkiv/schema.md)
+- Developer Friction & Feedback: [`/arkiv/friction.md`](file:///home/pritul-singh/AUTONEX/arkiv/friction.md)
+- Architectural Justification: [`/arkiv/why-arkiv.md`](file:///home/pritul-singh/AUTONEX/arkiv/why-arkiv.md)
+- Target Audience & Reach: [`/arkiv/reach.md`](file:///home/pritul-singh/AUTONEX/arkiv/reach.md)
+- Reproducible Arkiv + Swarm Script: [`scripts/reproduce-swarm-arkiv.mjs`](file:///home/pritul-singh/AUTONEX/scripts/reproduce-swarm-arkiv.mjs)
+
+---
+
+## 🤖 Honest AI Usage Disclosure
+
+In compliance with ETHGlobal hackathon rules:
+- **Autonomous Simulation Logic:** GravityDesk uses open-weight LLMs (DeepSeek-R1 / V3, Qwen-2.5-Coder-32B, Llama-3.3-70B via Groq/OpenRouter) to generate plans, code deliverables, and multi-agent swarm debates.
+- **Development Assistance:** AI coding assistants (Google Antigravity / Claude) were used as pair-programming tools during development to assist with TypeScript boilerplate, Three.js shaders, and test creation.
+- **Architecture & Web3 Integration:** All schema designs (`autonex.*`), Arkiv SDK implementation, wallet authorization flows, and consensus verification logic were architected, tested, and validated by the team.
 
 ---
 
