@@ -80,7 +80,7 @@ AUTONEX integrates **0G Private Compute** and the **iAI token staking ecosystem*
 - **Direct 0G Router Inference:** Agents execute complex reasoning across approved 0G models (`glm-5.3-flash`, `qwen3-coder-flash`, `kimi-k2.7-code`, and `qwen3.7-flash`).
 - **Cryptographic Wallet Verification:** Proves wallet ownership via EIP-191 `personal_sign` nonce challenges (Chain ID: `16661`), establishing verifiable identity without exposing sensitive private keys.
 - **iAI Staking Benefits:** Verifies on-chain iAI staked debt positions directly against the Vault contract (`0x3e1762e84ecdfb7042a9b6c4b2257d09618f03ff`). Eligible stakers unlock **1.271 indicative daily compute credits** per staked iAI.
-- **Detailed Integration Spec:** See [`frontend/docs/IAI_0G_INTEGRATION.md`](file:///home/pritul-singh/AUTONEX/frontend/docs/IAI_0G_INTEGRATION.md).
+- **Architecture & Technical Spec:** See [`docs/0G_ARCHITECTURE.md`](file:///d:/AUTONEX/docs/0G_ARCHITECTURE.md) and [`frontend/docs/IAI_0G_INTEGRATION.md`](file:///d:/AUTONEX/frontend/docs/IAI_0G_INTEGRATION.md).
 
 ---
 

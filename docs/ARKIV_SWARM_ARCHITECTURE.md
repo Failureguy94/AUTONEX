@@ -11,7 +11,7 @@ AUTONEX integrates a decentralized, cost-optimized, and cryptographically verifi
 
 | Layer | Technology | Primary Role | Data Stored | Gas / Economic Model |
 | :--- | :--- | :--- | :--- | :--- |
-| **Inference & Execution** | **0G Private Computer** | Confidential model routing & agent deliberation | LLM prompts, tool execution, DAG steps | 0G Compute Credits |
+| **Inference & Execution** | **0G Private Computer** ([Architecture Spec](file:///d:/AUTONEX/docs/0G_ARCHITECTURE.md)) | Confidential model routing & agent deliberation | LLM prompts, tool execution, DAG steps | 0G Compute Credits |
 | **Metadata & Identity** | **Arkiv DB-Chain** (Rabdi Testnet, ID: 7794095) | Verifiable source of truth, indexes, pointers, consensus | User identity, project metadata, report pointers, SHA-256 hashes, quorum proofs | Low-cost `tGLM` native token, zero-gas public reads |
 | **Heavy File Payloads** | **Ethereum Swarm** (BZZ) | Immutable, content-addressed decentralized storage | Large context files, Markdown synthesis reports, full code bundles | Swarm Postage Batches / BZZ content addressing |
 
