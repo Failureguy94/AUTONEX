@@ -48,6 +48,7 @@ export function Landing() {
   const appMode = useStore((s) => s.appMode);
   const swarmSize = useStore((s) => s.swarmSize);
   const zgConn = useStore((s) => s.zgConnection);
+  const iai = useStore((s) => s.iai);
   const executionState = useStore((s) => s.executionState);
   const setZGModal = useStore((s) => s.setZGModalOpen);
   const checkZGStatus = useStore((s) => s.checkZGStatus);
@@ -151,10 +152,14 @@ export function Landing() {
                 zgConn.isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
               }`}
             />
-            <span>0G Private Computer</span>
+            <span>0G Compute · iAI Hub</span>
             <span className="opacity-40">·</span>
             <span className="text-[10px] font-semibold uppercase">
-              {zgConn.isVerified ? (zgConn.maskedKey ? `Verified (${zgConn.maskedKey})` : 'Verified') : 'Click to Configure'}
+              {iai?.stakingStatus === 'verified'
+                ? `iAI Verified (${iai.indicativeDailyCredits.toFixed(2)} cr/d)`
+                : zgConn.isVerified
+                ? (zgConn.maskedKey ? `Active (${zgConn.maskedKey})` : 'Active')
+                : 'Configure & Verify'}
             </span>
           </button>
           {USE_MOCK && (

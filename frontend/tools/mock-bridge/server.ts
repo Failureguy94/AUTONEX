@@ -47,6 +47,8 @@ interface Run {
 }
 
 const runs = new Map<string, Run>();
+const activeNonces = new Map<string, { address: string; issuedAt: number }>();
+const authenticatedSessions = new Map<string, { address: string; verifiedAt: number }>();
 let config = {
   model_id: MODELS[0].id,
   concurrency_limit: 4,
@@ -237,6 +239,106 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
         });
       }
 
+      // ----------------------------------------------------------------------
+      // Wallet Authentication & Nonce Verification (EIP-4361 / SIWE style)
+      // ----------------------------------------------------------------------
+      if (p === '/api/auth/nonce' && req.method === 'GET') {
+        const address = (url.searchParams.get('address') || '').toLowerCase();
+        const nonce = 'auth_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        const issuedAt = new Date().toISOString();
+        activeNonces.set(nonce, { address, issuedAt: Date.now() });
+        return json(res, 200, { nonce, issuedAt, address });
+      }
+
+      if (p === '/api/auth/verify' && req.method === 'POST') {
+        const b = await readBody(req);
+        const address = (b.address || '').toLowerCase();
+        const { message, signature, nonce } = b;
+
+        if (!address || !message || !signature) {
+          return json(res, 400, { verified: false, message: 'Missing address, message or signature.' });
+        }
+
+        try {
+          const { verifyMessage } = await import('viem');
+          const isValid = await verifyMessage({
+            address: address as `0x${string}`,
+            message,
+            signature: signature as `0x${string}`
+          });
+
+          if (!isValid) {
+            return json(res, 401, { verified: false, message: 'Cryptographic signature verification failed.' });
+          }
+
+          const token = 'sess_' + Math.random().toString(36).substring(2, 14) + Date.now().toString(36);
+          authenticatedSessions.set(token, { address, verifiedAt: Date.now() });
+          if (nonce) activeNonces.delete(nonce);
+
+          return json(res, 200, {
+            verified: true,
+            token,
+            address,
+            message: 'Wallet ownership verified successfully'
+          });
+        } catch (err: any) {
+          return json(res, 400, { verified: false, message: err?.message || 'Signature verification error' });
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // iAI Holder Staking & On-Chain Query
+      // ----------------------------------------------------------------------
+      if (p === '/api/iai/status' && req.method === 'GET') {
+        const address = url.searchParams.get('address') || '';
+        if (!address) {
+          return json(res, 400, { error: 'Address required' });
+        }
+        try {
+          const { queryOnChainIAIStatus } = await import('../../src/services/iaiContract');
+          const status = await queryOnChainIAIStatus(address);
+          return json(res, 200, status);
+        } catch (err: any) {
+          return json(res, 500, { error: err?.message || 'Error querying iAI on-chain status' });
+        }
+      }
+
+      if (p === '/api/iai/usage' && req.method === 'GET') {
+        const usage = zgClient.getUsageMetrics();
+        return json(res, 200, usage);
+      }
+
+      if (p === '/api/iai/balance' && req.method === 'GET') {
+        const balance = await zgClient.checkAccountBalance();
+        return json(res, 200, balance);
+      }
+
+      if (p === '/api/zg/test-inference' && req.method === 'POST') {
+        const b = await readBody(req);
+        const prompt = b.prompt || 'Say hello in 3 words';
+        const model = b.model || 'glm-5.3-flash';
+        try {
+          const zgRes = await zgClient.call({
+            prompt,
+            model,
+            task: 'general',
+            maxTokens: 15
+          });
+          return json(res, 200, {
+            ok: true,
+            status: 'successful',
+            result: zgRes,
+            usage: zgClient.getUsageMetrics()
+          });
+        } catch (err: any) {
+          return json(res, 500, {
+            ok: false,
+            status: 'failed',
+            error: err.message
+          });
+        }
+      }
+
       if (p === '/api/config/0g/status' && req.method === 'GET') {
         return json(res, 200, zgClient.getConnectionStatus());
       }
@@ -244,7 +346,11 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
       if (p === '/api/config/0g/verify' && req.method === 'POST') {
         const b = await readBody(req);
         const apiKey = b.apiKey || b.api_key;
+        const walletAddress = b.walletAddress || b.wallet_address;
         const result = await zgClient.validateCredentials(apiKey);
+        if (result.valid && walletAddress) {
+          zgClient.associateWalletKey(walletAddress, apiKey);
+        }
         const statusCode = result.valid ? 200 : (result.status === 'invalid_key' ? 401 : 400);
         return json(res, statusCode, result);
       }
