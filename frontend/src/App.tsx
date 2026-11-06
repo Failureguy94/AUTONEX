@@ -44,13 +44,10 @@ export default function App() {
     const hex = useStore.getState().accent;
     document.documentElement.style.setProperty('--accent', hex);
     setAccent(hex); resetAccentBlend();
-    if (USE_MOCK) useStore.setState({ models: MODELS });
-    else {
-      fetch(apiUrl('/api/models'))
-        .then((r) => r.json())
-        .then((models) => useStore.setState({ models, demoMode: false, offline: false }))
-        .catch(() => useStore.setState({ models: MODELS, demoMode: false }));
-    }
+    fetch(apiUrl('/api/models'))
+      .then((r) => r.json())
+      .then((models) => useStore.setState({ models: Array.isArray(models) && models.length ? models : MODELS, demoMode: false, offline: false }))
+      .catch(() => useStore.setState({ models: MODELS, demoMode: false }));
   }, []);
 
   return (

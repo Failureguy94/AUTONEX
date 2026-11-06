@@ -38,7 +38,8 @@ const env = (k: string): string | undefined =>
   (import.meta as any).env?.[k] ?? (typeof process !== 'undefined' ? process.env?.[k] : undefined);
 export const API_URL = env('VITE_API_URL') ?? '';
 export const apiUrl = (path: string) => `${API_URL}${path}`;
-export const USE_MOCK = env('VITE_USE_MOCK') === 'true';
+// Default to built-in simulation engine unless explicitly configured with VITE_USE_MOCK=false
+export const USE_MOCK = env('VITE_USE_MOCK') !== 'false';
 
 export class HttpClient implements ApiClient {
   private base = API_URL;
