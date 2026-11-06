@@ -160,7 +160,6 @@ class LiveEngine implements RunEngine {
       useStore.setState({ toast: msg, offline: false, demoMode: false, executionState: 'failed', executionError: msg });
       useStore.getState().triggerErrorCheckpoint({
         error: msg,
-        reason: /credit|balance|quota/i.test(msg) ? 'credit_depletion' : 'inference_error'
       });
     }
   }

@@ -50,16 +50,35 @@ export async function switchOrAddRabdiNetwork(): Promise<void> {
 
   const chainIdHex = '0x76ee8f'; // 7794095 in hex
 
+  // Check current chain ID first! If already on Rabdi, return immediately without throwing switch prompt
+  try {
+    const currentChain = await eth.request({ method: 'eth_chainId' });
+    if (
+      currentChain &&
+      (String(currentChain).toLowerCase() === chainIdHex.toLowerCase() ||
+        parseInt(String(currentChain), 16) === 7794095 ||
+        Number(currentChain) === 7794095)
+    ) {
+      return;
+    }
+  } catch (err) {
+    console.warn('[Rabdi] eth_chainId check error:', err);
+  }
+
   try {
     await eth.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: chainIdHex }],
     });
   } catch (switchError: any) {
+    const msg = switchError?.message || '';
+    if (msg.includes('already') || msg.includes('current')) {
+      return;
+    }
     if (
       switchError?.code === 4902 ||
-      switchError?.message?.includes('unrecognized') ||
-      switchError?.message?.includes('Unknown chain') ||
+      msg.includes('unrecognized') ||
+      msg.includes('Unknown chain') ||
       switchError?.data?.originalError?.code === 4902
     ) {
       await eth.request({
@@ -95,7 +114,7 @@ export async function ensureRabdiWalletClient(
   }
 
   if (eth) {
-    // 1. Switch or register Rabdi DB-Chain in wallet
+    // 1. Switch or register Rabdi DB-Chain in wallet if not already on it
     await switchOrAddRabdiNetwork();
 
     // 2. Request / check connected account
