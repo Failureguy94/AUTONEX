@@ -1,16 +1,16 @@
 <!-- Animated Header with Walking AI Agents -->
 <p align="center">
-  <img src="assets/gravitydesk_header.svg" alt="GravityDesk Animated Header" width="100%">
+  <img src="assets/autonex_header.svg" alt="AUTONEX Animated Header" width="100%">
 </p>
 
 <!-- Hero Banner -->
 <p align="center">
-  <img src="assets/gravitydesk_banner.jpg" alt="GravityDesk - Multi-Agent Software Engineering Floor" width="100%" style="border-radius: 12px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);">
+  <img src="assets/autonex_banner.jpg" alt="AUTONEX - Multi-Agent Software Engineering Floor" width="100%" style="border-radius: 12px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);">
 </p>
 
 <!-- Badges -->
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/GravityDesk-v2.0-7b2ff7?style=for-the-badge&logo=rocket&logoColor=white" alt="GravityDesk v2.0"></a>
+  <a href="https://github.com/pritulsingh/AUTONEX"><img src="https://img.shields.io/badge/AUTONEX-v2.0-7b2ff7?style=for-the-badge&logo=rocket&logoColor=white" alt="AUTONEX v2.0"></a>
   <a href="#"><img src="https://img.shields.io/badge/Three.js-WebGL_3D_Floor-000000?style=for-the-badge&logo=threedotjs&logoColor=white" alt="Three.js WebGL"></a>
   <a href="#"><img src="https://img.shields.io/badge/Dual_Engine-Office_%26_Swarm-00d4ff?style=for-the-badge" alt="Dual Engine"></a>
   <a href="#"><img src="https://img.shields.io/badge/Open_Weight-DeepSeek--R1_%7C_Groq_%7C_Qwen-34d399?style=for-the-badge&logo=huggingface&logoColor=white" alt="Open Weights"></a>
@@ -29,13 +29,17 @@
 
 ---
 
-### A spatially-grounded, multi-agent autonomous engineering simulation where specialized AI agents plan, debate in swarms, cross-examine architectures, and deliver code inside an observable real-time 3D workspace.
+<p align="center">
+  <b><i>"Where code is not just written — it is deliberated, architected, and proven."</i></b>
+</p>
+
+> **AUTONEX** is a next-generation autonomous engineering nexus. Instead of an isolated chatbot guessing in a terminal, AUTONEX orchestrates software development across an observable 3D spatial floor powered by **0G decentralized compute**, multi-agent consensus deliberation, and zero-trust permission boundaries.
 
 ---
 
 ## ⚡ Core Highlights
 
-- **Dual-Engine Workflows:** Switch between **Deskmates Virtual Office** (manager + backend, frontend and QA engineers) and **Swarm Hall** (10, 20, 30, 40 or 50 agents at a grand oval conference table).
+- **Dual-Engine Workflows:** Switch between **AUTONEX Virtual Office** (manager + backend, frontend and QA engineers) and **Swarm Hall** (10, 20, 30, 40 or 50 agents at a grand oval conference table).
 - **Live LLM Execution:** In live mode, plans, proposals, critiques, votes and code deliverables are generated from your prompt through a multi-provider fallback chain (**DeepSeek-V3 / R1, Qwen-2.5-Coder, Llama-3.3-70B** via OpenRouter, DeepSeek direct, or Groq).
 - **Real Tool-Using Agents:** Agents read files and PDFs, write code to disk, run shell commands and execute tests, every action gated by a permission request.
 - **Visual Rate-Limit Backoff (Coffee Breaks):** On HTTP 429, the affected agent walks to the pantry, waits out the cooldown, and the bridge auto-switches to the next model in the chain.
@@ -60,14 +64,14 @@
 | Provider Gateway (Python) | ✅ Done | Token bucket, TPM window, priority queue with aging, AIMD on 429, circuit breaker, fallback chain. 16 tests |
 | Swarm Engine (Python / FastAPI) | ✅ Done | Full 6-phase engine, real Borda tally, clustering, verification, supervisor, privacy firewall. 29 tests. Wired to live provider adapters |
 | Real provider HTTP adapters in the Python gateway | ✅ Done | OpenRouter, DeepSeek and Groq adapters run behind the gateway's rate limiter, breaker and fallback chain |
-| RealGravity / PAG terminal agent (`backend/`) | ✅ Done | Docker sandbox, `strict` / `assist` / `turbo` profiles, egress allowlist, eval harness |
+| AUTONEX / PAG terminal agent (`backend/`) | ✅ Done | Docker sandbox, `strict` / `assist` / `turbo` profiles, egress allowlist, eval harness |
 | Git merge / discard from the UI report | ✅ Done | Report buttons merge or discard the `agent/<timestamp>` branch |
 
 ---
 
 ## 🏛️ Dual Working Modalities
 
-### 1. Deskmates Office Mode (Collaborative Sprint Execution)
+### 1. AUTONEX Office Mode (Collaborative Sprint Execution)
 Designed for iterative feature development, bug fixing and test-driven work:
 - 👩‍💼 **Diya (Lead Manager):** Goal triage, task planning, glass-walled executive cabin and real-time operator chat.
 - 👨‍💻 **Rohan (Backend Engineer):** APIs, schemas and system logic.
@@ -195,7 +199,7 @@ sequenceDiagram
 - Local file classifier labels files `restricted` / `internal` / `public` (`.env*`, keys, certs and credentials are restricted by default).
 - Secret and PII **redaction**, **pseudonymization**, payload minimization, **canary token** leak detection and a local audit log.
 
-**RealGravity / PAG Sandbox (`backend/`):**
+**AUTONEX / PAG Sandbox (`backend/`):**
 - Docker-isolated agent with an nginx key-injecting LLM proxy (keys never enter the container), a Squid egress allowlist, and private SearXNG search.
 - Three profiles: `strict` (asks before every edit), `assist` (default), `turbo` (auto-pilot on clean repos). `sudo`, `rm -rf`, `git push`, `ssh`, `scp` and `git reset --hard` are always denied.
 - Agent work lands on a throwaway `agent/<timestamp>` git branch with a live audit pane and live diff pane.
@@ -204,7 +208,7 @@ sequenceDiagram
 
 ## 🧰 Provider Gateway
 
-Implemented in `bridge/deskmates_bridge/gateway/` and covered by 16 tests:
+Implemented in `bridge/autonex_bridge/gateway/` and covered by 16 tests:
 
 - Real HTTP adapters for OpenRouter, DeepSeek and Groq
 - Token-bucket limiter with safety margin and a sliding **TPM window**
@@ -226,8 +230,8 @@ Implemented in `bridge/deskmates_bridge/gateway/` and covered by 16 tests:
 
 ### 2. Setup
 ```bash
-git clone https://github.com/bhalerao-aditya007/RealGravity_slayers.git
-cd RealGravity_slayers
+git clone https://github.com/pritulsingh/AUTONEX.git
+cd AUTONEX
 
 # Environment variables
 cp .env.example .env
@@ -263,17 +267,17 @@ npm run dev
 ```
 
 > On Windows, `scripts/start-all.ps1` launches both together.
-> **Note:** the live runner currently writes deliverables under a hard-coded `D:\GravityDesk\output` path. Change it in `frontend/tools/mock-bridge/realRunner.ts` if your checkout lives elsewhere.
+> **Note:** the live runner writes deliverables under `D:\AUTONEX\output` (configurable in `frontend/tools/mock-bridge/realRunner.ts`).
 
 ### 5. Run the Python Swarm Engine
 ```bash
 cd bridge
 pip install -e ".[dev]"
-uvicorn deskmates_bridge.main:app --port 8001
+uvicorn autonex_bridge.main:app --port 8001
 ```
 Exposes `/api/swarm/estimate`, `/api/swarm/{run_id}/admission`, `/consent`, `/steer`, `/board`, `/egress`, `/phase`, `/ideas`, `/api/providers/health` and `/ws/events`. Provider keys are read from the same `.env`.
 
-### 6. Run the RealGravity Terminal Agent
+### 6. Run the AUTONEX Terminal Agent
 ```bash
 cd backend
 cp .env.example .env && chmod 600 .env
@@ -336,10 +340,10 @@ python -m pytest -q
 |---|---|
 | `frontend/src/` | 3D office, swarm hall, UI panels, state store, A* navigation, simulator |
 | `frontend/tools/mock-bridge/` | Node/TS live bridge: REST + WS server, agent loop, real runner, swarm runner |
-| `bridge/deskmates_bridge/gateway/` | Provider Gateway (provider adapters, rate limiting, breaker, routing) |
-| `bridge/deskmates_bridge/swarm/` | Phase engine, tally, clustering, verification, supervisor, privacy, store |
+| `bridge/autonex_bridge/gateway/` | Provider Gateway (provider adapters, rate limiting, breaker, routing) |
+| `bridge/autonex_bridge/swarm/` | Phase engine, tally, clustering, verification, supervisor, privacy, store |
 | `bridge/config/` | `providers`, `models`, `departments`, `triage`, `swarm`, `personas` YAML |
-| `backend/` | RealGravity / PAG terminal agent: Docker, profiles, plugins, evals |
+| `backend/` | AUTONEX / PAG terminal agent: Docker, profiles, plugins, evals |
 | `output/` | Projects generated during testing (InMemoryCache, RogueCrawler, CRYPTracker, CipherTool, AI Lab solutions) |
 | `frontend/docs/` | Architecture, API contract, bridge spec, triage, acceptance tests |
 
@@ -353,5 +357,5 @@ python -m pytest -q
 ---
 
 <p align="center">
-  <b>GravityDesk</b> · Built with 💜 for the next generation of autonomous engineering.
+  <b>AUTONEX</b> · Built with 💜 for the next generation of autonomous engineering.
 </p>

@@ -1,5 +1,5 @@
 import pytest
-from deskmates_bridge.swarm.rounds.personas import (
+from autonex_bridge.swarm.rounds.personas import (
     PERSONA_COUNTS_BY_N,
     PersonaSeatAllocator,
     compute_distinctness,

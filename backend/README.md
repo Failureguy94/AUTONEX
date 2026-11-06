@@ -1,4 +1,4 @@
-# RealGravity (PAG: Personal Antigravity)
+# AUTONEX (PAG Autonomous Coding Engine)
 
 A personal, terminal-first, autonomous coding agent that mirrors Google Antigravity's permissions, safety sandboxing, and diff visibility — powered by **free open-weight models** from Groq, NVIDIA NIM, OpenRouter, and OpenCode Go.
 
@@ -22,7 +22,7 @@ You only need **one** key to start. Add more providers later.
 ### 2. Configure
 
 ```bash
-cd /mnt/d/Realgravity
+cd /mnt/d/AUTONEX
 cp .env.example .env
 chmod 600 .env
 # Edit .env — paste your key(s)
@@ -48,7 +48,7 @@ pag /path/to/project strict
 pag /path/to/project turbo
 ```
 
-You can also use the alias `realgravity` instead of `pag`.
+You can also use the alias `autonex` instead of `pag`.
 
 ---
 
@@ -105,7 +105,7 @@ Edit `profiles/base.json` → `agents.build.model` and `agents.plan.model`.
 
 ## Terminal Layout
 
-RealGravity opens in a 3-pane `tmux` session:
+AUTONEX opens in a 3-pane `tmux` session:
 
 1. **Left (Agent TUI):** Interactive OpenCode session with permissions, chat, and tool execution
 2. **Top-Right (Live Audit):** Real-time log of every file modified with exact line ranges
@@ -157,7 +157,7 @@ Pre-approve common shell commands for `assist`/`turbo` profiles:
    npm run lint *
    cargo check *
    ```
-2. On launch, RealGravity shows these, asks for confirmation, then allows them without prompting.
+2. On launch, AUTONEX shows these, asks for confirmation, then allows them without prompting.
 
 ---
 
@@ -171,7 +171,7 @@ The agent container can only reach:
 To add a documentation site:
 ```bash
 echo ".docs.rs" >> docker/allowlist.txt
-cd /mnt/d/Realgravity/docker && docker compose restart egress
+cd /mnt/d/AUTONEX/docker && docker compose restart egress
 ```
 
 ---
@@ -180,10 +180,10 @@ cd /mnt/d/Realgravity/docker && docker compose restart egress
 
 ```bash
 # 1. Edit .env with new key(s)
-nano /mnt/d/Realgravity/.env
+nano /mnt/d/AUTONEX/.env
 
 # 2. Restart the proxy
-cd /mnt/d/Realgravity/docker && docker compose up -d --force-recreate llmproxy
+cd /mnt/d/AUTONEX/docker && docker compose up -d --force-recreate llmproxy
 ```
 
 ---
@@ -205,13 +205,13 @@ Optimized for low-resource PCs (total Docker overhead ~2.5 GB):
 
 ```bash
 # Run all safety escape tests (S1-S9)
-/mnt/d/Realgravity/scripts/escape-tests.sh
+/mnt/d/AUTONEX/scripts/escape-tests.sh
 
 # Run context management unit tests
-cd /mnt/d/Realgravity/plugins/context && npx tsx --test lib.test.ts
+cd /mnt/d/AUTONEX/plugins/context && npx tsx --test lib.test.ts
 
 # View API quota usage
-/mnt/d/Realgravity/scripts/quota.sh
+/mnt/d/AUTONEX/scripts/quota.sh
 ```
 
 ---
@@ -221,10 +221,10 @@ cd /mnt/d/Realgravity/plugins/context && npx tsx --test lib.test.ts
 Run benchmarks on any model:
 ```bash
 # Run evals with a specific model and profile
-/mnt/d/Realgravity/evals/run.sh groq/llama-3.3-70b-versatile assist 3 1
+/mnt/d/AUTONEX/evals/run.sh groq/llama-3.3-70b-versatile assist 3 1
 
 # Compare models
-/mnt/d/Realgravity/evals/run.sh nvidia/meta/llama-3.1-70b-instruct assist 3 3
+/mnt/d/AUTONEX/evals/run.sh nvidia/meta/llama-3.1-70b-instruct assist 3 3
 ```
 
 ---
@@ -234,7 +234,7 @@ Run benchmarks on any model:
 If an agent run produces unwanted edits:
 ```bash
 # 1. Exit the agent (Ctrl+C or /exit)
-# 2. RealGravity prints the branch name (e.g. agent/20261002-173000)
+# 2. AUTONEX prints the branch name (e.g. agent/20261002-173000)
 
 # Discard all changes:
 git checkout main && git branch -D agent/<timestamp>

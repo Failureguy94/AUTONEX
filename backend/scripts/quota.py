@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RealGravity API Usage & Quota Summary.
+AUTONEX API Usage & Quota Summary.
 Cross-platform parser for logs/pag.log.
 """
 
@@ -14,7 +14,7 @@ def main():
     root_dir = os.path.dirname(script_dir)
     log_file = os.path.join(root_dir, "logs", "pag.log")
 
-    print("=== RealGravity (PAG) API Usage & Quota Summary ===")
+    print("=== AUTONEX (PAG) API Usage & Quota Summary ===")
     print()
 
     if not os.path.isfile(log_file):

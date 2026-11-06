@@ -1,19 +1,19 @@
 # START HERE — handoff to the integrating engineer (Antigravity / Claude Opus)
 
-**Mission:** connect the finished Deskmates office UI to RealGravity through a new **Bridge Server**, so that typing one task makes a
-manager triage it, hire the right team, run it on RealGravity + free open-weight models, and show every real action in the 3D office —
+**Mission:** connect the finished AUTONEX office UI to AUTONEX through a new **Bridge Server**, so that typing one task makes a
+manager triage it, hire the right team, run it on AUTONEX + free open-weight models, and show every real action in the 3D office —
 without hitting per-minute rate limits.
 
 You are given: a **verified frontend** (`src/`), a **contract-compliant mock backend** (`tools/mock-bridge`) that is the executable spec, a full
-**specification set** (`docs/`), config templates + a **tested Gateway core** (`bridge/`), and the owner's RealGravity docs (`reference/realgravity/`).
-You must build the rest of the Bridge. Read in this order: this file → `ARCHITECTURE.md` → `api-contract.md` → `BRIDGE_SPEC.md` → `TRIAGE_AND_PLANNING.md` → `MODEL_ROUTING_AND_RATE_LIMITS.md` → `REALGRAVITY_INTEGRATION.md` → `ACCEPTANCE_TESTS.md`.
+**specification set** (`docs/`), config templates + a **tested Gateway core** (`bridge/`), and the owner's AUTONEX docs (`reference/autonex_reference/`).
+You must build the rest of the Bridge. Read in this order: this file → `ARCHITECTURE.md` → `api-contract.md` → `BRIDGE_SPEC.md` → `TRIAGE_AND_PLANNING.md` → `MODEL_ROUTING_AND_RATE_LIMITS.md` → `AUTONEX_INTEGRATION.md` → `ACCEPTANCE_TESTS.md`.
 
 ---
 ## ⚑ A. Open items for the OWNER — ask them these before/while you build
 These cannot be decided by code. **Stop and ask the owner for each one that is still open.**
 
 ### A1. API keys (this answers "do we need more APIs to avoid the per-minute limit?" — yes, more *providers*)
-Rate limits are enforced **per account/key per provider**. One provider = one bucket = a bottleneck for a 6-worker run. The cure is **several independent providers**, each with its own free tier (that is exactly what RealGravity's mesh is for).
+Rate limits are enforced **per account/key per provider**. One provider = one bucket = a bottleneck for a 6-worker run. The cure is **several independent providers**, each with its own free tier (that is exactly what AUTONEX's mesh is for).
 
 | Priority | Provider (free, open-weight models) | Needed for | Get key at |
 |---|---|---|---|
@@ -38,7 +38,7 @@ Rate limits are enforced **per account/key per provider**. One provider = one bu
 4. **Permission Desk in v1?** Depends on discovery D4. If it can't work, ship v1 with `assist` + pre-approved commands and add it later (frontend already supports it).
 5. **Deadline / demo format** (live vs recorded tape) → scales the build order and how much to polish.
 6. **License:** `LICENSE` is MIT; switch to Apache-2.0 if the hackathon prefers (one file).
-7. **Who is the "real" RealGravity maintainer** for questions about plugin hook shapes (`plugins/audit`, `plugins/context`)?
+7. **Who is the "real" AUTONEX maintainer** for questions about plugin hook shapes (`plugins/audit`, `plugins/context`)?
 
 ---
 ## B. Verified state of what you received (re-run to confirm)
@@ -64,10 +64,10 @@ npm run dev            # office UI on :5173 (mock mode); VITE_USE_MOCK=false →
 ## C. Build plan (do in order; each phase ends with its acceptance test)
 | Phase | Build | Done when |
 |---|---|---|
-| 0 | Run section B. Run **Step 0 discovery** (`REALGRAVITY_INTEGRATION §2`, D1-D8) → `bridge/DISCOVERIES.md`. Eyeball the UI. | all D answered; UI looks right |
+| 0 | Run section B. Run **Step 0 discovery** (`AUTONEX_INTEGRATION §2`, D1-D8) → `bridge/DISCOVERIES.md`. Eyeball the UI. | all D answered; UI looks right |
 | 1 | `bridge/` skeleton: config loader, `events.py` (EventBus + SQLite tape + resume), `schemas.py` (pydantic mirror), REST/WS exactly like `tools/mock-bridge/server.ts`. Serve a **recorded tape** (`tapes/heavy.json`). | `live-contract.test.ts` passes with `VITE_API_URL` → your Bridge; B6 |
-| 2 | **Gateway** (`bridge/deskmates_bridge/gateway/` — core provided & tested; add FastAPI proxy + SSE streaming + providers + header learning). Point *nothing* else at providers. | `pytest bridge/tests/gateway` green; B4 fault-injection; real streaming call works |
-| 3 | **One real code worker**: launch one headless RealGravity session in a worktree through the Gateway; tail `audit.jsonl`; map events. | **B2** (exact line ranges in Inspector) |
+| 2 | **Gateway** (`bridge/autonex_bridge/gateway/` — core provided & tested; add FastAPI proxy + SSE streaming + providers + header learning). Point *nothing* else at providers. | `pytest bridge/tests/gateway` green; B4 fault-injection; real streaming call works |
+| 3 | **One real code worker**: launch one headless AUTONEX session in a worktree through the Gateway; tail `audit.jsonl`; map events. | **B2** (exact line ranges in Inspector) |
 | 4 | Permission relay via the plugin (or the D4 fallback). | **B3** (approve ≤ 1 s) |
 | 5 | Triage (heuristic port → scoring → LLM confirm) + budget pre-check + org + desks. | T1, T2, T4; unit tests ported from `triage.test.ts` |
 | 6 | Planner (manager DAG + validator + repair + templates) and leads (expand/review). | planner unit tests; B1 |
@@ -88,7 +88,7 @@ npm run dev            # office UI on :5173 (mock mode); VITE_USE_MOCK=false →
 1. The contract is additive-only. Change `docs/api-contract.md`, `src/api/types.ts`, the pydantic mirror **and** the tests together.
 2. **Never invent progress, breaks or chats.** Sprint runs emit none. A break needs a real trigger (`BRIDGE_SPEC §7`).
 3. Every LLM call goes through the Gateway. Workers never hold real keys. Keys never appear in events/logs/tapes/worktrees.
-4. Do not edit RealGravity internals, `profiles/*`, or `AGENTS.global.md`. One new plugin only.
+4. Do not edit AUTONEX internals, `profiles/*`, or `AGENTS.global.md`. One new plugin only.
 5. If you touch `src/config/layout.ts`, run `npm run test` — the validator guards the "no overlap / no clipping" promise.
 6. Be honest in the UI and the pitch: the Gateway keeps usage *within* provider limits; it does not bypass them.
 7. Anything marked **VERIFY** in the docs is an assumption — verify it, then record the answer in `bridge/DISCOVERIES.md`.

@@ -13,7 +13,7 @@ export interface AgentDef {
 const NAMES = [
   'Aanya', 'Rohan', 'Meera', 'Kabir', 'Isha', 'Vikram', 'Nisha', 'Arjun',
   'Tara', 'Dev', 'Kavya', 'Farhan', 'Anaya', 'Zoya', 'Neel', 'Riya',
-  'Sameer', 'Divya', 'Karan', 'Pooja', 'Yash', 'Sneha', 'Aditya', 'Lata',
+  'Sameer', 'Divya', 'Karan', 'Pooja', 'Yash', 'Sneha', 'Aryan', 'Lata',
 ];
 
 const llmBig = { kind: 'llm' as const, label: '0G · glm-5.3-flash (manager)' };
@@ -76,7 +76,7 @@ export function deskOf(id: string, org: AgentDef[]): { x: number; z: number } {
   return it?.seat ? { x: it.seat.x, z: it.seat.z } : { x: it!.x, z: it!.z };
 }
 
-// Model roster = the RealGravity free-tier mesh (whitepaper §4). Context windows are real:
+// Model roster = the AUTONEX free-tier mesh (whitepaper §4). Context windows are real:
 // 0G Private Computer (Router: https://router-api.0g.ai/v1) & Fallbacks
 export const MODELS: ModelInfo[] = [
   { id: '0g/glm-5.3-flash', label: '0G Private Computer · GLM 5.3 Flash (manager default)', provider: '0g', context_tokens: 1179648 },
@@ -126,7 +126,7 @@ export const SOLO_REPORT_MD = `# Quick draft
 
 Here is a short, self-contained draft written directly by the manager — no team was needed for a single-output task.
 
-> RealGravity runs a terminal-first coding agent on free open-weight models, with a permission-gated sandbox, staged context discipline, and one-command rollback.
+> AUTONEX runs a terminal-first coding agent on free open-weight models, with a permission-gated sandbox, staged context discipline, and one-command rollback.
 `;
 
 export const SOURCES = [

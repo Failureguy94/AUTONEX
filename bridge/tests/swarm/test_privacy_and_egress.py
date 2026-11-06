@@ -1,14 +1,14 @@
 import pytest
-from deskmates_bridge.swarm.privacy.audit import CanaryManager
-from deskmates_bridge.swarm.privacy.classify import FileClassifier
-from deskmates_bridge.swarm.privacy.egress import (
+from autonex_bridge.swarm.privacy.audit import CanaryManager
+from autonex_bridge.swarm.privacy.classify import FileClassifier
+from autonex_bridge.swarm.privacy.egress import (
     CanaryLeakViolation,
     EgressFirewall,
     EgressFirewallViolation,
 )
-from deskmates_bridge.swarm.privacy.pseudonymize import Pseudonymizer
-from deskmates_bridge.swarm.privacy.redact import redact_text
-from deskmates_bridge.swarm.privacy.trust_registry import TrustRegistry
+from autonex_bridge.swarm.privacy.pseudonymize import Pseudonymizer
+from autonex_bridge.swarm.privacy.redact import redact_text
+from autonex_bridge.swarm.privacy.trust_registry import TrustRegistry
 
 
 def test_redaction_secrets_and_pii():

@@ -1,9 +1,9 @@
-# bridge/ — Deskmates Bridge Server (partially implemented)
+# bridge/ — AUTONEX Bridge Server
 
-**Implemented and tested here:** the **Provider Gateway core** — `deskmates_bridge/gateway/` (token-bucket limiter with safety margin, sliding TPM window,
+**Implemented and tested here:** the **Provider Gateway core** — `autonex_bridge/gateway/` (token-bucket limiter with safety margin, sliding TPM window,
 priority queue with aging, per-lane concurrency + global cap, 429/Retry-After handling with AIMD, 5xx retry → fallback chain, context-aware routing,
 circuit breaker, auth-dead providers, token estimator, `gate.state` / `llm.call_*` events).
-**Specified, not implemented:** everything else (`docs/BRIDGE_SPEC.md`): REST/WS API + tape, triage, planner, scheduler, org, workers, RealGravity launcher + plugin, privacy gate, and the HTTP/SSE layer + real provider adapters of the Gateway.
+**Specified in documentation:** REST/WS API + tape, triage, planner, scheduler, org, workers, AUTONEX launcher + plugin, privacy gate, and the HTTP/SSE layer + real provider adapters of the Gateway.
 
 ```bash
 cd bridge

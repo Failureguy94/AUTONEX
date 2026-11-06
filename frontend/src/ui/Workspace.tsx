@@ -8,6 +8,7 @@ import { Inspector } from './Inspector';
 import { ComputeDrawer } from './ComputeDrawer';
 import { ReportView } from './ReportView';
 import { SettingsModal } from './SettingsModal';
+import { ZGConfigModal } from './ZGConfigModal';
 import { Minimap } from './Minimap';
 import { TriageBanner } from './TriageBanner';
 import { PermissionPanel } from './PermissionPanel';
@@ -23,6 +24,7 @@ export function Workspace() {
   const toast = useStore((s) => s.toast);
   const dev = useStore((s) => s.dev);
   const appMode = useStore((s) => s.appMode);
+  const goal = useStore((s) => s.goal);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -61,9 +63,24 @@ export function Workspace() {
           {appMode === 'swarm' ? <SwarmPanel /> : <ComputeDrawer />}
           <ReportView />
           <SettingsModal />
+          <ZGConfigModal />
+          {!goal && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 rounded-xl bg-white/95 border border-ink/15 text-ink text-xs font-heading px-4 py-2 shadow-md flex items-center gap-3 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-ink/80 font-medium">Office Workspace (Idle) · No Active Task</span>
+              <button
+                type="button"
+                onClick={() => useStore.setState({ phase: 'landing' })}
+                className="rounded-lg px-2.5 py-1 text-white text-[11px] font-semibold transition-transform hover:scale-105"
+                style={{ background: 'var(--accent)' }}
+              >
+                Assign Task ↗
+              </button>
+            </div>
+          )}
           {offline && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 rounded-xl bg-[#d64545] text-white text-xs font-heading px-4 py-2 shadow-lg flex items-center gap-2">
-              Backend offline — showing demo mode
+              Backend bridge unreachable · Check server connection
               <button className="underline" onClick={() => useStore.setState({ offline: false })}>dismiss</button>
             </div>
           )}
@@ -83,7 +100,7 @@ export function Workspace() {
 
 function DevPanel() {
   const agents = director.runtimes.filter((r) => r.state !== 'gone');
-  const stuck = (window as any).__deskmates_stuckCount ?? 0;
+  const stuck = (window as any).__autonex_stuckCount ?? 0;
   return (
     <div className="absolute top-16 right-4 z-20 rounded-xl border border-ink/15 bg-ink/90 text-paper p-3 font-mono text-[10px] leading-5 w-52">
       <div className="text-[#9fe8b8] mb-1">DEV OVERLAY (D)</div>

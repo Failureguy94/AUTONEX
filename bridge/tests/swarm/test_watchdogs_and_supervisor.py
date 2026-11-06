@@ -1,8 +1,8 @@
 import time
 import pytest
-from deskmates_bridge.swarm.supervisor.arbiter import SupervisorArbiter
-from deskmates_bridge.swarm.supervisor.directives import SwarmDirective
-from deskmates_bridge.swarm.supervisor.watchdogs import WatchdogIncident, WatchdogManager
+from autonex_bridge.swarm.supervisor.arbiter import SupervisorArbiter
+from autonex_bridge.swarm.supervisor.directives import SwarmDirective
+from autonex_bridge.swarm.supervisor.watchdogs import WatchdogIncident, WatchdogManager
 
 
 def test_watchdogs_scope_and_stall():

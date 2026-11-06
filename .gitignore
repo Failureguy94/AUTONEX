@@ -19,9 +19,9 @@ env/
 venv/
 .venv/
 
-# RealGravity & Deskmates runtime files
+# AUTONEX runtime files
 .agent/
-.deskmates/
+.autonex/
 *.log
 
 # IDE & OS

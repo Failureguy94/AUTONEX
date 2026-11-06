@@ -1,17 +1,17 @@
-# RealGravity (PAG: Personal Antigravity)
-## Comprehensive Architecture & Technical Engineering Whitepaper
+# AUTONEX Technical Architecture & Engineering Whitepaper
+## Autonomous Multi-Agent Engineering Floor & Terminal Execution Engine
 
-**Author:** Aditya Bhalerao (`bhalerao-aditya007`)  
-**Repository:** [https://github.com/bhalerao-aditya007/RealGravity](https://github.com/bhalerao-aditya007/RealGravity)  
-**Date:** October 2026  
-**System Architecture:** Terminal-First, Autonomous AI Coding Agent Engine  
+**Author:** AUTONEX Team (`pritulsingh`)  
+**Repository:** [https://github.com/pritulsingh/AUTONEX](https://github.com/pritulsingh/AUTONEX)  
+**Date:** November 2026  
+**System Architecture:** Spatially-Grounded Multi-Agent Swarm & Terminal Coding Engine  
 **Target Environments:** Native Windows 11/10 & Hardened Linux/WSL2 Docker Sandbox  
 
 ---
 
 ## 1. Executive Summary
 
-**RealGravity** (also known as **PAG: Personal Antigravity**) is a production-grade, terminal-first autonomous coding agent engineered from first principles to replicate the capabilities, safety sandboxing, context discipline, and diff visibility of **Google Antigravity** on personal, resource-constrained hardware with **zero operational cost**.
+**AUTONEX** is a production-grade autonomous coding and multi-agent engineering platform engineered from first principles to replicate the capabilities, safety sandboxing, context discipline, and diff visibility of advanced agentic systems on personal hardware and distributed multi-agent floors with **zero operational cost**.
 
 Commercial AI coding assistants frequently suffer from four critical architectural deficiencies:
 1. **Opaque Execution & Data Insecurity:** Code and system credentials are broadcast to third-party proprietary services without transparent egress control.
@@ -19,7 +19,7 @@ Commercial AI coding assistants frequently suffer from four critical architectur
 3. **Runaway Autonomous Risk:** Agents equipped with shell access risk executing destructive commands (`rm -rf`, `git reset --hard`, `git push --force`) or exfiltrating private SSH keys.
 4. **Heavyweight Virtualization Overhead:** Standard containerized agents require 4 GB to 8 GB of host RAM, making them unusable on standard developer PCs.
 
-RealGravity resolves these challenges through a dual-engine architecture:
+AUTONEX resolves these challenges through a dual-engine architecture:
 - **A Multi-Provider Open-Source LLM Mesh:** Accessing 24 frontier open-weight models (Groq LPU, NVIDIA NIM, OpenRouter Free Tier, OpenCode Go) with zero subscriptions.
 - **A 5-Tier Context Discipline System:** Implementing staged observation masking, output truncation, prompt cache prefix stabilization, and externalized notes.
 - **Granular Least-Privilege Policy Enforcement:** Spliced permission trees enforcing non-bypassable denials for high-consequence operations.
@@ -27,7 +27,7 @@ RealGravity resolves these challenges through a dual-engine architecture:
 
 ```
 +──────────────────────────────────────────────────────────────────────────────────────────+
-│                               REALGRAVITY RUNTIME TOPOLOGY                               │
+│                               AUTONEX RUNTIME TOPOLOGY                               │
 +──────────────────────────────────────────────────────────────────────────────────────────+
 
                [ User Command Line: PowerShell / Terminal / CMD ]
@@ -63,7 +63,7 @@ RealGravity resolves these challenges through a dual-engine architecture:
 
 ## 2. Core Architectural Invariants
 
-RealGravity's design is governed by four non-negotiable architectural invariants:
+AUTONEX's design is governed by four non-negotiable architectural invariants:
 
 ### Invariant 1: Zero Credential Exposure & Strict Data Sovereignty
 - API credentials never enter the execution container or get committed to version control.
@@ -72,7 +72,7 @@ RealGravity's design is governed by four non-negotiable architectural invariants
 - A **Pre-Launch Privacy Gate (`hosted-allowed.txt`)** mandates explicit owner consent before any codebase path can transmit tokens to external inference APIs.
 
 ### Invariant 2: Non-Bypassable Permission Precedence
-- RealGravity uses a strict **last-match-wins** evaluation engine.
+- AUTONEX uses a strict **last-match-wins** evaluation engine.
 - Hard deny policies (`sudo *`, `git push *`, `rm -rf *`, `ssh *`, `git reset --hard`) are dynamically anchored **after** all automated allow rules and saved approvals.
 - Custom project rules (from `.pag/commands.txt`) are injected dynamically before the first deny rule, making privilege escalation impossible.
 
@@ -84,13 +84,13 @@ RealGravity's design is governed by four non-negotiable architectural invariants
 ### Invariant 4: Deterministic Auditability & One-Click Rollback
 - Every session automatically forks a timestamped Git branch (`agent/<timestamp>`) from a clean checkpoint.
 - Real-time mutations are mirrored across a multi-pane terminal layout (Agent TUI, Live File Audit, Live Git Diff).
-- Upon session termination, RealGravity generates a unified Git diff summary (`.agent/summary-<timestamp>.txt`) and prints one-command instructions to either merge or cleanly delete the branch.
+- Upon session termination, AUTONEX generates a unified Git diff summary (`.agent/summary-<timestamp>.txt`) and prints one-command instructions to either merge or cleanly delete the branch.
 
 ---
 
 ## 3. Dual Execution Engine Architecture
 
-RealGravity provides two distinct runtime operational profiles to cater to diverse developer hardware environments.
+AUTONEX provides two distinct runtime operational profiles to cater to diverse developer hardware environments.
 
 ### 3.1. Native Engine (Ultra-Lightweight Profile)
 Engineered specifically for low-resource PCs, the Native Engine eliminates the virtualization layer entirely:
@@ -101,7 +101,7 @@ Engineered specifically for low-resource PCs, the Native Engine eliminates the v
 - **Resource Footprint:** Consumes **~80 MB to 110 MB RAM**, reducing memory pressure by over 96% compared to containerized engines.
 
 ### 3.2. Docker Sandbox Engine (Hardened Isolation Profile)
-For untrusted repositories or strict isolation requirements, RealGravity orchestrates a 4-container Docker Compose mesh:
+For untrusted repositories or strict isolation requirements, AUTONEX orchestrates a 4-container Docker Compose mesh:
 
 | Container | Image | Memory Limit | Security Profile | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
@@ -114,7 +114,7 @@ For untrusted repositories or strict isolation requirements, RealGravity orchest
 
 ## 4. Multi-Provider Open-Source Model Mesh
 
-RealGravity abstracts diverse inference providers into a unified schema defined in `profiles/base.json`. Every model is accessible via the `--model <provider/id>` CLI parameter or ergonomic shorthands.
+AUTONEX abstracts diverse inference providers into a unified schema defined in `profiles/base.json`. Every model is accessible via the `--model <provider/id>` CLI parameter or ergonomic shorthands.
 
 ### 4.1. Supported Provider Matrix (100% Free Tiers)
 
@@ -154,7 +154,7 @@ pag D:\Django assist --model fast        # Resolves to: groq/openai/gpt-oss-20b
 
 ## 5. Five-Tier Context Discipline System
 
-RealGravity incorporates a mathematically rigorous context management engine implemented in `plugins/context/index.ts` and `plugins/context/lib.ts`. This subsystem guarantees that token accumulation scales logarithmically rather than linearly over long coding sessions.
+AUTONEX incorporates a mathematically rigorous context management engine implemented in `plugins/context/index.ts` and `plugins/context/lib.ts`. This subsystem guarantees that token accumulation scales logarithmically rather than linearly over long coding sessions.
 
 ```
 +─────────────────────────────────────────────────────────────────────────────+
@@ -203,13 +203,13 @@ $$\text{Placeholder}(L, H) = \text{"[... output omitted: } L \text{ lines, hash:
 Where $H = \text{SHA-256}(\text{content})[0:8]$.
 
 ### 5.2. Double-Masking Bug Remediation
-During the engineering audit, a critical bug was identified in prior context implementations: `planMask()` was executed twice per turn — once to evaluate stage boundaries and once with `window: 0` to regenerate replacement strings. The second call erased turn protection. RealGravity resolves this by computing replacements exactly once, caching them in an immutable `Map<string, string>`, and applying them idempotently across turns.
+During the engineering audit, a critical bug was identified in prior context implementations: `planMask()` was executed twice per turn — once to evaluate stage boundaries and once with `window: 0` to regenerate replacement strings. The second call erased turn protection. AUTONEX resolves this by computing replacements exactly once, caching them in an immutable `Map<string, string>`, and applying them idempotently across turns.
 
 ---
 
 ## 6. Security Architecture & Threat Mitigation
 
-RealGravity treats untrusted repositories and autonomous AI agents as potentially adversarial. Safety is maintained through defense-in-depth across multiple architectural boundaries:
+AUTONEX treats untrusted repositories and autonomous AI agents as potentially adversarial. Safety is maintained through defense-in-depth across multiple architectural boundaries:
 
 ```
 [ Host System ]
@@ -236,7 +236,7 @@ RealGravity treats untrusted repositories and autonomous AI agents as potentiall
 ```
 
 ### 6.1. Dynamic Permission Injection
-In OpenCode's last-match-wins engine, permission rules placed after a deny rule override that denial. RealGravity's launcher inspects the merged permission tree dynamically, identifies the exact index of the first shell deny policy, and injects project-specific allowances immediately **before** it:
+In OpenCode's last-match-wins engine, permission rules placed after a deny rule override that denial. AUTONEX's launcher inspects the merged permission tree dynamically, identifies the exact index of the first shell deny policy, and injects project-specific allowances immediately **before** it:
 
 ```bash
 # Dynamic Splicing Algorithm (bin/pag)
@@ -261,7 +261,7 @@ Every build is certified against 9 automated escape test scenarios in `scripts/e
 
 ## 7. Repository Mapping & Virtualenv Optimization
 
-Autonomous agents require a holistic mental model of repository structure to make cross-module edits. RealGravity incorporates `scripts/repo-map.py` to construct `.agent/repo-map.md` using file ranking based on recent Git commit frequency.
+Autonomous agents require a holistic mental model of repository structure to make cross-module edits. AUTONEX incorporates `scripts/repo-map.py` to construct `.agent/repo-map.md` using file ranking based on recent Git commit frequency.
 
 ### The Virtualenv Bloat Discovery
 During native testing on a Django project (`D:\Django`), prompt token counts unexpectedly exploded from 500 to 7,577 tokens, triggering provider rate limits. Deep database inspection of `C:\Users\Lenovo\.local\share\opencode\opencode.db` uncovered the root cause:
@@ -288,10 +288,10 @@ def should_include(path_str):
 
 ## 8. Benchmark Evaluation Harness
 
-To objectively measure model coding capability, token efficiency, and instruction following, RealGravity features a standalone benchmarking harness (`evals/run.sh` and `evals/collect.py`).
+To objectively measure model coding capability, token efficiency, and instruction following, AUTONEX features a standalone benchmarking harness (`evals/run.sh` and `evals/collect.py`).
 
 ### 8.1. Token Metric Accumulation Fix
-Prior token collectors scanned entire Nginx access logs from beginning to end, causing later benchmark tasks to report accumulated tokens from all earlier tasks. RealGravity's `evals/collect.py` was rewritten to accept a `--since <timestamp>` parameter, parsing ISO-8601 log timestamps and filtering SQLite metrics strictly to the individual task execution window.
+Prior token collectors scanned entire Nginx access logs from beginning to end, causing later benchmark tasks to report accumulated tokens from all earlier tasks. AUTONEX's `evals/collect.py` was rewritten to accept a `--since <timestamp>` parameter, parsing ISO-8601 log timestamps and filtering SQLite metrics strictly to the individual task execution window.
 
 ### 8.2. Four Standardized Benchmark Tasks
 
@@ -312,7 +312,7 @@ $$\text{CSV Schema: } [\text{timestamp}, \text{task}, \text{run}, \text{pass/fai
 ## 9. Comprehensive Codebase File Catalog
 
 ```
-d:\Realgravity\
+d:\AUTONEX\
 ├── .env.example                     # API key template with free provider signup links
 ├── .gitignore                       # Git ignore definitions (strictly protects .env and binaries)
 ├── AGENTS.global.md                 # Universal agent persona and context discipline rules
@@ -326,9 +326,9 @@ d:\Realgravity\
 │   ├── pag                          # Master Bash launcher for Linux/WSL environments
 │   ├── pag.cmd                      # Windows Command Prompt launcher redirect
 │   ├── pag.ps1                      # Master Windows PowerShell launcher (Native & Docker engine)
-│   ├── realgravity                  # POSIX alias symlink
-│   ├── realgravity.cmd              # Windows CMD alias
-│   └── realgravity.ps1              # Windows PowerShell alias
+│   ├── autonex                      # POSIX alias symlink
+│   ├── autonex.cmd                  # Windows CMD alias
+│   └── autonex.ps1                  # Windows PowerShell alias
 │
 ├── docker/
 │   ├── allowlist.txt                # Squid proxy outbound domain allowlist
@@ -389,4 +389,4 @@ Empirical performance metrics measured on consumer Windows hardware (Intel Core 
 
 ## 11. Conclusion
 
-**RealGravity** demonstrates that high-performance, autonomous AI software engineering does not require expensive closed-source SaaS platforms or resource-intensive cloud infrastructure. By uniting first-principles context discipline, non-bypassable security policies, and frontier open-source language models under an ultra-lightweight execution engine, RealGravity provides a deterministic, private, and zero-cost coding assistant engineered to professional standards.
+**AUTONEX** demonstrates that high-performance, autonomous AI software engineering does not require expensive closed-source SaaS platforms or resource-intensive cloud infrastructure. By uniting first-principles context discipline, non-bypassable security policies, and frontier open-source language models under an ultra-lightweight execution engine, AUTONEX provides a deterministic, private, and zero-cost coding assistant engineered to professional standards.

@@ -34,7 +34,7 @@ Everything below is covered by the 25 frontend tests unless marked *visual*.
 | F19 | `client.ts` could not be pointed at a server under vitest/node | also reads `process.env` (browser unchanged) |
 
 ## C. Integration of the Triage Layer (GLM's change-set, applied with the fixes above)
-Dynamic departments registry (`state/departments.ts`, wing = slot, department = tenant; wing materials, chairs and carpet follow the tenant; live re-tint on accent change; vacant wings dimmed), `TriageBanner`, `PermissionPanel` (+ director cabin wait/resume), Landing profile picker + live triage preview, Toolbar badges, Inspector Live v2 (context stage, structured file edits, terminal, checkpoint Merge/Discard), model roster replaced by the **RealGravity mesh** (real context windows, Groq 8k), `LiveEngine` control channel (`permission.respond`, `run.control`).
+Dynamic departments registry (`state/departments.ts`, wing = slot, department = tenant; wing materials, chairs and carpet follow the tenant; live re-tint on accent change; vacant wings dimmed), `TriageBanner`, `PermissionPanel` (+ director cabin wait/resume), Landing profile picker + live triage preview, Toolbar badges, Inspector Live v2 (context stage, structured file edits, terminal, checkpoint Merge/Discard), model roster replaced by the **AUTONEX mesh** (real context windows, Groq 8k), `LiveEngine` control channel (`permission.respond`, `run.control`).
 The simulator was rewritten in full (GLM shipped an abbreviated skeleton): policy-guarded breaks/chats/lunch, failure → reassignment (workday), validation failure → rework, meeting-room review, 429 backoff moment, permission request on the first code worker, `file.edit`, `run.checkpoint`, context stages, hand-off blackboard notes, everyone released at the end. Breaks are long (~100 s) because the pantry is ~60 m from the bays — walking is real.
 
 ## D. Additions that did not exist
@@ -45,5 +45,5 @@ Contract server `tools/mock-bridge` · tape recorder · layout exporter (`docs/l
 * The people are **procedural low-poly 3D figures** (capsules/spheres, walk/sit/type/drink/talk animations driven by math) — *not* 2D sprites and *not* motion-captured. They read as friendly stylised characters, not realistic humans.
 * Hierarchy is visible by clothing (manager suit + tie, lead lanyard + deeper shirt) and furniture (manager glass cabin; lead semi-enclosed glass desk; workers' open desks). **Leads do not have fully walled offices** — only the manager does. Meeting rooms exist for reviews.
 * Monitor screens are a static "switched-on" blue (no per-desk animated content).
-* The Bridge (everything between the UI and RealGravity) is **not built**; only the Gateway core is. `ReplayEngine` for real past runs, Compute drawer v2, `triage.override` UI: see `00_START_HERE.md` backlog.
+* The Bridge (everything between the UI and AUTONEX) is **not built**; only the Gateway core is. `ReplayEngine` for real past runs, Compute drawer v2, `triage.override` UI: see `00_START_HERE.md` backlog.
 * Provider limit numbers in `bridge/config/providers.yaml` are **placeholders**; model ids must be verified on the day.

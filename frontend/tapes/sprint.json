@@ -235,7 +235,7 @@
    "ts_sim": "09:03",
    "type": "result.final",
    "payload": {
-    "report_markdown": "# Quick draft\n\nHere is a short, self-contained draft written directly by the manager — no team was needed for a single-output task.\n\n> RealGravity runs a terminal-first coding agent on free open-weight models, with a permission-gated sandbox, staged context discipline, and one-command rollback.\n",
+    "report_markdown": "# Quick draft\n\nHere is a short, self-contained draft written directly by the manager — no team was needed for a single-output task.\n\n> AUTONEX runs a terminal-first coding agent on free open-weight models, with a permission-gated sandbox, staged context discipline, and one-command rollback.\n",
     "sources": [],
     "effort_logical_s": 260,
     "effort_real_s": 8

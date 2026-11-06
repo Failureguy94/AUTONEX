@@ -135,7 +135,7 @@ function parseAction(text: string): ToolCall | null {
 // 3. Autonomous ReAct Agent Loop
 export async function runAutonomousAgent(run: RunState) {
   emitEvent(run, 'task.created', undefined, undefined, { goal: run.goal });
-  emitEvent(run, 'sandbox.mode', undefined, undefined, { mode: 'real_gravity' });
+  emitEvent(run, 'sandbox.mode', undefined, undefined, { mode: 'autonex_runtime' });
 
   // Hire Agents
   const agent = { id: 'M0', name: 'Diya', role: 'manager', department: 'engineering' };
@@ -145,10 +145,10 @@ export async function runAutonomousAgent(run: RunState) {
   });
 
   const projectName = 'Project_' + Date.now().toString(36);
-  const projectDir = path.join('D:\\GravityDesk\\output', projectName);
+  const projectDir = path.join('D:\\AUTONEX\\output', projectName);
   fs.mkdirSync(projectDir, { recursive: true });
 
-  const systemPrompt = `You are Diya, an elite autonomous software engineer at GravityDesk.
+  const systemPrompt = `You are Diya, an elite autonomous software engineer at AUTONEX.
 You have direct access to your local computer environment through these tools:
 
 - execute_command({"command": "..."}): Run any shell command (python, pip, node, etc.) in the project folder.

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 /**
- * GravityDesk Bridge Server - Real Multi-Agent Execution & Contract Engine
+ * AUTONEX Bridge Server - Real Multi-Agent Execution & Contract Engine
  */
 import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -13,6 +13,19 @@ import { executeSwarmRun } from './swarmRunner';
 import { zgClient, TASK_MODEL_ROUTING } from './zgClient';
 
 loadEnv();
+
+// Background validation of environment key on startup
+if (zgClient.hasApiKey() && !process.env.VITEST) {
+  zgClient.validateCredentials().then((res) => {
+    if (res.valid) {
+      console.log(`[0G Bridge] Environment API key verified successfully (${res.maskedKey}, request_id: ${res.requestId})`);
+    } else {
+      console.warn(`[0G Bridge] Environment API key validation failed: ${res.message}`);
+    }
+  }).catch((err) => {
+    console.warn('[0G Bridge] Startup 0G verification error:', err.message);
+  });
+}
 
 interface Run {
   id: string;
@@ -175,10 +188,10 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
     try {
       if (p === '/' || p === '') {
         return json(res, 200, {
-          name: 'GravityDesk Bridge & Gateway Server (Live Engine)',
+          name: 'AUTONEX Bridge & Gateway Server (Live Engine)',
           status: 'online',
           version: '2.0.0',
-          mode: 'real_gravity',
+          mode: 'autonex_runtime',
           providers: {
             zg_compute: {
               active: true,
@@ -207,7 +220,7 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
       if (p === '/api/health') {
         return json(res, 200, {
           status: 'ok',
-          system: 'GravityDesk Live RealGravity',
+          system: 'AUTONEX Live Engine',
           model_loaded: true,
           queue_depth: 0,
           providers: {
@@ -222,6 +235,23 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
             openrouter: !!process.env.OPENROUTER_API_KEY
           }
         });
+      }
+
+      if (p === '/api/config/0g/status' && req.method === 'GET') {
+        return json(res, 200, zgClient.getConnectionStatus());
+      }
+
+      if (p === '/api/config/0g/verify' && req.method === 'POST') {
+        const b = await readBody(req);
+        const apiKey = b.apiKey || b.api_key;
+        const result = await zgClient.validateCredentials(apiKey);
+        const statusCode = result.valid ? 200 : (result.status === 'invalid_key' ? 401 : 400);
+        return json(res, statusCode, result);
+      }
+
+      if (p === '/api/config/0g' && req.method === 'DELETE') {
+        zgClient.disconnect();
+        return json(res, 200, { ok: true, status: 'not_configured' });
       }
 
       if (p === '/api/zg/requests' && req.method === 'GET') {
@@ -279,10 +309,37 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
 
       if (p === '/api/tasks' && req.method === 'POST') {
         const b = await readBody(req);
-        if (!b.goal || typeof b.goal !== 'string') return json(res, 422, { error: 'goal is required' });
+        if (!b.goal || typeof b.goal !== 'string' || !b.goal.trim()) {
+          return json(res, 422, { error: 'Please provide the required task details.', code: 'MISSING_TASK_INPUT' });
+        }
+
+        // Authoritative execution gate (Requirement B, C, D)
+        if (!process.env.VITEST && !zgClient.isVerified()) {
+          const status = zgClient.getConnectionStatus().status;
+          if (status === 'unavailable') {
+            return json(res, 503, {
+              error: '0G is currently unavailable. Please try again.',
+              code: '0G_UNAVAILABLE',
+              status
+            });
+          }
+          if (status === 'invalid_key') {
+            return json(res, 401, {
+              error: 'Your 0G API key has not been verified.',
+              code: '0G_INVALID_KEY',
+              status
+            });
+          }
+          return json(res, 401, {
+            error: 'Connect your 0G account before starting an agent.',
+            code: '0G_NOT_CONFIGURED',
+            status
+          });
+        }
+
         const mode = b.options?.mode || b.mode || 'office';
         const swarmSize = b.options?.swarm_size || b.swarm_size || 20;
-        const run = startRun(b.goal, mode, swarmSize);
+        const run = startRun(b.goal.trim(), mode, swarmSize);
         return json(res, 200, { task_id: run.id.replace('run_', 'task_'), run_id: run.id });
       }
 
@@ -347,9 +404,12 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
 
       // Live Diya Manager Reasoning Chat via 0G Private Computer
       if (p === '/api/llm/chat' && req.method === 'POST') {
+        if (!process.env.VITEST && !zgClient.isVerified()) {
+          return json(res, 401, { error: 'Connect your 0G account before starting an agent.' });
+        }
         const b = await readBody(req);
         try {
-          const system = b.system || 'You are Diya, Lead Engineering Manager of GravityDesk. Provide crisp, technically deep, and professional responses.';
+          const system = b.system || 'You are Diya, Lead Engineering Manager of AUTONEX. Provide crisp, technically deep, and professional responses.';
           const reply = await callLLM(b.prompt || 'Hello', system, { task: 'chat', role: 'manager', model: b.model });
           const lastReq = zgClient.getRequestLog().slice(-1)[0];
           return json(res, 200, {
@@ -454,7 +514,7 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
 
 if (process.argv[1] && /server\.ts$/.test(process.argv[1])) {
   createServer().then(({ port }) =>
-    console.log(`[gravitydesk-bridge] live multi-agent server on http://localhost:${port}  (ws: /ws/events)`)
+    console.log(`[autonex-bridge] live multi-agent server on http://localhost:${port}  (ws: /ws/events)`)
   );
 }
 

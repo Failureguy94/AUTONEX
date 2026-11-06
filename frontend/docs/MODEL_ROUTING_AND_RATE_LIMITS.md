@@ -14,7 +14,7 @@ Nothing else in the system talks to a model provider directly.
 ```
  Manager / Lead / LLM-worker calls ──┐
                                       ├──►  GATEWAY  127.0.0.1:8787/v1/chat/completions   (+ /v1/messages for Anthropic-protocol models)
- RealGravity sessions (opencode run) ─┘     ├─ router      alias → ordered model chain
+ AUTONEX sessions (opencode run) ─┘     ├─ router      alias → ordered model chain
    provider "bridge", baseURL=gateway       ├─ limiter     per-(provider,key) RPM + TPM + daily/window budgets
    apiKey = "bridge:<agent_id>"             ├─ queue       priority queue, global + per-provider concurrency
                                             ├─ resilience  Retry-After, backoff+jitter, circuit breaker, fallback
@@ -23,11 +23,11 @@ Nothing else in the system talks to a model provider directly.
                                                    │
                       groq · openrouter · nvidia · opencode-go  (real keys live ONLY here, from .env)
 ```
-Why a proxy rather than a library: RealGravity's agent loop makes **dozens of calls per task and retries on its own**. Pointing its
+Why a proxy rather than a library: AUTONEX's agent loop makes **dozens of calls per task and retries on its own**. Pointing its
 provider `baseURL` at the gateway puts those calls under the *same* limiter as the manager's calls. This **replaces** the nginx `llmproxy`
 of Docker mode (which only has a blunt 30 req/min `limit_req` — a 503 from it would be surfaced to the agent as a failure). In Docker mode run the gateway on the host and set `HTTP(S)_PROXY`/`NO_PROXY` so the container reaches it; keep nginx out of the path or set its limit above the gateway's.
 
-* The Bridge writes a per-worker OpenCode config whose only provider is `bridge` with **role aliases as model ids**: `bridge/manager`, `bridge/lead`, `bridge/code`, `bridge/fast`, `bridge/text`. Swapping a real model, adding a fallback, or changing provider needs **no change to RealGravity config** — only `config/models.yaml`.
+* The Bridge writes a per-worker OpenCode config whose only provider is `bridge` with **role aliases as model ids**: `bridge/manager`, `bridge/lead`, `bridge/code`, `bridge/fast`, `bridge/text`. Swapping a real model, adding a fallback, or changing provider needs **no change to AUTONEX config** — only `config/models.yaml`.
 * The agent id rides in the bearer token (`bridge:<agent_id>`) → the gateway attributes every call to an office worker → correct `llm.call_started{agent_id}`, per-worker token counts, context-% → **energy**.
 * **Streaming is mandatory.** OpenCode streams (SSE). The gateway must pass SSE through unbuffered. Retrying is only possible **before the first byte**; after that, an upstream failure is returned to the caller as an error (OpenCode retries by making a *new* request, which re-enters the gateway). Never switch model mid-stream.
 * The gateway must also expose **`GET /v1/models`** (aliases + contexts) so OpenCode can validate config.
@@ -36,7 +36,7 @@ of Docker mode (which only has a blunt 30 req/min `limit_req` — a 503 from it 
 
 ## 2. Roles → models (all free / open-weight; verify ids on build day)
 
-Model ids below come from the owner's RealGravity docs (`reference/realgravity/`). Free tiers and catalogues change: the gateway ships
+Model ids below come from the owner's AUTONEX docs (`reference/autonex_reference/`). Free tiers and catalogues change: the gateway ships
 `scripts/verify-models` that lists each provider's `/models` and fails loudly on an unknown id. **Never hard-code a model id outside `models.yaml`.**
 
 | Alias | Role | Primary | Fallback chain | Context | Why |
@@ -45,7 +45,7 @@ Model ids below come from the owner's RealGravity docs (`reference/realgravity/`
 | `manager` | planner + final synthesis (**best general model**) | `openrouter/google/gemma-4-31b-it:free` | `nvidia/llama-3.1-nemotron-70b-instruct` → `openrouter/qwen/qwen3.8-27b:free` → `go/deepseek-v4-pro` | 128k | must hold plan + all lead summaries; **context, not IQ, is her bottleneck** |
 | `manager_escalation` | hard replans / synthesis bursts only | `groq/openai/gpt-oss-120b` | `openrouter/qwen/qwen3.8-27b:free` | 8k | strongest thinker, but 8k → compress the problem to < 6k tokens first |
 | `lead` | department decompose + review | `openrouter/qwen/qwen3.8-27b:free` | `nvidia/deepseek-ai/deepseek-v4.1-flash` → `go/deepseek-v4-flash` | 128k | needs repo-wide view; short prompts |
-| `code` | RealGravity code sessions | `nvidia/deepseek-ai/deepseek-v4.1-flash` | `openrouter/qwen/qwen3.8-27b:free` → `go/deepseek-v4-flash` → `nvidia/mistralai/codestral-22b-instruct-v0.1` | 128k | high throughput; spreads load off OpenRouter's daily cap |
+| `code` | AUTONEX code sessions | `nvidia/deepseek-ai/deepseek-v4.1-flash` | `openrouter/qwen/qwen3.8-27b:free` → `go/deepseek-v4-flash` → `nvidia/mistralai/codestral-22b-instruct-v0.1` | 128k | high throughput; spreads load off OpenRouter's daily cap |
 | `fast` | short-context edits, UI components, sprint text | `groq/openai/gpt-oss-20b` | `openrouter/google/gemma-4-31b-it:free` | 8k | instant latency = sprint feel |
 | `research` | reasoning over search results | `openrouter/google/gemma-4-31b-it:free` | `nvidia/llama-3.1-nemotron-70b-instruct` | 128k | |
 | `qa` | data / QA / eval instruction-following | `openrouter/nvidia/nemotron-3.5-lightning:free` | `nvidia/deepseek-ai/deepseek-v4.1-flash` | 128k | exactly what harness runs need |
@@ -60,10 +60,10 @@ Hard rules:
 ---
 
 ## 3. Context budgeting (prevents the other kind of error: 400 "context too long")
-`gateway/estimator.py`: `tokens ≈ ceil(chars/3.5)` (same estimator RealGravity's `quota.py` uses); replace with the provider's `usage` once a response arrives (learn a per-model chars/token ratio).
+`gateway/estimator.py`: `tokens ≈ ceil(chars/3.5)` (same estimator AUTONEX's `quota.py` uses); replace with the provider's `usage` once a response arrives (learn a per-model chars/token ratio).
 * Admit a request only if `prompt_tokens + max_tokens ≤ 0.85 × context`.
 * Over budget → (a) route to a larger-context model in the chain; else (b) ask the caller to compress (manager/lead calls pass a `compress()` callback that map-reduces); else (c) fail that call with a clear `run.error` — never truncate silently.
-* **Energy for the UI** = `round(100·(1 − tokens_in_context/context_window))`; stage S0-S3 at 0.40 / 0.60 / 0.75 (RealGravity's own thresholds).
+* **Energy for the UI** = `round(100·(1 − tokens_in_context/context_window))`; stage S0-S3 at 0.40 / 0.60 / 0.75 (AUTONEX's own thresholds).
 
 ---
 
@@ -126,7 +126,7 @@ feasible    = calls_needed ≤ 0.8·remaining  AND  time_needed ≤ time_budget 
 Not feasible → degrade **in this order**, stopping at the first that fits, and tell the user in `task.triaged.rationale`:
 1. serialise code sessions (1 at a time) · 2. fewer workers / merge adjacent nodes · 3. move non-critical roles to the cheapest model · 4. shrink validation to deterministic checks only · 5. **ask the user** (`run.error{recoverable:true, message:"needs ~N calls, ~M available — continue reduced?"}`).
 
-## 6. Admission control for RealGravity sessions
+## 6. Admission control for AUTONEX sessions
 A code session = 25-60 calls over minutes, so *sessions*, not calls, are the unit the scheduler admits:
 `max_code_sessions = floor(effective_rpm / (calls_per_min_per_session ≈ 6))`, clamped to `[1, memory_cap]` where `memory_cap` = Native ≈ 6 (≈ 80-110 MB each), Docker ≈ 3 (2 GB each). At 30 rpm that is **≈ 5 sessions max**; at 15 rpm, **2**. Everything beyond waits in the scheduler as a real, visible `WAITING`.
 
@@ -138,7 +138,7 @@ Everything above still applies; what changes is the chains and the numbers. Dist
 | Only have… | manager | lead | code / text workers | triage / fast | Caveats |
 |---|---|---|---|---|---|
 | **OpenRouter** (`:free`) | `gemma-4-31b-it:free` | `qwen3.8-27b:free` | `qwen3.8-27b:free` (code), `nemotron-3.5-lightning:free` (qa), `north-mini-code:free` (text, 32k) | `nemotron-3.5-lightning:free` | tightest **daily** request cap → budget pre-check is essential; usually restrict to `standard`, 1 code session |
-| **Groq** | `gpt-oss-120b` | `qwen3.8-27b` | `gpt-oss-20b` | `gpt-oss-20b` | **everything 8k**: manager sees only ≤ 400-token compressed worker reports; RealGravity tiers must be set to the 8k cap; refuse tasks needing repo-wide context (offer a smaller scope) |
+| **Groq** | `gpt-oss-120b` | `qwen3.8-27b` | `gpt-oss-20b` | `gpt-oss-20b` | **everything 8k**: manager sees only ≤ 400-token compressed worker reports; AUTONEX tiers must be set to the 8k cap; refuse tasks needing repo-wide context (offer a smaller scope) |
 | **NVIDIA NIM** | `llama-3.1-nemotron-70b-instruct` | `deepseek-v4.1-flash` | `deepseek-v4.1-flash` / `codestral-22b` | `deepseek-v4.1-flash` | finite free **credits** — track `credits` in the budget; stop at 10 % and ask |
 | **OpenCode Go** | `deepseek-v4-pro` (escalate `glm-5.2`) | `deepseek-v4-flash` | `deepseek-v4-flash` / `glm-5.3-flash` | `glm-5.3-flash` | limits are **dollar windows** (5-hour & weekly) not RPM; DeepSeek peak hours (01-04, 06-10 UTC weekdays) cost 2× → schedule `heavy` runs off-peak; free models stay usable when the window is exhausted |
 

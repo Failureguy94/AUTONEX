@@ -1,8 +1,8 @@
 import math
 import pytest
-from deskmates_bridge.swarm.rounds.estimator import RunEstimator
-from deskmates_bridge.swarm.scheduler.admission import AdmissionController
-from deskmates_bridge.swarm.scheduler.planner_capacity import CapacityBucket, CapacityMap
+from autonex_bridge.swarm.rounds.estimator import RunEstimator
+from autonex_bridge.swarm.scheduler.admission import AdmissionController
+from autonex_bridge.swarm.scheduler.planner_capacity import CapacityBucket, CapacityMap
 
 
 def test_estimator_deliberative_protocol_exact_formulas():

@@ -55,8 +55,8 @@ server {
     proxy_pass https://openrouter.ai/api/v1/;
     proxy_set_header Host openrouter.ai;
     proxy_set_header Authorization "Bearer ${OPENROUTER_API_KEY}";
-    proxy_set_header X-Title "RealGravity";
-    proxy_set_header HTTP-Referer "https://github.com/realgravity";
+    proxy_set_header X-Title "AUTONEX";
+    proxy_set_header HTTP-Referer "https://github.com/pritulsingh/AUTONEX";
     proxy_ssl_server_name on;
     proxy_buffering off;
     proxy_read_timeout 600s;

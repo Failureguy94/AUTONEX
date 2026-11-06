@@ -1,7 +1,7 @@
 import { RawEv } from '@/mock/simulator';
 import { ROLES, roleAt } from './roles';
 
-const NAMES = ['Aanya','Rohan','Meera','Kabir','Isha','Vikram','Nisha','Arjun','Tara','Dev','Kavya','Farhan','Anaya','Zoya','Neel','Riya','Sameer','Divya','Karan','Pooja','Yash','Sneha','Aditya','Lata','Omar','Tara2','Ines','Milan','Sara','Ravi','Nadia','Felix','Anya','Kiran','Maya','Jonas','Leah','Arnav','Diya2','Rhea','Ojas','Naina','Veer','Sana','Peter','Alia'];
+const NAMES = ['Aanya','Rohan','Meera','Kabir','Isha','Vikram','Nisha','Arjun','Tara','Dev','Kavya','Farhan','Anaya','Zoya','Neel','Riya','Sameer','Divya','Karan','Pooja','Yash','Sneha','Aryan','Lata','Omar','Tara2','Ines','Milan','Sara','Ravi','Nadia','Felix','Anya','Kiran','Maya','Jonas','Leah','Arnav','Diya2','Rhea','Ojas','Naina','Veer','Sana','Peter','Alia'];
 
 const STOP = new Set(['the','a','an','and','or','for','of','to','in','on','with','how','should','what','is','are','best','my','our','we','i','you','it','that','this','by','from','at','as','be','can','do','does','will']);
 function topicWords(goal: string, k = 3): string[] {

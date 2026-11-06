@@ -5,7 +5,7 @@
  YOU type one task
       │
       ▼
-┌─────────────────────────────  DESKMATES OFFICE (frontend, DONE)  ─────────────────────────────┐
+┌─────────────────────────────  AUTONEX OFFICE (frontend, DONE)  ─────────────────────────────┐
 │ React + three.js + zustand.  A PURE RENDERER of an event stream: nothing moves unless an event  │
 │ says so.  Landing (task, profile, model) → 3D office → Inspector, Permission Desk, DAG, report.  │
 └───────────────▲──────────────────────────────────────────────────────────┬───────────────────┘
@@ -15,13 +15,13 @@
 │ 2 ORG      departments (frontend / backend / research / data / qa / content) + leads + workers  │
 │ 3 PLAN     manager LLM → validated task DAG;  leads expand their branch                          │
 │ 4 SCHEDULE DAG resolver · assignment score · admission control · failure ladder                  │
-│ 5 WORKERS  search · llm · script · validate (no agent)        code → RealGravity session         │
+│ 5 WORKERS  search · llm · script · validate (no agent)        code → AUTONEX session         │
 │ 6 REVIEW   validators → lead review → manager synthesis → git merge → result.final              │
 │ + EventBus/Tape · Privacy gate · Permission relay · Break/energy derivation                      │
 └───────────────┬──────────────────────────────────────────────────────────┬───────────────────┘
                 │ every LLM call                                            │ headless sessions
                 ▼                                                           ▼
-┌──────────────────────────  PROVIDER GATEWAY (core DONE: bridge/)  ─────┐   ┌────────  RealGravity (UNTOUCHED)  ────────┐
+┌──────────────────────────  PROVIDER GATEWAY (core DONE: bridge/)  ─────┐   ┌────────  AUTONEX (UNTOUCHED)  ────────┐
 │ OpenAI-compatible local proxy 127.0.0.1:8787/v1                          │◄──┤ opencode run, provider "bridge",          │
 │ router · limiter · priority queue · 429/5xx/ctx handling · fallback ·   │   │ plugins, permissions, context tiers,      │
 │ breaker · budget · accounting → llm.call_*, gate.state                   │   │ audit.jsonl, git branch, walkthrough.md   │
@@ -37,9 +37,9 @@
 | Mock bridge | executable spec of the contract; lets UI + Bridge be developed independently | **done & tested** |
 | Bridge | the *company*: triage, org, plan, schedule, aggregate, derive human moments from real signals | **specified** (`BRIDGE_SPEC.md`) |
 | Gateway | the *only* path to any model; keeps usage inside limits; emits compute events | **core done & tested (16 tests)**; HTTP/SSE layer to build |
-| RealGravity | an excellent single-agent coding worker with safety, context discipline, rollback | **existing, untouched** |
+| AUTONEX | an excellent single-agent coding worker with safety, context discipline, rollback | **existing, untouched** |
 
-**Only code workers use RealGravity.** Manager/leads are single-shot structured calls; research/data/QA/content are mostly deterministic code. That is why a 15-person office costs ~100 LLM calls, not ~1000.
+**Only code workers use AUTONEX.** Manager/leads are single-shot structured calls; research/data/QA/content are mostly deterministic code. That is why a 15-person office costs ~100 LLM calls, not ~1000.
 
 ## 3. Mapping of the owner's ideas to the design
 | Idea | Where it lives |
@@ -51,7 +51,7 @@
 | Different models for different leads; manager = the best free model | `MODEL_ROUTING §2` role→model table + fallback chains |
 | Coffee/lunch/chat must mean something | `BRIDGE_SPEC §7`: coffee = real context compaction, chat = real hand-off, energy = real context fraction |
 | Click an employee → live status (progress, energy, context, engine) | Inspector (done) fed by `agent.metrics`, `task.progress`, `file.edit` |
-| RealGravity gets a GUI (permissions, diffs, rollback) | Permission Desk, Inspector Live tab, Merge/Discard (frontend done; Bridge relay specified) |
+| AUTONEX gets a GUI (permissions, diffs, rollback) | Permission Desk, Inspector Live tab, Merge/Discard (frontend done; Bridge relay specified) |
 | One API/account hits the per-minute limit | Gateway (`MODEL_ROUTING`): limiter, queue, backoff, fallback, budget pre-check, **more providers** (`00_START_HERE A1`) |
 
 ## 4. Ports & processes (local only)
@@ -60,8 +60,8 @@
 | Vite dev server (UI) | 5173 | `npm run dev` |
 | Bridge (REST + `/ws/events`) | 8000 | `VITE_API_URL` points here; `npm run bridge:mock` is the stand-in |
 | Gateway (`/v1/chat/completions`) | 8787 | mounted in the Bridge process or separate; bound to 127.0.0.1 |
-| RealGravity sessions | – | child processes of the Bridge, one worktree each |
-| Search backend | – | SearXNG (RealGravity docker) or the `ddgs` python lib as a keyless fallback |
+| AUTONEX sessions | – | child processes of the Bridge, one worktree each |
+| Search backend | – | SearXNG (AUTONEX docker) or the `ddgs` python lib as a keyless fallback |
 
 ## 5. Data flow of one heavy run (worked example, placeholder limits)
 Goal: *"Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one"*.

@@ -1,6 +1,6 @@
 import pytest
-from deskmates_bridge.swarm.controller import SwarmController
-from deskmates_bridge.swarm.store.repo import SwarmRepository
+from autonex_bridge.swarm.controller import SwarmController
+from autonex_bridge.swarm.store.repo import SwarmRepository
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,8 @@
 import asyncio
 import pytest
-from deskmates_bridge.swarm.rounds.wave_dispatcher import WaveDispatcher
-from deskmates_bridge.swarm.scheduler.planner_capacity import CapacityBucket, CapacityMap
-from deskmates_bridge.swarm.scheduler.pool import KeyPool
+from autonex_bridge.swarm.rounds.wave_dispatcher import WaveDispatcher
+from autonex_bridge.swarm.scheduler.planner_capacity import CapacityBucket, CapacityMap
+from autonex_bridge.swarm.scheduler.pool import KeyPool
 
 
 def test_pool_rate_limiting_and_failover():

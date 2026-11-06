@@ -11,7 +11,7 @@ user goal ─► 1 TRIAGE ─► 2 SIZING ─► 3 ORG ─► 4 PLAN (manager) �
 
 Rule of thumb that drives every choice: **an LLM call is a scarce, rate-limited resource. Use it only where reasoning adds value.**
 Search, parsing, git, tests, linting, schema checks and merges are deterministic code. Manager and leads are *single-shot
-structured LLM calls*, **not agent sessions**. Only code-editing workers run a RealGravity (OpenCode) agent session.
+structured LLM calls*, **not agent sessions**. Only code-editing workers run a AUTONEX (OpenCode) agent session.
 
 ---
 
@@ -113,7 +113,7 @@ Emit order: `task.triaged` → manager `worker.hired` → plan → leads and wor
 
 | id | capability | worker engine |
 |---|---|---|
-| `frontend` | UI code, components, styles | `code` (RealGravity session) |
+| `frontend` | UI code, components, styles | `code` (AUTONEX session) |
 | `backend` | APIs, services, CLI, core logic | `code` |
 | `research` | SearXNG-grounded gathering | `tool` (+ small LLM summariser) |
 | `data` | benchmark harness, metrics | `tool` (python scripts) |
@@ -159,12 +159,12 @@ Same validate → repair → fallback loop. Subtasks become additional `Task` no
 4. Run the worker (§6.1). Emit `task.started`, real `task.progress`, `task.completed`.
 
 ### 6.1 Worker kinds (what actually runs)
-| `worker_kind` | Implementation | LLM calls | RealGravity? |
+| `worker_kind` | Implementation | LLM calls | AUTONEX? |
 |---|---|---|---|
 | `search` | SearXNG query → fetch → trafilatura extract → rank | 0-1 (summarise) | no |
 | `llm` | one gateway call with a role prompt (drafts, summaries, docs) | 1-3 | no |
 | `script` | python/pandas/benchmark harness in the sandbox dir | 0 | no |
-| `code` | **headless RealGravity session** in its own git worktree | 25-60 (agent loop) | **yes** |
+| `code` | **headless AUTONEX session** in its own git worktree | 25-60 (agent loop) | **yes** |
 | `validate` | pytest / ruff / tsc / schema check / citation check / determinism re-run | 0 | no |
 
 ### 6.2 Failure ladder (never silently hang)

@@ -45,18 +45,10 @@ export default function App() {
     else {
       fetch(((import.meta as any).env?.VITE_API_URL ?? 'http://localhost:8000') + '/api/models')
         .then((r) => r.json())
-        .then((models) => useStore.setState({ models, demoMode: false }))
-        .catch(() => useStore.setState({ offline: true, models: MODELS }));
+        .then((models) => useStore.setState({ models, demoMode: false, offline: false }))
+        .catch(() => useStore.setState({ models: MODELS, demoMode: false }));
     }
   }, []);
-
-  // landing: loop the ambient run in the background (office or swarm)
-  useEffect(() => {
-    if (phase === 'landing') {
-      engine.start(appMode === 'swarm' ? 'Best go-to-market plan for a student-run coffee cart' : GOLDEN_GOAL);
-      engine.setSpeed(2);
-    }
-  }, [phase, appMode]);
 
   return <div className="h-full w-full">{phase === 'landing' ? <Landing /> : <Workspace />}</div>;
 }

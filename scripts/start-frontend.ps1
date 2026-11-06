@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Starts the GravityDesk 3D Virtual Office Frontend.
+    Starts the AUTONEX 3D Virtual Office Frontend.
 #>
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -10,9 +10,9 @@ $FrontendDir = Join-Path $RootDir "frontend"
 Set-Location $FrontendDir
 
 if (-not (Test-Path "node_modules")) {
-    Write-Host "[GravityDesk] Installing frontend dependencies..." -ForegroundColor Cyan
+    Write-Host "[AUTONEX] Installing frontend dependencies..." -ForegroundColor Cyan
     npm install
 }
 
-Write-Host "[GravityDesk] Launching Deskmates 3D Office Frontend on http://localhost:5173..." -ForegroundColor Green
+Write-Host "[AUTONEX] Launching AUTONEX 3D Office Frontend on http://localhost:5173..." -ForegroundColor Green
 npm run dev

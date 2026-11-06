@@ -1,10 +1,10 @@
 import asyncio
 import pytest
-from deskmates_bridge.gateway.breaker import CircuitBreaker
-from deskmates_bridge.gateway.clock import FakeClock
-from deskmates_bridge.gateway.estimator import TokenEstimator
-from deskmates_bridge.gateway.lane import GatewayBusy, Hub, LaneConfig, ProviderLane
-from deskmates_bridge.gateway.router import (AllModelsFailed, ContextTooLong, Gateway, ModelRouter, ModelSpec, UpstreamError)
+from autonex_bridge.gateway.breaker import CircuitBreaker
+from autonex_bridge.gateway.clock import FakeClock
+from autonex_bridge.gateway.estimator import TokenEstimator
+from autonex_bridge.gateway.lane import GatewayBusy, Hub, LaneConfig, ProviderLane
+from autonex_bridge.gateway.router import (AllModelsFailed, ContextTooLong, Gateway, ModelRouter, ModelSpec, UpstreamError)
 from .fakes import FakeUpstream
 
 REQ = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 100}

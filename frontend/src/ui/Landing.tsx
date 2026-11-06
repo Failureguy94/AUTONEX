@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useStore } from '@/state/store';
 import { Icon, I } from './Icons';
@@ -9,6 +9,7 @@ import { USE_MOCK } from '@/api/client';
 import { setAccent, resetAccentBlend } from '@/three/materials';
 import { sfx } from '@/sim/sound';
 import { triage } from '@/mock/triage';
+import { ZGConfigModal } from './ZGConfigModal';
 
 const CHIPS = [
   'Compare top 3 open-weight coding models and build a tiny CLI that benchmarks one',
@@ -45,38 +46,196 @@ export function Landing() {
   const profile = useStore((s) => s.profile);
   const appMode = useStore((s) => s.appMode);
   const swarmSize = useStore((s) => s.swarmSize);
+  const zgConn = useStore((s) => s.zgConnection);
+  const executionState = useStore((s) => s.executionState);
+  const setZGModal = useStore((s) => s.setZGModalOpen);
+  const checkZGStatus = useStore((s) => s.checkZGStatus);
   const [goal, setGoal] = useState('');
   const [mode, setMode] = useState<'live' | 'replay'>('live');
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const isExecuting = executionState === 'validating' || executionState === 'waiting_0g' || executionState === 'running';
+
+  useEffect(() => {
+    checkZGStatus();
+  }, [checkZGStatus]);
 
   const preview = useMemo(() => (appMode === 'office' && goal.trim().length > 12 ? triage(goal) : null), [goal, appMode]);
 
-  const open = () => {
-    const defaultGoal = appMode === 'swarm' ? SWARM_CHIPS[0] : CHIPS[0];
-    const g = goal.trim() || defaultGoal;
-    useStore.setState({ phase: 'workspace', mode });
+  const validateGuards = (): { ok: boolean; reason?: string } => {
+    // 1. Missing required task details
+    if (!goal.trim()) {
+      return { ok: false, reason: 'Please provide the required task details.' };
+    }
+
+    if (mode === 'live') {
+      // 2. 0G Service Unavailable
+      if (zgConn.status === 'unavailable') {
+        return { ok: false, reason: '0G is currently unavailable. Please try again.' };
+      }
+      // 3. Invalid or unverified credentials
+      if (zgConn.status === 'invalid_key') {
+        return { ok: false, reason: 'Your 0G API key has not been verified.' };
+      }
+      // 4. No API key or not verified
+      if (!zgConn.isVerified) {
+        return { ok: false, reason: 'Connect your 0G account before starting an agent.' };
+      }
+    }
+
+    return { ok: true };
+  };
+
+  const handleStartTask = () => {
+    if (isExecuting) return; // Prevent duplicate execution (Requirement 4)
+    const check = validateGuards();
+    if (!check.ok) {
+      setValidationError(check.reason!);
+      if (!goal.trim()) {
+        document.getElementById('task-input')?.focus();
+      } else if (!zgConn.isVerified) {
+        setZGModal(true);
+      }
+      return;
+    }
+
+    setValidationError(null);
+    useStore.setState({ phase: 'workspace', mode, goal: goal.trim() });
     sfx.setEnabled(useStore.getState().settings.sound);
-    engine.start(mode === 'replay' ? GOLDEN_GOAL : g);
+    engine.start(mode === 'replay' ? GOLDEN_GOAL : goal.trim());
+  };
+
+  const handleHeaderAction = () => {
+    if (goal.trim()) {
+      handleStartTask();
+      return;
+    }
+
+    // Open workspace in idle mode without triggering an agent (Requirement B)
+    setValidationError(null);
+    engine.stop();
+    useStore.setState({ phase: 'workspace', mode, goal: '' });
+    sfx.setEnabled(useStore.getState().settings.sound);
   };
 
   const chips = appMode === 'swarm' ? SWARM_CHIPS : CHIPS;
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden flex flex-col">
+      {/* 1. Dedicated Fixed Top Header Navbar */}
+      <header className="fixed top-0 left-0 right-0 z-30 h-14 border-b border-ink/10 bg-[#FAF7F2]/90 backdrop-blur-md px-6 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs cursor-pointer transition-transform hover:scale-105"
+            style={{ background: 'var(--accent)' }}
+          >
+            <span className="font-heading font-black text-white text-sm">A</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-heading font-bold text-lg tracking-tight text-ink">AUTONEX</span>
+            <span className="text-[10px] font-mono text-ink/40 uppercase tracking-widest hidden sm:inline">Autonomous Floor</span>
+          </div>
+          <div className="h-4 w-px bg-ink/10 mx-1 hidden sm:block" />
+          <button
+            type="button"
+            onClick={() => setZGModal(true)}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono transition-transform hover:scale-105 ${
+              zgConn.isVerified
+                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-700'
+                : 'bg-amber-500/10 border border-amber-500/30 text-amber-800'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                zgConn.isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+              }`}
+            />
+            <span>0G Private Computer</span>
+            <span className="opacity-40">·</span>
+            <span className="text-[10px] font-semibold uppercase">
+              {zgConn.isVerified ? (zgConn.maskedKey ? `Verified (${zgConn.maskedKey})` : 'Verified') : 'Click to Configure'}
+            </span>
+          </button>
+          {USE_MOCK && (
+            <span className="text-[10px] font-mono uppercase tracking-wider rounded-full border border-ink/20 px-2 py-0.5 text-ink/60">
+              Demo mode
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Quick mode switcher */}
+          <div className="flex rounded-lg border border-ink/15 p-0.5 bg-paper/80 shadow-xs text-xs font-heading">
+            <button
+              type="button"
+              onClick={() => useStore.setState({ appMode: 'office' })}
+              className={`rounded-md px-2.5 py-1 transition-all ${
+                appMode === 'office' ? 'text-white shadow-xs font-medium' : 'text-ink/60 hover:text-ink'
+              }`}
+              style={appMode === 'office' ? { background: 'var(--accent)' } : {}}
+            >
+              Office
+            </button>
+            <button
+              type="button"
+              onClick={() => useStore.setState({ appMode: 'swarm' })}
+              className={`rounded-md px-2.5 py-1 transition-all ${
+                appMode === 'swarm' ? 'text-white shadow-xs font-medium' : 'text-ink/60 hover:text-ink'
+              }`}
+              style={appMode === 'swarm' ? { background: 'var(--accent)' } : {}}
+            >
+              Swarm
+            </button>
+          </div>
+
+          {/* Accent picker */}
+          <label className="relative cursor-pointer flex items-center" title="Theme accent color">
+            <input
+              type="color"
+              value={accent}
+              onChange={(e) => {
+                useStore.setState({ accent: e.target.value });
+                document.documentElement.style.setProperty('--accent', e.target.value);
+                setAccent(e.target.value);
+                resetAccentBlend();
+              }}
+              className="sr-only"
+            />
+            <div
+              className="w-5 h-5 rounded-full border-2 border-white shadow-xs transition-transform hover:scale-110"
+              style={{ background: accent }}
+            />
+          </label>
+
+          {/* Direct Header CTA */}
+          <button
+            onClick={handleHeaderAction}
+            disabled={isExecuting}
+            className="rounded-lg px-3.5 py-1.5 font-heading font-semibold text-xs text-white shadow-xs transition-transform hover:scale-105 disabled:opacity-60 disabled:pointer-events-none"
+            style={{ background: 'var(--accent)' }}
+            title={goal.trim() ? 'Launch agent with specified task' : 'Open 3D office in idle mode without executing tasks'}
+          >
+            {isExecuting ? 'Starting...' : (goal.trim() ? (appMode === 'swarm' ? 'Convene Swarm' : 'Start Task') : 'Open Office (Idle)')}
+          </button>
+        </div>
+      </header>
+
+      {/* 2. Background 3D Viewport */}
       <div className="absolute inset-0">
         {appMode === 'swarm' ? <SwarmCanvas ambient /> : <OfficeCanvas ambient />}
       </div>
       <div className="absolute inset-0 blueprint-grid pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#FAF7F2]/95 via-[#FAF7F2]/70 to-transparent" />
-      <div className="relative h-full flex items-center">
-        <div className="max-w-xl px-8 lg:px-16 py-12">
+      <div className="absolute inset-0 bg-gradient-to-r from-[#FAF7F2]/95 via-[#FAF7F2]/75 to-transparent pointer-events-none" />
+
+      {/* 3. Hero Content Container with Safe Top Clearance & Scrollability */}
+      <div className="relative h-full pt-16 flex flex-col justify-start overflow-y-auto no-scrollbar z-10">
+        <div className="max-w-xl px-8 lg:px-16 py-6 lg:py-8">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent)' }}>
-                <span className="font-heading font-bold text-white text-sm">G</span>
-              </div>
-              <span className="font-heading font-bold text-xl tracking-tight">GravityDesk</span>
-              {USE_MOCK && <span className="ml-2 text-[10px] font-mono uppercase tracking-wider rounded-full border border-ink/20 px-2 py-0.5">Demo mode</span>}
+            <div className="inline-flex items-center gap-2 mb-3 px-2.5 py-1 rounded-full bg-white/70 border border-ink/10 text-xs font-heading text-ink/70 shadow-xs">
+              <span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
+              <span>Decentralized AI Floor on 0G Private Computer</span>
             </div>
+
             <h1 className="font-heading font-bold text-4xl lg:text-5xl leading-tight tracking-tight mb-4">
               {appMode === 'swarm' ? (
                 <>
@@ -143,18 +302,54 @@ export function Landing() {
               )}
             </div>
 
+            {/* Validation Guard Alert Banner (Requirement E) */}
+            {validationError && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 text-xs font-body flex items-center justify-between shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-bold shrink-0">⚠️</span>
+                  <span className="font-medium">{validationError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValidationError(null)}
+                  className="text-amber-900/40 hover:text-amber-900 text-xs px-1 font-bold"
+                >
+                  ✕
+                </button>
+              </motion.div>
+            )}
+
             <div className="flex gap-2 mb-1">
               <input
-                id="task-input" value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && open()}
+                id="task-input"
+                value={goal}
+                onChange={(e) => {
+                  setGoal(e.target.value);
+                  if (validationError) setValidationError(null);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleStartTask()}
                 placeholder={appMode === 'swarm' ? 'Topic for the swarm to deliberate…' : 'Describe a task for the manager…'}
                 className="flex-1 rounded-xl border border-ink/15 bg-white/90 px-4 py-3 font-body text-sm outline-none focus:border-ink/40 shadow-sm"
               />
-              <button onClick={open}
-                className="rounded-xl px-5 py-3 font-heading font-semibold text-sm text-white shadow-md transition-transform hover:scale-[1.02]"
-                style={{ background: 'var(--accent)' }}>
-                {appMode === 'swarm' ? 'Convene swarm' : 'Open the office'}
+              <button
+                type="button"
+                onClick={handleStartTask}
+                disabled={isExecuting}
+                className="flex items-center gap-2 rounded-xl px-5 py-3 font-heading font-semibold text-sm text-white shadow-md transition-all hover:scale-[1.02] disabled:opacity-60 disabled:pointer-events-none"
+                style={{ background: 'var(--accent)' }}
+              >
+                {isExecuting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <span>{executionState === 'waiting_0g' ? 'Connecting 0G...' : 'Starting...'}</span>
+                  </>
+                ) : (
+                  <span>{appMode === 'swarm' ? 'Convene swarm' : 'Open the office'}</span>
+                )}
               </button>
             </div>
 
@@ -235,8 +430,9 @@ export function Landing() {
         </div>
       </div>
       <div className="absolute bottom-4 right-6 flex items-center gap-3 text-[11px] font-mono text-ink/50">
-        <Icon d={I.cube} size={13} /> triage → org → RealGravity workers · {USE_MOCK ? 'mock event stream' : 'live bridge'}
+        <Icon d={I.cube} size={13} /> triage → multi-agent floor → 0G Private Computer · {zgConn.isVerified ? '0G live router' : '0G config required'}
       </div>
+      <ZGConfigModal />
     </div>
   );
 }

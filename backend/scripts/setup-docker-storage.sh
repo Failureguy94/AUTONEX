@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p /mnt/d/Realgravity/docker-data
+mkdir -p /mnt/d/AUTONEX/docker-data
 cat <<EOF > /etc/docker/daemon.json
 {
-  "data-root": "/mnt/d/Realgravity/docker-data"
+  "data-root": "/mnt/d/AUTONEX/docker-data"
 }
 EOF
 

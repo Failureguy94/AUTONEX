@@ -1,5 +1,5 @@
 import pytest
-from deskmates_bridge.swarm.rounds.tally import SwarmBallot, VoteTallyEngine
+from autonex_bridge.swarm.rounds.tally import SwarmBallot, VoteTallyEngine
 
 
 def test_borda_and_early_decision():

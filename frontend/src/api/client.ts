@@ -17,6 +17,9 @@ export interface ApiClient {
   getRuns(): Promise<any[]>;
   getEvents(runId: string, sinceSeq: number, limit: number): Promise<{ events: Envelope[]; next_seq: number }>;
   health(): Promise<boolean>;
+  get0GStatus(): Promise<{ status: string; isVerified: boolean; maskedKey: string | null; lastVerifiedAt: string | null; lastRequestId: string | null }>;
+  verify0GKey(apiKey: string): Promise<{ valid: boolean; status: string; message: string; maskedKey?: string; requestId?: string }>;
+  disconnect0G(): Promise<{ ok: boolean; status: string }>;
 }
 export interface EventStream {
   start(runId: string, sinceSeq: number, onEvent: (e: Envelope) => void): void;
@@ -29,13 +32,18 @@ export interface EventStream {
 const env = (k: string): string | undefined =>
   (import.meta as any).env?.[k] ?? (typeof process !== 'undefined' ? process.env?.[k] : undefined);
 const API_URL = env('VITE_API_URL') ?? 'http://localhost:8000';
-export const USE_MOCK = (env('VITE_USE_MOCK') ?? 'true') !== 'false';
+export const USE_MOCK = env('VITE_USE_MOCK') === 'true';
 
 export class HttpClient implements ApiClient {
   private base = API_URL;
   private async req(path: string, init?: RequestInit) {
     const r = await fetch(this.base + path, { headers: { 'Content-Type': 'application/json' }, ...init });
-    if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+    if (!r.ok) {
+      let errJson: any = null;
+      try { errJson = await r.json(); } catch {}
+      const errMsg = errJson?.error || errJson?.message || `${path} -> ${r.status}`;
+      throw new Error(errMsg);
+    }
     return r.json();
   }
   createTask(goal: string, model?: string, options?: any) {
@@ -58,6 +66,15 @@ export class HttpClient implements ApiClient {
     return this.req(`/api/runs/${runId}/events?since_seq=${sinceSeq}&limit=${limit}`);
   }
   async health() { try { const r = await fetch(this.base + '/api/health'); return r.ok; } catch { return false; } }
+  get0GStatus() {
+    return this.req('/api/config/0g/status');
+  }
+  verify0GKey(apiKey: string) {
+    return this.req('/api/config/0g/verify', { method: 'POST', body: JSON.stringify({ apiKey }) });
+  }
+  disconnect0G() {
+    return this.req('/api/config/0g', { method: 'DELETE' });
+  }
 }
 
 export class HttpStream implements EventStream {

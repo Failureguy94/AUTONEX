@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a concise repository map for PAG / RealGravity.
+Generate a concise repository map for PAG / AUTONEX.
 Lists tracked files, runs ctags -x to extract top-level symbols,
 ranks by git commit activity, and caps output at 6,000 characters.
 Output is written to .agent/repo-map.md in the current working directory.

@@ -11,7 +11,7 @@ fi
 
 LOG_FILE="${PAG_ROOT}/logs/pag.log"
 
-echo "=== RealGravity (PAG) API Usage & Quota Summary ==="
+echo "=== AUTONEX (PAG) API Usage & Quota Summary ==="
 
 if [ ! -f "$LOG_FILE" ]; then
   echo "No log file found at ${LOG_FILE} yet. Run a session first."

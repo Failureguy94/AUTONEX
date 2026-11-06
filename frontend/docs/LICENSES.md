@@ -16,5 +16,5 @@ No external 3D models or textures. All geometry is procedural; all textures are 
 ## Models
 Open-weight models are used through third-party hosted APIs on their free tiers; each model keeps its own license (Apache-2.0 / MIT / OpenRAIL-M / community licenses). Record each model's license in your submission.
 
-## RealGravity reference files
-`reference/realgravity/` holds the owner's own documents, **unmodified**, for context. They are not part of the MIT grant unless the owner decides so.
+## AUTONEX reference files
+`reference/autonex_reference/` holds the owner's own documents, **unmodified**, for context. They are not part of the MIT grant unless the owner decides so.

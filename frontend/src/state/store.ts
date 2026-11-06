@@ -13,6 +13,18 @@ export interface Settings {
   reducedMotion: boolean; concurrency: number; pricePerM: number; showPaidCost: boolean;
 }
 
+export type ZGStatus = 'not_configured' | 'validating' | 'connected' | 'invalid_key' | 'unavailable' | 'error';
+export type ExecutionState = 'idle' | 'validating' | 'waiting_0g' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface ZGConnectionState {
+  status: ZGStatus;
+  isVerified: boolean;
+  maskedKey: string | null;
+  error: string | null;
+  lastVerifiedAt: string | null;
+  requestId: string | null;
+}
+
 interface Store {
   phase: 'landing' | 'workspace';
   goal: string; modelId: string; models: ModelInfo[]; mode: 'live' | 'replay';
@@ -51,6 +63,15 @@ interface Store {
   fileEdits: Record<string, { path: string; line_ranges: [number, number][]; branch?: string; ts: string }[]>;
   checkpoint: { branch: string; start_commit: string } | null;
   settings: Settings;
+  zgConnection: ZGConnectionState;
+  zgModalOpen: boolean;
+  executionState: ExecutionState;
+  executionError: string | null;
+  setExecutionState: (state: ExecutionState, error?: string | null) => void;
+  setZGModalOpen: (open: boolean) => void;
+  checkZGStatus: () => Promise<void>;
+  verifyZGKey: (apiKey: string) => Promise<{ valid: boolean; message: string }>;
+  disconnectZG: () => Promise<void>;
   set: (p: Partial<Store>) => void;
   resetRun: (goal: string) => void;
 }
@@ -86,9 +107,202 @@ export const useStore = create<Store>((set) => ({
   fileEdits: {},
   checkpoint: null,
   settings: { shadows: 'med', post: true, lodDist: 26, sound: true, reducedMotion: false, concurrency: 4, pricePerM: 0.6, showPaidCost: false },
+  executionState: 'idle',
+  executionError: null,
+  setExecutionState: (executionState, executionError = null) => set({ executionState, executionError }),
+  zgModalOpen: false,
+  zgConnection: {
+    status: 'not_configured',
+    isVerified: false,
+    maskedKey: null,
+    error: null,
+    lastVerifiedAt: null,
+    requestId: null
+  },
+  setZGModalOpen: (open) => set({ zgModalOpen: open }),
+  checkZGStatus: async () => {
+    // 1. Check local session storage first
+    try {
+      const savedKey = typeof window !== 'undefined' ? sessionStorage.getItem('zg_api_key') : null;
+      if (savedKey) {
+        const trimmed = savedKey.trim();
+        const masked = trimmed.length <= 8 ? '••••' + trimmed.slice(-2) : trimmed.slice(0, 4) + '••••••••' + trimmed.slice(-4);
+        set((s) => ({
+          zgConnection: {
+            ...s.zgConnection,
+            status: 'connected',
+            isVerified: true,
+            maskedKey: masked,
+            error: null
+          }
+        }));
+      }
+    } catch {}
+
+    // 2. Check local bridge server (non-blocking with short timeout)
+    try {
+      const res = await fetch('http://localhost:8000/api/config/0g/status', {
+        signal: AbortSignal.timeout(1500)
+      }).then((r) => r.json());
+
+      if (res && res.isVerified) {
+        set((s) => ({
+          zgConnection: {
+            status: 'connected',
+            isVerified: true,
+            maskedKey: res.maskedKey || s.zgConnection.maskedKey,
+            error: null,
+            lastVerifiedAt: res.lastVerifiedAt || new Date().toISOString(),
+            requestId: res.lastRequestId || s.zgConnection.requestId
+          }
+        }));
+      }
+    } catch {
+      // Bridge is not running; retain existing status (default 'not_configured' or sessionStorage validated state)
+    }
+  },
+  verifyZGKey: async (apiKey: string) => {
+    const trimmed = (apiKey || '').trim();
+    if (!trimmed) {
+      set((s) => ({
+        zgConnection: {
+          ...s.zgConnection,
+          status: 'not_configured',
+          error: 'Please enter your 0G API Key'
+        }
+      }));
+      return { valid: false, message: 'Please enter your 0G API Key' };
+    }
+
+    set((s) => ({
+      zgConnection: {
+        ...s.zgConnection,
+        status: 'validating',
+        error: null
+      }
+    }));
+
+    const masked = trimmed.length <= 8 ? '••••' + trimmed.slice(-2) : trimmed.slice(0, 4) + '••••••••' + trimmed.slice(-4);
+
+    try {
+      // Direct live verification against 0G Private Computer Router API (supports CORS)
+      const zgRes = await fetch('https://router-api.0g.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${trimmed}`,
+          'X-0G-Provider-Trust-Mode': 'standard'
+        },
+        body: JSON.stringify({
+          model: 'qwen-flash',
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      const capturedRequestId = zgRes.headers.get('x-request-id') || zgRes.headers.get('request-id');
+
+      // HTTP 200 or 429 confirms valid token
+      if (zgRes.ok || zgRes.status === 429) {
+        const effectiveId = capturedRequestId || `req_0g_${Date.now()}`;
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('zg_api_key', trimmed);
+          }
+        } catch {}
+
+        set({
+          zgConnection: {
+            status: 'connected',
+            isVerified: true,
+            maskedKey: masked,
+            error: null,
+            lastVerifiedAt: new Date().toISOString(),
+            requestId: effectiveId
+          }
+        });
+
+        // Background sync to bridge server if online
+        fetch('http://localhost:8000/api/config/0g/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: trimmed })
+        }).catch(() => {});
+
+        return { valid: true, message: '0G Private Computer credentials successfully verified' };
+      }
+
+      // HTTP 401 or 403: Invalid Key
+      if (zgRes.status === 401 || zgRes.status === 403) {
+        set({
+          zgConnection: {
+            status: 'invalid_key',
+            isVerified: false,
+            maskedKey: null,
+            error: 'Invalid 0G API Key: authentication failed (401)',
+            lastVerifiedAt: null,
+            requestId: capturedRequestId || null
+          }
+        });
+        return { valid: false, message: 'Invalid 0G API Key: authentication failed (401)' };
+      }
+
+      // HTTP 5xx: Service unavailable
+      const errText = await zgRes.text();
+      set({
+        zgConnection: {
+          status: 'unavailable',
+          isVerified: false,
+          maskedKey: null,
+          error: `0G service unavailable (HTTP ${zgRes.status})`,
+          lastVerifiedAt: null,
+          requestId: capturedRequestId || null
+        }
+      });
+      return { valid: false, message: `0G service unavailable (HTTP ${zgRes.status}): ${errText.slice(0, 100)}` };
+    } catch (err: any) {
+      const isAbort = err.name === 'AbortError' || err.name === 'TimeoutError';
+      const errMsg = isAbort
+        ? '0G service unavailable: request timed out'
+        : `0G connection error: ${err.message || 'network unreachable'}`;
+
+      set({
+        zgConnection: {
+          status: 'unavailable',
+          isVerified: false,
+          maskedKey: null,
+          error: errMsg,
+          lastVerifiedAt: null,
+          requestId: null
+        }
+      });
+      return { valid: false, message: errMsg };
+    }
+  },
+  disconnectZG: async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('zg_api_key');
+      }
+    } catch {}
+    try {
+      await fetch('http://localhost:8000/api/config/0g', { method: 'DELETE' });
+    } catch {}
+    set({
+      zgConnection: {
+        status: 'not_configured',
+        isVerified: false,
+        maskedKey: null,
+        error: null,
+        lastVerifiedAt: null,
+        requestId: null
+      }
+    });
+  },
   set: (p) => set(p),
   resetRun: (goal) => set({
-    goal, agents: {}, order: [], tasks: {}, edges: [], notes: [], log: [], runEvents: [],
+    goal, executionState: 'idle', executionError: null, agents: {}, order: [], tasks: {}, edges: [], notes: [], log: [], runEvents: [],
     metrics: { llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 },
     gate: { in_flight: 0, limit: 4, queue_depth: 0, backoff_active: false },
     llmByRole: {}, llmByModel: {}, terminal: {}, report: null, replanCount: 0,

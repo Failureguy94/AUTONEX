@@ -50,7 +50,7 @@ export function ReportView() {
     ? dirMatch[1]
     : (report?.sources?.[0]?.url
       ? report.sources[0].url.replace(/^file:\/\/\/?/, '').replace(/\/[^/]+$/, '').replace(/\//g, '\\')
-      : 'D:\\GravityDesk\\output\\ProjectOutput');
+      : 'D:\\AUTONEX\\output\\ProjectOutput');
   const projectName = localOutputDir.split(/[\\/]/).filter(Boolean).pop() || 'ProjectOutput';
 
   const [realFiles, setRealFiles] = useState<Record<string, string> | null>(null);
@@ -97,7 +97,7 @@ export function ReportView() {
     const W = doc.internal.pageSize.getWidth();
     let y = 60;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor('#E4572E');
-    doc.text('GravityDesk - Final Synthesis Report', 40, y); y += 26;
+    doc.text('AUTONEX - Final Synthesis Report', 40, y); y += 26;
     doc.setTextColor('#2B2B2E'); doc.setFontSize(10); doc.setFont('helvetica', 'normal');
     doc.text(`Organizational effort ${fmtEffort(report.effort_logical_s)} vs real time ${(report.effort_real_s / 60).toFixed(1)} min`, 40, y); y += 24;
     for (const line of report.report_markdown.split('\n')) {

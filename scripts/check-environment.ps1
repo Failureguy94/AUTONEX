@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Environment verification for GravityDesk.
+    Environment verification for AUTONEX.
 #>
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host " GravityDesk Environment Verification" -ForegroundColor Cyan
+Write-Host " AUTONEX Environment Verification" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -25,11 +25,11 @@ try {
     Write-Host "[ERROR] Python is not found on PATH." -ForegroundColor Red
 }
 
-# Check RealGravity Opencode binary
+# Check AUTONEX Opencode binary
 $opencodeExe = Join-Path $RootDir "backend\bin\opencode.exe"
 if (Test-Path $opencodeExe) {
     $sizeMb = [math]::Round((Get-Item $opencodeExe).Length / 1MB, 2)
-    Write-Host "[OK] RealGravity opencode.exe found ($sizeMb MB)" -ForegroundColor Green
+    Write-Host "[OK] AUTONEX opencode.exe found ($sizeMb MB)" -ForegroundColor Green
 } else {
     Write-Host "[ERROR] opencode.exe not found at $opencodeExe" -ForegroundColor Red
 }

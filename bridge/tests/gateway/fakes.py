@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import deque
-from deskmates_bridge.gateway.clock import FakeClock
-from deskmates_bridge.gateway.router import ModelSpec, UpstreamError, UpstreamResponse
+from autonex_bridge.gateway.clock import FakeClock
+from autonex_bridge.gateway.router import ModelSpec, UpstreamError, UpstreamResponse
 
 
 class FakeUpstream:

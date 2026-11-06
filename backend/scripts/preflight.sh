@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PAG_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "=== RealGravity (PAG) Preflight Check ==="
+echo "=== AUTONEX (PAG) Preflight Check ==="
 
 # 1. OS check
 OS_INFO=$(uname -a)
@@ -175,7 +175,7 @@ EOF
     cd "$SCRATCH_DIR"
     git init -b main >/dev/null 2>&1 || git init >/dev/null 2>&1
     git config user.name "PAG Tester"
-    git config user.email "tester@realgravity.local"
+    git config user.email "tester@autonex.local"
     git add .
     git commit -m "Initial scratch repo commit" >/dev/null 2>&1
   )

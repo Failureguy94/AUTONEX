@@ -1,7 +1,7 @@
 import pytest
-from deskmates_bridge.swarm.rounds.assign import CritiqueAssignmentSolver
-from deskmates_bridge.swarm.rounds.cluster_local import LocalClusterer
-from deskmates_bridge.swarm.rounds.personas import PersonaSeatAllocator
+from autonex_bridge.swarm.rounds.assign import CritiqueAssignmentSolver
+from autonex_bridge.swarm.rounds.cluster_local import LocalClusterer
+from autonex_bridge.swarm.rounds.personas import PersonaSeatAllocator
 
 
 def test_clustering_and_outlier_tray():

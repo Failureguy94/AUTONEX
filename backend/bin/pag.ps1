@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    RealGravity (PAG) Windows Launcher.
+    AUTONEX (PAG) Windows Launcher.
     Runs in super-lightweight Native Mode (default, ~80MB RAM, zero Docker needed)
     or in Docker Sandbox Mode (--docker).
 #>
@@ -66,7 +66,7 @@ while ($queue.Count -gt 0) {
 
 if ($Help) {
     Write-Host ''
-    Write-Host 'RealGravity (PAG) - Personal Antigravity' -ForegroundColor Cyan -NoNewline
+    Write-Host 'AUTONEX - Autonomous Agent Engine' -ForegroundColor Cyan -NoNewline
     Write-Host ' [Native Mode]' -ForegroundColor Green
     Write-Host '=========================================================='
     Write-Host 'Usage: pag [project-folder] [profile] [options]'
@@ -86,14 +86,14 @@ if ($Help) {
     Write-Host '  pag D:\Django assist'
     Write-Host '  pag D:\Django assist --model nvidia'
     Write-Host '  pag D:\Django assist --model groq'
-    Write-Host '  pag D:\Realgravity\scratch-repo assist'
+    Write-Host '  pag D:\AUTONEX\scratch-repo assist'
     Write-Host '  pag --list-models'
     exit 0
 }
 
 if ($ListModels -or ($TargetDir -eq '--list-models')) {
     Write-Host ''
-    Write-Host '=== RealGravity Available Models (Free Tier) ===' -ForegroundColor Cyan
+    Write-Host '=== AUTONEX Available Models (Free Tier) ===' -ForegroundColor Cyan
     Write-Host ''
     if (Test-Path $BASE_JSON) {
         $cfg = Get-Content $BASE_JSON -Raw | ConvertFrom-Json
@@ -171,7 +171,7 @@ if ($UseDocker) {
     if ($Tier -ne 3) { $cmdParts.Add('--tier'); $cmdParts.Add("$Tier") }
 
     $WslCmd = $cmdParts -join ' '
-    Write-Host 'RealGravity - Launching Docker Sandbox Mode...' -ForegroundColor Cyan
+    Write-Host 'AUTONEX - Launching Docker Sandbox Mode...' -ForegroundColor Cyan
     wsl -d Ubuntu -- bash -c "$WslCmd"
     exit $LASTEXITCODE
 }
@@ -219,8 +219,8 @@ try {
     # Ensure git user name/email configured
     $gitUser = git config user.name 2>$null
     if (-not $gitUser) {
-        git config user.name "RealGravity Agent"
-        git config user.email "agent@realgravity.local"
+        git config user.name "AUTONEX Agent"
+        git config user.email "agent@autonex.local"
     }
 
     # Check for uncommitted work
@@ -262,7 +262,7 @@ try {
     # 6. Launch Native OpenCode TUI Session
     Write-Host ''
     Write-Host '================================================================' -ForegroundColor Cyan
-    Write-Host '            RealGravity - Personal Antigravity Agent            ' -ForegroundColor Cyan
+    Write-Host '            AUTONEX - Autonomous Agent Engine                   ' -ForegroundColor Cyan
     Write-Host '================================================================' -ForegroundColor Cyan
     Write-Host " Mode:     Native (Fast, No Docker, Low Resource)" -ForegroundColor Green
     Write-Host " Target:   $ResolvedPath" -ForegroundColor DarkGray
@@ -282,7 +282,7 @@ try {
     # 7. Post-Session Diff Summary & Rollback
     Write-Host ''
     Write-Host '============================================================' -ForegroundColor Cyan
-    Write-Host '   RealGravity Session Summary' -ForegroundColor Cyan
+    Write-Host '   AUTONEX Session Summary' -ForegroundColor Cyan
     Write-Host '============================================================' -ForegroundColor Cyan
 
     Write-Host "Changes since start commit ($StartCommit):" -ForegroundColor Yellow
@@ -295,7 +295,7 @@ try {
     $statDiff = git diff --stat $StartCommit 2>$null
     $patchDiff = git diff -U0 $StartCommit 2>$null
     $summaryLines = @(
-        "RealGravity Session Summary: $TS",
+        "AUTONEX Session Summary: $TS",
         "Start Commit: $StartCommit",
         "Branch: $BranchName",
         "Profile: $Profile",

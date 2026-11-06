@@ -51,7 +51,7 @@ for task_dir in "${TASKS_DIR}"/*; do
       cd "$WORK_COPY"
       git init -b main >/dev/null 2>&1 || git init >/dev/null 2>&1
       git config user.name "Eval Agent"
-      git config user.email "eval@realgravity.local"
+      git config user.email "eval@autonex.local"
       git add . >/dev/null 2>&1 || true
       git commit -m "Initial eval state" >/dev/null 2>&1 || true
     )

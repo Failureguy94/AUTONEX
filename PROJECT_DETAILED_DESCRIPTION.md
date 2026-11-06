@@ -1,4 +1,4 @@
-# GravityDesk (BenchMates / RealGravity)
+# AUTONEX (Autonomous Multi-Agent Engineering Floor)
 ## Master Presentation, Technical Architecture & Defense Dossier
 
 ---
@@ -6,7 +6,7 @@
 ## 1. Executive Overview (Non-Technical Pitch)
 
 ### 1.1 The One-Liner
-> **GravityDesk is the world’s first spatially-grounded, multi-agent autonomous software engineering floor where specialized AI agents collaborate, debate, and deliver production-grade software inside a real-time 3D simulation.**
+> **AUTONEX is the world’s first spatially-grounded, multi-agent autonomous software engineering floor — transforming isolated AI coding into a living 3D collaborative nexus where specialized agent swarms deliberate, architect, and deliver verified production software in real time.**
 
 ### 1.2 The Core Problem
 When software engineering teams or individual developers use current AI coding tools (ChatGPT, Claude, Cursor, Copilot), they hit three systemic walls:
@@ -14,10 +14,10 @@ When software engineering teams or individual developers use current AI coding t
 2. **The "Black Box" Problem:** Traditional autonomous agent harnesses (AutoGPT, Devin, SWE-agent) dump endless walls of terminal text. Nobody knows which agent is stuck, what they are debating, or why a decision was made until 20 minutes and $50 of API credits are wasted.
 3. **The Rate-Limit Meltdown:** Orchestrating multiple AI agents triggers constant HTTP 429 rate limits, crashing simulations or causing silent drops.
 
-### 1.3 The GravityDesk Breakthrough
-GravityDesk solves this by modeling autonomous engineering as a **physical, human-observable office floor and grand deliberation hall**:
+### 1.3 The AUTONEX Breakthrough
+AUTONEX solves this by modeling autonomous engineering as a **physical, human-observable office floor and grand deliberation hall**:
 - **Dual Working Modes:**
-  - **Deskmates Office (Collaborative Execution):** A dedicated 4-agent core team (Diya as Manager, Rohan on Backend, Kabir on Frontend, Nisha on QA) working through hierarchical task DAGs, walking to meetings, and writing code.
+  - **AUTONEX Office (Collaborative Execution):** A dedicated 4-agent core team (Diya as Manager, Rohan on Backend, Kabir on Frontend, Nisha on QA) working through hierarchical task DAGs, walking to meetings, and writing code.
   - **Swarm Hall (Massive Consensus Synthesis):** A 10, 20, or 50-agent autonomous council sitting at a grand oval conference table, debating complex architectural trade-offs through multi-phase consensus rounds before writing unified code.
 - **Cognitive Spatial Observability:** Instead of reading terminal logs, human managers see agents walking, debating, holding standups, taking coffee breaks during API cooldowns, and raising explicit permission modals before risky operations.
 
@@ -116,7 +116,7 @@ When a complex architectural objective is fed to Swarm Mode, it executes a mathe
 
 ## 4. Key USPs (Unique Selling Propositions)
 
-| # | Unique Feature | How Competitors Do It | How GravityDesk Does It | Why It Wins |
+| # | Unique Feature | How Competitors Do It | How AUTONEX Does It | Why It Wins |
 |---|---|---|---|---|
 | **1** | **Spatial Grounding** | Text logs or static node graphs. | Full 3D WebGL isometric office & swarm hall with procedural avatars, walking trajectories, and zone interactions. | **10x higher cognitive observability.** The human brain processes spatial movement 60,000x faster than reading log streams. |
 | **2** | **Zero Hardcoding** | Hardcoded scripts or canned mock workflows. | **100% prompt-driven dynamic LLM generation.** Every proposal, critique, and code file is created live via DeepSeek-R1 / OpenRouter. | Real, verifiable engineering work on any domain (cryptography, matching engines, compilers). |
@@ -132,7 +132,7 @@ When a complex architectural objective is fed to Swarm Mode, it executes a mathe
 
 ### Q1: "Isn't the 3D office just a visual gimmick? Why not just use a dashboard?"
 > **Defense:**  
-> "A 2D dashboard shows you metrics after the fact; our 3D spatial floor provides **real-time spatial situational awareness**. In multi-agent systems, human cognitive load is the primary bottleneck. If 20 agents are debating and 2 deadlocked on a dependency, reading 100,000 log lines takes 10 minutes. In GravityDesk, you immediately see the agents clustered at a specific desk or whiteboard with a visual warning aura. Furthermore, spatial grounding enforces physical concurrency limits—agents must be at their desks or in conference rooms to take action, preventing invisible thread explosions."
+> "A 2D dashboard shows you metrics after the fact; our 3D spatial floor provides **real-time spatial situational awareness**. In multi-agent systems, human cognitive load is the primary bottleneck. If 20 agents are debating and 2 deadlocked on a dependency, reading 100,000 log lines takes 10 minutes. In AUTONEX, you immediately see the agents clustered at a specific desk or whiteboard with a visual warning aura. Furthermore, spatial grounding enforces physical concurrency limits—agents must be at their desks or in conference rooms to take action, preventing invisible thread explosions."
 
 ### Q2: "How do you prevent agents in the 50-agent Swarm from hallucinating and agreeing with each other's mistakes (Groupthink)?"
 > **Defense:**  
@@ -143,7 +143,7 @@ When a complex architectural objective is fed to Swarm Mode, it executes a mathe
 
 ### Q3: "How do you handle API cost and context explosion when running 50 agents?"
 > **Defense:**  
-> "Naive multi-agent systems run all-to-all communication ($N^2$ complexity), which for 50 agents is 2,500 interactions per round. GravityDesk uses **Semantic Clustering and Wave Dispatch**:  
+> "Naive multi-agent systems run all-to-all communication ($N^2$ complexity), which for 50 agents is 2,500 interactions per round. AUTONEX uses **Semantic Clustering and Wave Dispatch**:  
 > - Proposals are posted to an Idea Blackboard ($O(N)$).  
 > - Diya/Clustering algorithms compress them into $K=4$ orthogonal architectural schools of thought.  
 > - Critiques and voting happen per cluster ($O(N \cdot K)$).  
@@ -155,7 +155,7 @@ When a complex architectural objective is fed to Swarm Mode, it executes a mathe
 
 ### Q5: "What happens if an agent writes malicious code or attempts to delete system files?"
 > **Defense:**  
-> "GravityDesk enforces an **Asynchronous Security Sandbox**:  
+> "AUTONEX enforces an **Asynchronous Security Sandbox**:  
 > 1. No tool execution (`file.write`, `bash.exec`, `git.push`) can execute autonomously without clearing the permission engine.  
 > 2. The Bridge halts the calling agent's Promise and sends a `permission.requested` event to the frontend.  
 > 3. The human operator is presented with a diff and explanation modal to approve (`once`, `always`, or `reject`).  
@@ -173,14 +173,14 @@ When a complex architectural objective is fed to Swarm Mode, it executes a mathe
 ## 6. Slide-by-Slide Presentation Structure (Pitch Deck)
 
 - **Slide 1: Title & Hook**  
-  *GravityDesk: The Autonomous 3D Multi-Agent Engineering Floor.*  
+  *AUTONEX: The Autonomous 3D Multi-Agent Engineering Floor.*  
   "What if your AI coding assistant wasn't a single chatbox, but an entire 50-person engineering department you could watch, guide, and collaborate with in real-time?"
 - **Slide 2: The Three Failures of Modern AI Coding**  
   Single-brain saturation, zero visual transparency, and brittle rate-limit handling.
 - **Slide 3: The Architecture (Spatial Grounding + Consensus Mesh)**  
   Three.js WebGL Floor + Event Bridge + Multi-Model Routing Mesh.
 - **Slide 4: Dual Working Modes**  
-  - *Deskmates Office:* Agile sprint execution (PM, Backend, Frontend, QA).  
+  - *AUTONEX Office:* Agile sprint execution (PM, Backend, Frontend, QA).  
   - *Swarm Hall:* 50-agent council for deep architectural synthesis.
 - **Slide 5: Live Demo & Walkthrough**  
   Submit a complex prompt -> Watch framing -> 3D agent walk to table -> Idea board clustering -> Live critique -> Realistic coffee break during rate limit -> Generated production project in `output/`.

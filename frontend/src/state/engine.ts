@@ -121,6 +121,7 @@ class LiveEngine implements RunEngine {
     director.reset();
     useStore.getState().resetRun(goal);
     this.replayTape = [];
+    useStore.setState({ executionState: 'waiting_0g', executionError: null });
     try {
       const st = useStore.getState();
       if (st.appMode === 'swarm') {
@@ -135,17 +136,27 @@ class LiveEngine implements RunEngine {
         { profile: st.profile, mode: st.appMode, swarm_size: st.swarmSize } as any
       );
       this.currentRunId = run_id;
+      useStore.setState({ executionState: 'running' });
       this.stream = new HttpStream();
       this.stream.start(run_id, 0, (e) => {
         const ev = parseEvent(e);
         if (!ev) { console.warn('dropped invalid event', e); return; }
         this.replayTape.push(ev);
         useStore.setState({ runEvents: [...useStore.getState().runEvents, ev] });
+
+        if (ev.type === 'final.result' || ev.type === 'run.completed') {
+          useStore.setState({ executionState: 'completed' });
+        } else if (ev.type === 'system.halted') {
+          useStore.setState({ executionState: 'cancelled' });
+        }
+
         applyEvent(ev, false);
       });
       useStore.setState({ offline: false, demoMode: false });
-    } catch {
-      useStore.setState({ offline: true });
+    } catch (err: any) {
+      console.error('[LiveEngine] Task execution blocked or failed:', err);
+      const msg = err?.message || 'Execution blocked: verification or input required';
+      useStore.setState({ toast: msg, offline: false, demoMode: false, executionState: 'failed', executionError: msg });
     }
   }
   stop() {
@@ -155,6 +166,9 @@ class LiveEngine implements RunEngine {
     }
     this.stream?.stop();
     this.stream = null;
+    if (useStore.getState().executionState === 'running' || useStore.getState().executionState === 'waiting_0g') {
+      useStore.setState({ executionState: 'cancelled' });
+    }
   }
   setSpeed(f: number) { this.stream?.setSpeed(f); }
   pause(p: boolean) { useStore.setState({ paused: p }); }

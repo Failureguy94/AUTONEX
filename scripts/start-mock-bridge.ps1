@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Starts the GravityDesk Bridge Contract Server (Port 8000).
+    Starts the AUTONEX Bridge Contract Server (Port 8000).
 #>
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -10,9 +10,9 @@ $FrontendDir = Join-Path $RootDir "frontend"
 Set-Location $FrontendDir
 
 if (-not (Test-Path "node_modules")) {
-    Write-Host "[GravityDesk] Installing frontend dependencies..." -ForegroundColor Cyan
+    Write-Host "[AUTONEX] Installing frontend dependencies..." -ForegroundColor Cyan
     npm install
 }
 
-Write-Host "[GravityDesk] Starting Contract Bridge Server on http://localhost:8000..." -ForegroundColor Green
+Write-Host "[AUTONEX] Starting Contract Bridge Server on http://localhost:8000..." -ForegroundColor Green
 npm run bridge:mock

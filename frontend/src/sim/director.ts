@@ -388,8 +388,8 @@ export class Director {
         if (rt.repaths > 2) { const nf = nearestFree(GRID, rt.x, rt.z); rt.x = nf.x; rt.z = nf.z; rt.repaths = 0; }
         else if (rt.path.length) this.startWalk(rt, rt.path[rt.path.length - 1]);
         if (typeof window !== 'undefined') {
-          (window as any).__deskmates_stuck?.(rt.id);
-          (window as any).__deskmates_stuckCount = ((window as any).__deskmates_stuckCount ?? 0) + 1;
+          (window as any).__autonex_stuck?.(rt.id);
+          (window as any).__autonex_stuckCount = ((window as any).__autonex_stuckCount ?? 0) + 1;
         }
       }
     } else rt.stuckT = 0;

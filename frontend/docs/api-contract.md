@@ -1,4 +1,4 @@
-# Deskmates API & Event Contract — v3
+# AUTONEX API & Event Contract — v3
 
 Single source of truth between the **frontend** (`src/`) and the **Bridge Server** (to be built, see `BRIDGE_SPEC.md`).
 Mirrored in code by the zod schemas in `src/api/types.ts` (frontend) — the Bridge must mirror them with pydantic

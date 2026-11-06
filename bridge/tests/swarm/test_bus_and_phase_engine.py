@@ -1,5 +1,5 @@
 import pytest
-from deskmates_bridge.swarm.bus import MessageBus, SwarmMessage
+from autonex_bridge.swarm.bus import MessageBus, SwarmMessage
 
 
 def test_bus_phase_gating():

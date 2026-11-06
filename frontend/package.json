@@ -1,5 +1,5 @@
 {
-  "name": "deskmates",
+  "name": "autonex-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "bridge": "tsx tools/mock-bridge/server.ts",
     "bridge:mock": "tsx tools/mock-bridge/server.ts",
     "tape:record": "tsx scripts/record-tape.ts",
     "layout:export": "tsx scripts/export-layout.ts",

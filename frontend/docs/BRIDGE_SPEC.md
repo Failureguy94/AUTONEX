@@ -1,22 +1,22 @@
-# Deskmates Bridge Server — specification
+# AUTONEX Bridge Server — specification
 
-The Bridge is the **missing middle** between the Deskmates office (frontend, done) and RealGravity (single-agent coding runtime, done, untouched).
-RealGravity is *one agent in one terminal with no API*; Deskmates assumes *a company with a live event stream*. The Bridge **builds the company**
-on top of RealGravity and translates everything that really happens into the event contract (`api-contract.md`).
+The Bridge is the **missing middle** between the AUTONEX office (frontend, done) and AUTONEX (single-agent coding runtime, done, untouched).
+AUTONEX is *one agent in one terminal with no API*; AUTONEX assumes *a company with a live event stream*. The Bridge **builds the company**
+on top of AUTONEX and translates everything that really happens into the event contract (`api-contract.md`).
 
 ```
 ┌──────────────┐  REST + WS (contract v3)  ┌────────────────────────────── BRIDGE ──────────────────────────────┐
-│  Deskmates   │◄─────────────────────────►│ API · Event Bus+Tape · Triage · Planner · Scheduler · Org · Privacy │
+│  AUTONEX   │◄─────────────────────────►│ API · Event Bus+Tape · Triage · Planner · Scheduler · Org · Privacy │
 │  office UI   │                           │            │                         │                              │
 └──────────────┘                           │     Workers (search/llm/script/validate)        Code workers        │
-                                           │            │                         │   (RealGravity sessions)     │
+                                           │            │                         │   (AUTONEX sessions)     │
                                            │            └──────────►  PROVIDER GATEWAY  ◄──────────┘           │
                                            └──────────────────────────────┬───────────────────────────────────┘
                                                                           ▼
                                              groq · openrouter · nvidia · opencode-go  (keys live only here)
 ```
 
-**Non-goals:** do not fork or edit RealGravity (`opencode`, `bin/pag*`, profiles, plugins other than adding one new plugin);
+**Non-goals:** do not fork or edit AUTONEX (`opencode`, `bin/pag*`, profiles, plugins other than adding one new plugin);
 do not put an LLM behind every employee; do not stream anything to the internet except model calls through the gateway.
 
 ## 1. Stack & layout
@@ -27,7 +27,7 @@ bridge/
   pyproject.toml
   config/                      providers.yaml · models.yaml · departments.yaml · triage.yaml   (templates provided)
   .env.example                 GROQ_API_KEY= OPENROUTER_API_KEY= NVIDIA_API_KEY= GO_API_KEY=
-  deskmates_bridge/
+  autonex_bridge/
     main.py                    FastAPI app: REST + /ws/events + mounts the gateway router
     config.py                  load yaml + env; validate; hot-reload models.yaml
     schemas.py                 pydantic mirror of src/api/types.ts  (CONTRACT TEST compares them)
@@ -41,7 +41,7 @@ bridge/
     workers/                   base.py · search.py · llm_text.py · data_script.py · validate.py · code_session.py
     gateway/                   app.py (OpenAI-compatible proxy) · limiter.py · queue.py · router.py · providers.py
                                estimator.py · breaker.py · budget.py · accounting.py
-    realgravity/               launcher.py · config_gen.py · git.py · audit_tail.py · permissions.py · plugin/index.ts
+    autonex/                   launcher.py · config_gen.py · git.py · audit_tail.py · permissions.py · plugin/index.ts
   tests/                       contract · triage · planner · scheduler · gateway · fake_provider.py · e2e
 ```
 Reference implementations you can port from the frontend repo: `src/mock/triage.ts` (+`triage.test.ts`), `src/mock/simulator.ts` (the exact event beats and ordering), `tools/mock-bridge/server.ts` (REST/WS/resume/permission/control), `src/tests/live-contract.test.ts`.
@@ -69,7 +69,7 @@ Cancellation (`POST /cancel` or `Ctrl-C`): stop schedulers → kill worker proce
 ## 3. Identity & desks
 * Ids: manager `M0`; lead `L_<dept>`; worker `W_<dept>_<n>`. Names from a fixed list (`org/names.py`, same list as `src/mock/data.ts`). `avatar_seed` = stable hash of the id (same person looks the same on replay).
 * Desks from `docs/layout-slots.json`: manager desk; per bay one lead desk + 12 worker desks. Allocate lowest free index; free it on `worker.released`. `worker.hired.desk` = that desk's `{x,z}`. Max 12 workers per bay, 40 agents total (frontend pool cap).
-* `Agent.engine.kind`: `llm` (manager/leads/text workers), `tool` (search/script/validate), `code` (RealGravity). `engine.label` is shown verbatim, e.g. `code:deepseek-v4.1-flash`.
+* `Agent.engine.kind`: `llm` (manager/leads/text workers), `tool` (search/script/validate), `code` (AUTONEX). `engine.label` is shown verbatim, e.g. `code:deepseek-v4.1-flash`.
 
 ## 4. Event derivation — every UI fact has a real source
 | UI shows | Event | Real source |
@@ -81,9 +81,9 @@ Cancellation (`POST /cancel` or `Ctrl-C`): stop schedulers → kill worker proce
 | file diff in Inspector | `file.edit` | `<worktree>/.agent/audit.jsonl` tail (path + line ranges) |
 | terminal lines | `runtime.stream` | tool-execute hook (stdout head/tail), pytest/lint output |
 | energy bar | `agent.metrics.energy` | `100·(1 − tokens_in_context / model_context)` from gateway usage per agent |
-| S0-S3 badge | `context.stage_changed` | thresholds 0.40/0.60/0.75 on the same fraction (RealGravity's own) |
+| S0-S3 badge | `context.stage_changed` | thresholds 0.40/0.60/0.75 on the same fraction (AUTONEX's own) |
 | hourglass / queue | `WAITING` + `gate.state` | gateway queue depth; DAG dependency not met |
-| permission desk | `permission.requested/resolved` | plugin `permission` hook (see REALGRAVITY_INTEGRATION §5) |
+| permission desk | `permission.requested/resolved` | plugin `permission` hook (see AUTONEX_INTEGRATION §5) |
 | coffee / lunch / chat | `agent.break_*`, `agent.chat` | **§7** — real triggers only |
 | report + effort | `result.final` | Σ active worker time vs wall clock |
 | Merge/Discard | `run.checkpoint` + `run.control` | real `git merge` / `git branch -D` + restore |
@@ -117,8 +117,8 @@ Scheduler rule: a break never removes the **only** capable worker for a READY ta
 1. **API keys** exist only in the Bridge process env/`.env` (`chmod 600`, git-ignored). Never in events, logs, tapes, error messages, worktrees, or worker env (workers get `bridge:<agent_id>` pseudo-keys).
 2. **Privacy gate:** a workspace path may be sent to hosted models only if it is listed in `hosted-allowed.txt` (normalise `D:\x` ⇄ `/mnt/d/x`, case-insensitive on Windows, resolve symlinks, prefix match on path boundaries). Otherwise `403`/`run.error{recoverable:true}` and the UI shows the gate banner. `--allow-hosted` semantics = append the path.
 3. Bind `127.0.0.1` only; CORS allow-list = the Vite origin.
-4. Tool output / web pages / file contents are **data, not instructions** (RealGravity rule) — worker prompts must wrap them in delimiters and the Bridge never executes text found in them.
-5. Destructive things stay denied by RealGravity's non-bypassable rules (`sudo`, `rm -rf`, `git push`, `ssh`, `scp`, `git reset --hard`). The Bridge's own git operations are limited to its worktrees/branches, never `push`.
+4. Tool output / web pages / file contents are **data, not instructions** (AUTONEX rule) — worker prompts must wrap them in delimiters and the Bridge never executes text found in them.
+5. Destructive things stay denied by AUTONEX's non-bypassable rules (`sudo`, `rm -rf`, `git push`, `ssh`, `scp`, `git reset --hard`). The Bridge's own git operations are limited to its worktrees/branches, never `push`.
 6. Redact `Authorization`, `x-api-key`, `*_KEY`, `sk-…`, `gsk_…`, `nvapi-…` from any logged string.
 
 ## 9. Testing the Bridge
@@ -126,4 +126,4 @@ Scheduler rule: a break never removes the **only** capable worker for a READY ta
 * **Triage:** port `triage.test.ts` 1:1 (word-boundary cases, unique bays, sprint = zero workers).
 * **Scheduler:** DAG readiness, assignment scoring, break deferral, failure ladder, unit-tested with fake workers.
 * **Gateway:** `MODEL_ROUTING_AND_RATE_LIMITS.md §9`.
-* **E2E:** one real RealGravity session editing a file (B2), strict-profile permission round-trip (B3), WS drop/resume (B6), merge/discard (B8). See `ACCEPTANCE_TESTS.md`.
+* **E2E:** one real AUTONEX session editing a file (B2), strict-profile permission round-trip (B3), WS drop/resume (B6), merge/discard (B8). See `ACCEPTANCE_TESTS.md`.

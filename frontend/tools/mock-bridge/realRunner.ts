@@ -157,7 +157,7 @@ export function extractFileContent(filePath: string): string {
   if (!fs.existsSync(filePath)) {
     throw new Error(`File not found: ${filePath}`);
   }
-  const scriptPath = path.resolve('D:\\GravityDesk\\frontend\\tools\\mock-bridge\\universal_extractor.py');
+  const scriptPath = path.resolve(__dirname, 'universal_extractor.py');
   return execFileSync('python', [scriptPath, filePath], { encoding: 'utf-8', timeout: 35000 }).trim();
 }
 
@@ -284,7 +284,7 @@ Format your answer strictly as a JSON object:
     } catch {
       // Sensible fallback plan if model response is not valid JSON
       plan = {
-        project_name: 'GravityTask_' + Date.now().toString(36),
+        project_name: 'AutonexTask_' + Date.now().toString(36),
         summary: 'Executable software solution for ' + run.goal.slice(0, 40),
         tasks: [
           {
@@ -310,7 +310,7 @@ Format your answer strictly as a JSON object:
     }
 
     const projectName = (plan.project_name || 'ProjectOutput').replace(/[^a-zA-Z0-9_-]/g, '');
-    const outputDir = path.join('D:\\GravityDesk\\output', projectName);
+    const outputDir = path.join('D:\\AUTONEX\\output', projectName);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -495,10 +495,10 @@ Return ONLY raw code (no markdown quotes, no conversational filler).`;
 ${Object.keys(generatedFiles).map(f => `- **\`${f}\`** (${generatedFiles[f].split('\n').length} lines)`).join('\n')}
 
 ## Verification Status:
-All tasks were synthesized by the GravityDesk engineering team, gated with permission checks, and compiled to disk.
+All tasks were synthesized by the AUTONEX engineering team, gated with permission checks, and compiled to disk.
 
 ---
-*Generated autonomously by GravityDesk Multi-Agent Floor.*
+*Generated autonomously by AUTONEX Multi-Agent Floor.*
 `;
 
     fs.mkdirSync(outputDir, { recursive: true });

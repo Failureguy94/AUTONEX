@@ -28,10 +28,10 @@ export function Toolbar() {
               background: 'linear-gradient(135deg, var(--accent) 0%, #2B2B2E 100%)',
             }}
           >
-            <span className="font-heading font-black text-white text-xs tracking-wider">G</span>
+            <span className="font-heading font-black text-white text-xs tracking-wider">A</span>
           </div>
           <div className="flex items-baseline gap-1.5">
-            <span className="font-heading font-bold text-sm tracking-tight text-ink">GravityDesk</span>
+            <span className="font-heading font-bold text-sm tracking-tight text-ink">AUTONEX</span>
             <span className="text-[9px] font-mono text-ink/40 uppercase tracking-widest hidden sm:inline">3D</span>
           </div>
         </div>
@@ -42,6 +42,27 @@ export function Toolbar() {
           style={{ background: s.appMode === 'swarm' ? 'var(--accent)' : 'transparent', color: s.appMode === 'swarm' ? '#fff' : 'var(--accent)', border: '1px solid var(--accent)' }}>
           {s.appMode === 'swarm' ? `Swarm · ${s.swarmSize} agents` : 'Office'}
         </span>
+
+        <button
+          type="button"
+          onClick={() => useStore.setState({ zgModalOpen: true })}
+          className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono whitespace-nowrap transition-transform hover:scale-105 ${
+            s.zgConnection?.isVerified
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-700'
+              : 'bg-amber-500/10 border border-amber-500/30 text-amber-800'
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              s.zgConnection?.isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+            }`}
+          />
+          <span>0G Compute</span>
+          <span className="opacity-40">·</span>
+          <span className="font-semibold uppercase">
+            {s.zgConnection?.isVerified ? (s.zgConnection.maskedKey ? s.zgConnection.maskedKey : 'Verified') : 'Config'}
+          </span>
+        </button>
 
         {/* Accent Picker */}
         <label className="relative cursor-pointer flex items-center" title="Theme accent color">

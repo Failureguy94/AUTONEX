@@ -1,7 +1,7 @@
 {
-  "name": "gravitydesk",
+  "name": "autonex",
   "version": "1.0.0",
-  "description": "GravityDesk - Unified RealGravity (PAG) autonomous coding agent + Deskmates 3D virtual office multi-agent visualizer",
+  "description": "AUTONEX - Unified autonomous multi-agent coding system and 3D spatial visualizer",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,8 @@
     "preview": "npm --prefix frontend run preview",
     "test": "npm --prefix frontend test",
     "check": "npm --prefix frontend run check",
-    "bridge:mock": "npm --prefix frontend run bridge:mock",
+    "bridge": "npm --prefix frontend run bridge",
+    "bridge:mock": "npm --prefix frontend run bridge",
     "tape:record": "npm --prefix frontend run tape:record",
     "layout:export": "npm --prefix frontend run layout:export",
     "install:frontend": "npm --prefix frontend install",
@@ -18,13 +19,12 @@
     "start:all": "powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1"
   },
   "keywords": [
-    "gravitydesk",
-    "realgravity",
-    "deskmates",
+    "autonex",
     "ai-agents",
     "threejs",
     "autonomous-agent",
-    "3d-office"
+    "3d-office",
+    "multi-agent-system"
   ],
   "author": "",
   "license": "MIT"

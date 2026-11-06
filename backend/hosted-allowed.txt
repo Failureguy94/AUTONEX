@@ -1,9 +1,9 @@
-/mnt/d/Realgravity/scratch-repo
+/mnt/d/AUTONEX/scratch-repo
 /home/lenovo/pag-scratch
 /mnt/d/Django
 D:\Django
 D:\officeai-master\officeai-master\scratch-repo
-D:\GravityDesk\backend\scratch-repo
-/mnt/d/GravityDesk/backend/scratch-repo
-D:\GravityDesk\scratch-repo
-/mnt/d/GravityDesk/scratch-repo
+D:\AUTONEX\backend\scratch-repo
+/mnt/d/AUTONEX/backend\scratch-repo
+D:\AUTONEX\scratch-repo
+/mnt/d/AUTONEX/scratch-repo

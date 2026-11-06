@@ -112,13 +112,15 @@ export class ZGInferenceClient {
   private defaultTrustMode: ZGTrustMode;
   private defaultTimeoutMs: number;
   private requestLog: ZGRequestRecord[] = [];
+  private isVerifiedState: boolean = false;
+  private lastVerifiedAt: string | null = null;
 
   constructor() {
     loadEnv();
     this.baseURL = process.env.ZG_BASE_URL || process.env['0G_BASE_URL'] || 'https://router-api.0g.ai/v1';
     this.apiKey = process.env.ZG_API_KEY || process.env['0G_API_KEY'] || '';
-    const tm = (process.env.ZG_TRUST_MODE || '').split('#')[0].trim();
-    this.defaultTrustMode = (tm === 'standard' || tm === 'verified' || tm === 'private') ? tm : 'verified';
+    const tm = (process.env.ZG_TRUST_MODE || '').split('#')[0].trim().toLowerCase();
+    this.defaultTrustMode = (tm === 'standard' || tm === 'verified' || tm === 'private') ? tm as ZGTrustMode : 'standard';
     this.defaultTimeoutMs = Number(process.env.ZG_TIMEOUT_MS) || 65000;
   }
 
@@ -128,6 +130,169 @@ export class ZGInferenceClient {
 
   public hasApiKey(): boolean {
     return !!this.apiKey && this.apiKey.trim().length > 0;
+  }
+
+  public isVerified(): boolean {
+    return this.isVerifiedState && this.hasApiKey();
+  }
+
+  public getMaskedKey(): string | null {
+    if (!this.apiKey || !this.apiKey.trim()) return null;
+    const trimmed = this.apiKey.trim();
+    if (trimmed.length <= 8) return '••••' + trimmed.slice(-2);
+    return trimmed.slice(0, 4) + '••••••••' + trimmed.slice(-4);
+  }
+
+  public getConnectionStatus(): {
+    status: 'connected' | 'not_configured' | 'invalid_key' | 'unavailable' | 'error';
+    isVerified: boolean;
+    maskedKey: string | null;
+    lastVerifiedAt: string | null;
+    lastRequestId: string | null;
+    baseURL: string;
+  } {
+    if (!this.hasApiKey()) {
+      return {
+        status: 'not_configured',
+        isVerified: false,
+        maskedKey: null,
+        lastVerifiedAt: null,
+        lastRequestId: this.getLastRequestId(),
+        baseURL: this.baseURL
+      };
+    }
+
+    return {
+      status: this.isVerifiedState ? 'connected' : 'not_configured',
+      isVerified: this.isVerifiedState,
+      maskedKey: this.getMaskedKey(),
+      lastVerifiedAt: this.lastVerifiedAt,
+      lastRequestId: this.getLastRequestId(),
+      baseURL: this.baseURL
+    };
+  }
+
+  public disconnect(): void {
+    this.apiKey = '';
+    this.isVerifiedState = false;
+    this.lastVerifiedAt = null;
+    delete process.env.ZG_API_KEY;
+    delete process.env['0G_API_KEY'];
+  }
+
+  public setApiKey(key: string): void {
+    this.apiKey = key ? key.trim() : '';
+    this.isVerifiedState = false;
+  }
+
+  public async validateCredentials(candidateKey?: string): Promise<{
+    valid: boolean;
+    status: 'connected' | 'not_configured' | 'invalid_key' | 'unavailable' | 'error';
+    message: string;
+    requestId?: string;
+    maskedKey?: string;
+    latencyMs?: number;
+  }> {
+    const keyToTest = candidateKey !== undefined ? candidateKey.trim() : this.apiKey.trim();
+
+    if (!keyToTest) {
+      this.isVerifiedState = false;
+      return {
+        valid: false,
+        status: 'not_configured',
+        message: 'No 0G API Key provided'
+      };
+    }
+
+    const t0 = Date.now();
+    const endpoint = `${this.baseURL.replace(/\/+$/, '')}/chat/completions`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${keyToTest}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'AUTONEX-0G/1.0',
+          'X-0G-Provider-Trust-Mode': 'standard'
+        },
+        body: JSON.stringify({
+          model: 'qwen-flash',
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1
+        }),
+        signal: AbortSignal.timeout(12000)
+      });
+
+      const latencyMs = Date.now() - t0;
+      const capturedRequestId = response.headers.get('x-request-id') || response.headers.get('request-id');
+
+      // HTTP 200 OK or HTTP 429 (Rate Limit confirms key is valid)
+      if (response.ok || response.status === 429) {
+        this.apiKey = keyToTest;
+        this.isVerifiedState = true;
+        this.lastVerifiedAt = new Date().toISOString();
+        const effectiveId = capturedRequestId || `req_0g_verify_${Date.now()}`;
+        this.recordRequest({
+          requestId: effectiveId,
+          timestamp: this.lastVerifiedAt,
+          task: 'general',
+          model: 'qwen-flash',
+          tokensIn: 1,
+          tokensOut: 1,
+          latencyMs,
+          isLive0G: true,
+          trustMode: 'standard'
+        });
+
+        return {
+          valid: true,
+          status: 'connected',
+          message: '0G Private Computer credentials successfully verified',
+          requestId: effectiveId,
+          maskedKey: this.getMaskedKey() || undefined,
+          latencyMs
+        };
+      }
+
+      // HTTP 401 or 403: Invalid Key
+      if (response.status === 401 || response.status === 403) {
+        this.isVerifiedState = false;
+        return {
+          valid: false,
+          status: 'invalid_key',
+          message: 'Invalid 0G API Key: authentication failed (401)',
+          requestId: capturedRequestId || undefined
+        };
+      }
+
+      // HTTP 5xx: Service unavailable
+      if (response.status >= 500) {
+        return {
+          valid: false,
+          status: 'unavailable',
+          message: `0G service unavailable: HTTP ${response.status}`,
+          requestId: capturedRequestId || undefined
+        };
+      }
+
+      const errText = await response.text();
+      return {
+        valid: false,
+        status: 'error',
+        message: `0G configuration error (HTTP ${response.status}): ${errText.slice(0, 120)}`
+      };
+    } catch (err: any) {
+      this.isVerifiedState = false;
+      const isAbort = err.name === 'AbortError' || err.name === 'TimeoutError';
+      return {
+        valid: false,
+        status: 'unavailable',
+        message: isAbort
+          ? '0G service unavailable: request timed out'
+          : `0G service unavailable: ${err.message || 'connection failed'}`
+      };
+    }
   }
 
   public getRequestLog(): ZGRequestRecord[] {
@@ -192,7 +357,7 @@ export class ZGInferenceClient {
             latencyMs: res.latencyMs,
             agentId: options.meta?.agentId,
             isLive0G: true,
-            trustMode
+            trustMode: res.trustMode
           });
 
           // Telemetry: Call Finished Event
@@ -206,7 +371,7 @@ export class ZGInferenceClient {
                 tokens_out: res.tokensOut,
                 latency_ms: res.latencyMs,
                 request_id: res.requestId,
-                trust_mode: trustMode
+                trust_mode: res.trustMode
               });
             } catch {}
           }
@@ -216,10 +381,18 @@ export class ZGInferenceClient {
           lastErr = err;
         }
       }
-      console.warn(`[0G Router] All 0G models failed (${lastErr?.message}). Falling back to simulation mode.`);
+
+      // In production, reject with real 0G error - DO NOT hide behind synthetic mocks
+      if (!process.env.VITEST) {
+        throw new Error(`0G Private Computer inference failed: ${lastErr?.message || 'Provider unavailable'}`);
+      }
     }
 
-    // Deterministic fallback execution for mock/offline tests
+    if (!process.env.VITEST) {
+      throw new Error('0G Private Computer API key is not configured. Connect your 0G account before starting an agent.');
+    }
+
+    // Deterministic fallback execution ONLY during protocol contract tests (Vitest)
     return this.executeMockFallback(candidateModels[0], messages, options, trustMode);
   }
 
@@ -253,18 +426,19 @@ export class ZGInferenceClient {
       requestBody.response_format = options.responseFormat;
     }
 
+    let activeTrustMode: ZGTrustMode = trustMode;
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'GravityDesk-0G/1.0',
-      'X-0G-Provider-Trust-Mode': trustMode
+      'User-Agent': 'AUTONEX-0G/1.0',
+      'X-0G-Provider-Trust-Mode': activeTrustMode
     };
 
     if (options.userDid) {
       headers['X-0G-User-DID'] = options.userDid;
     }
 
-    const maxRetries = 2;
+    const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await fetch(endpoint, {
@@ -288,7 +462,36 @@ export class ZGInferenceClient {
 
         if (!response.ok) {
           const errBody = await response.text();
-          throw new Error(`0G HTTP ${response.status}: ${errBody.slice(0, 160)}`);
+          let parsedMsg = errBody.slice(0, 160);
+          try {
+            const errJson = JSON.parse(errBody);
+            parsedMsg = errJson.error?.message || errJson.message || parsedMsg;
+          } catch {}
+
+          // Handle 0G router missing TEE hardware provider for verified/private trust mode:
+          // Gracefully fallback to standard 0G compute provider
+          if (response.status === 503 && (parsedMsg.includes('trust mode') || parsedMsg.includes('tier=') || parsedMsg.includes('no_provider_for_trust_mode'))) {
+            if (activeTrustMode !== 'standard') {
+              console.warn(`[0G Router] No provider available for trust mode '${activeTrustMode}' on model '${model}'. Retrying with 0G standard trust mode...`);
+              activeTrustMode = 'standard';
+              headers['X-0G-Provider-Trust-Mode'] = 'standard';
+              continue;
+            }
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            throw new Error(`0G Authentication Error (${response.status}): ${parsedMsg}`);
+          }
+          if (response.status === 402) {
+            throw new Error(`Insufficient 0G credits: Please top up your 0G Private Computer account.`);
+          }
+          if (response.status === 429) {
+            throw new Error(`0G Rate limit exceeded (429): Please wait before trying again.`);
+          }
+          if (response.status >= 500) {
+            throw new Error(`0G service unavailable (${response.status}): ${parsedMsg}`);
+          }
+          throw new Error(`0G HTTP ${response.status}: ${parsedMsg}`);
         }
 
         // Handle streaming response if requested
@@ -318,7 +521,7 @@ export class ZGInferenceClient {
             tokensOut: 600,
             latencyMs: Date.now() - t0,
             isLive0G: true,
-            trustMode
+            trustMode: activeTrustMode
           };
         }
 
@@ -348,7 +551,7 @@ export class ZGInferenceClient {
           tokensOut: data.usage?.completion_tokens || 600,
           latencyMs: latency,
           isLive0G: true,
-          trustMode
+          trustMode: activeTrustMode
         };
       } catch (err: any) {
         if (attempt >= maxRetries) throw err;

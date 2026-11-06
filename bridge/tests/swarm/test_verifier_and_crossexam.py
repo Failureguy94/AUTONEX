@@ -1,8 +1,8 @@
 import pytest
-from deskmates_bridge.swarm.verify.cluster import BehavioralClusterer
-from deskmates_bridge.swarm.verify.crossexam import CrossExamEngine
-from deskmates_bridge.swarm.verify.pipeline import VerificationPipeline
-from deskmates_bridge.swarm.verify.score import SelectionScorer
+from autonex_bridge.swarm.verify.cluster import BehavioralClusterer
+from autonex_bridge.swarm.verify.crossexam import CrossExamEngine
+from autonex_bridge.swarm.verify.pipeline import VerificationPipeline
+from autonex_bridge.swarm.verify.score import SelectionScorer
 
 
 def test_verification_pipeline_l0_l1_l2():

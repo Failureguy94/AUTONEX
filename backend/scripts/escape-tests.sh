@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PAG_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "=== RealGravity (PAG) Safety & Escape Verification (S1-S9) ==="
+echo "=== AUTONEX (PAG) Safety & Escape Verification (S1-S9) ==="
 
 COMPOSE="docker compose -f ${PAG_ROOT}/docker/docker-compose.yml"
 PASSED=0
