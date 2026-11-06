@@ -76,6 +76,14 @@ export interface ZGInferenceResult {
   latencyMs: number;
   isLive0G: boolean;
   trustMode: ZGTrustMode;
+  billing?: {
+    currency: string;
+    totalCost: string;
+    totalCostUsdMicro: string;
+    inputCost: string;
+    outputCost: string;
+  };
+  providerAddress?: string;
 }
 
 export interface ZGRequestRecord {
@@ -89,6 +97,14 @@ export interface ZGRequestRecord {
   agentId?: string;
   isLive0G: boolean;
   trustMode: ZGTrustMode;
+  billing?: {
+    currency: string;
+    totalCost: string;
+    totalCostUsdMicro: string;
+    inputCost: string;
+    outputCost: string;
+  };
+  providerAddress?: string;
 }
 
 // 1. Task-Based Model Router (Approved Step 3 Matrix)
@@ -114,6 +130,12 @@ export class ZGInferenceClient {
   private requestLog: ZGRequestRecord[] = [];
   private isVerifiedState: boolean = false;
   private lastVerifiedAt: string | null = null;
+  private totalInferenceRequests: number = 0;
+  private totalTokensIn: number = 0;
+  private totalTokensOut: number = 0;
+  private totalCostMicroUsd: number = 0;
+  private walletKeyMap: Map<string, string> = new Map();
+  private keyWalletMap: Map<string, string> = new Map();
 
   constructor() {
     loadEnv();
@@ -540,19 +562,56 @@ export class ZGInferenceClient {
         }
 
         const effectiveRequestId = capturedRequestId || data.id || `req_0g_${Date.now()}`;
+        const tokensIn = data.usage?.prompt_tokens || 800;
+        const tokensOut = data.usage?.completion_tokens || 600;
 
-        return {
+        // Parse official 0G billing trace and credit consumption
+        const trace = data.x_0g_trace;
+        const billingData = trace?.billing ? {
+          currency: trace.billing.currency || 'usd',
+          totalCost: String(trace.billing.total_cost || '0'),
+          totalCostUsdMicro: String(trace.billing.total_cost_usd_micro || '0'),
+          inputCost: String(trace.billing.input_cost || '0'),
+          outputCost: String(trace.billing.output_cost || '0')
+        } : undefined;
+
+        const costMicro = Number(trace?.billing?.total_cost_usd_micro || 0);
+        this.totalInferenceRequests++;
+        this.totalTokensIn += tokensIn;
+        this.totalTokensOut += tokensOut;
+        this.totalCostMicroUsd += costMicro;
+
+        const result: ZGInferenceResult = {
           content: content || reasoning,
           reasoning,
           toolCalls: choice?.tool_calls,
           requestId: effectiveRequestId,
           model: data.model || model,
-          tokensIn: data.usage?.prompt_tokens || 800,
-          tokensOut: data.usage?.completion_tokens || 600,
+          tokensIn,
+          tokensOut,
           latencyMs: latency,
           isLive0G: true,
-          trustMode: activeTrustMode
+          trustMode: activeTrustMode,
+          billing: billingData,
+          providerAddress: trace?.provider
         };
+
+        this.recordRequest({
+          requestId: effectiveRequestId,
+          timestamp: new Date().toISOString(),
+          task: options.task || 'general',
+          model: data.model || model,
+          tokensIn,
+          tokensOut,
+          latencyMs: latency,
+          agentId: options.meta?.agentId,
+          isLive0G: true,
+          trustMode: activeTrustMode,
+          billing: billingData,
+          providerAddress: trace?.provider
+        });
+
+        return result;
       } catch (err: any) {
         if (attempt >= maxRetries) throw err;
         await new Promise((r) => setTimeout(r, 1000 * attempt));
@@ -715,6 +774,82 @@ export class ZGInferenceClient {
       isLive0G: false,
       trustMode
     };
+  }
+
+  public getUsageMetrics() {
+    return {
+      totalRequests: this.totalInferenceRequests,
+      totalTokensIn: this.totalTokensIn,
+      totalTokensOut: this.totalTokensOut,
+      totalTokens: this.totalTokensIn + this.totalTokensOut,
+      totalCostMicroUsd: this.totalCostMicroUsd,
+      lastRequestId: this.getLastRequestId(),
+      requestCount: this.requestLog.length
+    };
+  }
+
+  public associateWalletKey(walletAddress: string, apiKey: string): void {
+    const cleanAddr = walletAddress.trim().toLowerCase();
+    const cleanKey = apiKey.trim();
+    this.walletKeyMap.set(cleanAddr, cleanKey);
+    this.keyWalletMap.set(cleanKey, cleanAddr);
+  }
+
+  public getWalletForApiKey(apiKey: string): string | null {
+    return this.keyWalletMap.get(apiKey.trim()) || null;
+  }
+
+  public getKeyForWallet(walletAddress: string): string | null {
+    return this.walletKeyMap.get(walletAddress.trim().toLowerCase()) || null;
+  }
+
+  /**
+   * Official 0G Account Balance Check.
+   * Note: The official 0G Router requires management-tier (mk-) keys for /v1/account/balance;
+   * inference-tier (sk-) keys return HTTP 403 (insufficient_scope) while inference billing
+   * functions directly on /v1/chat/completions.
+   */
+  public async checkAccountBalance(): Promise<{
+    status: 'available' | 'unavailable';
+    reason: string;
+    balance?: number;
+  }> {
+    if (!this.hasApiKey()) {
+      return { status: 'unavailable', reason: '0G API key is not configured' };
+    }
+
+    try {
+      const res = await fetch(`${this.baseURL.replace(/\/+$/, '')}/account/balance`, {
+        headers: { 'Authorization': `Bearer ${this.apiKey}` },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          status: 'available',
+          reason: '0G Router balance verified',
+          balance: data.balance ?? data.credits
+        };
+      }
+
+      if (res.status === 403) {
+        return {
+          status: 'unavailable',
+          reason: 'Compute balance unavailable: 0G sk- key is scoped for direct inference billing only. Balance queries require mk- management key.'
+        };
+      }
+
+      return {
+        status: 'unavailable',
+        reason: `0G balance endpoint returned HTTP ${res.status}`
+      };
+    } catch (err: any) {
+      return {
+        status: 'unavailable',
+        reason: `0G balance query failed: ${err.message || 'network timeout'}`
+      };
+    }
   }
 
   private recordRequest(rec: ZGRequestRecord) {

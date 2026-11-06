@@ -25,6 +25,30 @@ export interface ZGConnectionState {
   requestId: string | null;
 }
 
+export interface IAIState {
+  walletConnected: boolean;
+  walletAddress: string | null;
+  chainId: number | null;
+  isOwnerVerified: boolean;
+  authToken: string | null;
+  heldIAI: string;
+  stakedIAI: string;
+  stakedCollateralA0G: string;
+  eligibleStakedAmount: number;
+  stakingStatus: 'unconnected' | 'not_detected' | 'verified';
+  indicativeDailyCredits: number;
+  actualComputeBalance: number | null;
+  balanceStatus: 'available' | 'unavailable';
+  balanceReason: string;
+  lastCreditRefresh: string;
+  lastInferenceStatus: 'idle' | 'successful' | 'failed';
+  lastInferenceError: string | null;
+  totalInferenceRequests: number;
+  totalTokensUsed: number;
+  totalCostMicroUsd: number;
+  lastRequestId: string | null;
+}
+
 interface Store {
   phase: 'landing' | 'workspace';
   goal: string; modelId: string; models: ModelInfo[]; mode: 'live' | 'replay';
@@ -65,6 +89,7 @@ interface Store {
   settings: Settings;
   zgConnection: ZGConnectionState;
   zgModalOpen: boolean;
+  iai: IAIState;
   executionState: ExecutionState;
   executionError: string | null;
   setExecutionState: (state: ExecutionState, error?: string | null) => void;
@@ -72,12 +97,18 @@ interface Store {
   checkZGStatus: () => Promise<void>;
   verifyZGKey: (apiKey: string) => Promise<{ valid: boolean; message: string }>;
   disconnectZG: () => Promise<void>;
+  connectWallet: (address: string, chainId?: number) => Promise<void>;
+  disconnectWallet: () => void;
+  verifyWalletSignature: (signature: string, message: string, nonce: string) => Promise<{ verified: boolean; message: string }>;
+  refreshIAIStatus: (address?: string) => Promise<void>;
+  refreshIAIUsage: () => Promise<void>;
+  runTestInference: (prompt?: string) => Promise<{ ok: boolean; status: string; result?: any; error?: string }>;
   set: (p: Partial<Store>) => void;
   resetRun: (goal: string) => void;
 }
 
 let logId = 0;
-export const useStore = create<Store>((set) => ({
+export const useStore = create<Store>((set, get) => ({
   phase: 'landing',
   goal: '', modelId: 'openrouter/google/gemma-4-31b-it:free', models: [], mode: 'live',
   view: '3d', night: false, flows: false, dev: false,
@@ -118,6 +149,29 @@ export const useStore = create<Store>((set) => ({
     error: null,
     lastVerifiedAt: null,
     requestId: null
+  },
+  iai: {
+    walletConnected: false,
+    walletAddress: null,
+    chainId: null,
+    isOwnerVerified: false,
+    authToken: null,
+    heldIAI: '0',
+    stakedIAI: '0',
+    stakedCollateralA0G: '0',
+    eligibleStakedAmount: 0,
+    stakingStatus: 'unconnected',
+    indicativeDailyCredits: 0,
+    actualComputeBalance: null,
+    balanceStatus: 'unavailable',
+    balanceReason: 'Compute balance unavailable: 0G sk- key is scoped for direct inference billing only. Balance queries require mk- management key.',
+    lastCreditRefresh: 'Daily at 00:00 UTC',
+    lastInferenceStatus: 'idle',
+    lastInferenceError: null,
+    totalInferenceRequests: 0,
+    totalTokensUsed: 0,
+    totalCostMicroUsd: 0,
+    lastRequestId: null
   },
   setZGModalOpen: (open) => set({ zgModalOpen: open }),
   checkZGStatus: async () => {
@@ -299,6 +353,187 @@ export const useStore = create<Store>((set) => ({
         requestId: null
       }
     });
+  },
+  connectWallet: async (address: string, chainId = 16661) => {
+    const cleanAddr = address.trim().toLowerCase();
+    set((s) => ({
+      iai: {
+        ...s.iai,
+        walletConnected: true,
+        walletAddress: cleanAddr,
+        chainId
+      }
+    }));
+    await get().refreshIAIStatus(cleanAddr);
+  },
+  disconnectWallet: () => {
+    set((s) => ({
+      iai: {
+        ...s.iai,
+        walletConnected: false,
+        walletAddress: null,
+        chainId: null,
+        isOwnerVerified: false,
+        authToken: null,
+        heldIAI: '0',
+        stakedIAI: '0',
+        stakedCollateralA0G: '0',
+        eligibleStakedAmount: 0,
+        stakingStatus: 'unconnected',
+        indicativeDailyCredits: 0,
+        actualComputeBalance: null,
+        balanceStatus: 'unavailable'
+      }
+    }));
+  },
+  verifyWalletSignature: async (signature: string, message: string, nonce: string) => {
+    const s = get();
+    const address = s.iai.walletAddress;
+    if (!address) return { verified: false, message: 'No wallet connected' };
+
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, signature, message, nonce })
+      });
+      const data = await res.json();
+      if (data.verified) {
+        set((st) => ({
+          iai: {
+            ...st.iai,
+            isOwnerVerified: true,
+            authToken: data.token
+          }
+        }));
+        return { verified: true, message: 'Wallet ownership verified successfully' };
+      }
+      return { verified: false, message: data.message || 'Verification failed' };
+    } catch {
+      try {
+        const { verifyMessage } = await import('viem');
+        const valid = await verifyMessage({
+          address: address as `0x${string}`,
+          message,
+          signature: signature as `0x${string}`
+        });
+        if (valid) {
+          set((st) => ({
+            iai: {
+              ...st.iai,
+              isOwnerVerified: true,
+              authToken: `tok_local_${Date.now()}`
+            }
+          }));
+          return { verified: true, message: 'Wallet ownership verified successfully (client verification)' };
+        }
+        return { verified: false, message: 'Invalid cryptographic signature' };
+      } catch (err: any) {
+        return { verified: false, message: err?.message || 'Signature verification error' };
+      }
+    }
+  },
+  refreshIAIStatus: async (targetAddress?: string) => {
+    const address = targetAddress || get().iai.walletAddress;
+    if (!address) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/iai/status?address=${encodeURIComponent(address)}`);
+      if (res.ok) {
+        const data = await res.json();
+        set((st) => ({
+          iai: {
+            ...st.iai,
+            heldIAI: data.heldInWallet,
+            stakedIAI: data.actuallyStaked,
+            stakedCollateralA0G: data.stakedCollateralA0G,
+            eligibleStakedAmount: data.eligibleStakedAmount,
+            stakingStatus: data.isStakingVerified ? 'verified' : 'not_detected',
+            indicativeDailyCredits: data.indicativeDailyCredits,
+            lastCreditRefresh: data.lastCreditRefresh || 'Daily at 00:00 UTC'
+          }
+        }));
+        return;
+      }
+    } catch {}
+
+    try {
+      const { queryOnChainIAIStatus } = await import('@/services/iaiContract');
+      const data = await queryOnChainIAIStatus(address);
+      set((st) => ({
+        iai: {
+          ...st.iai,
+          heldIAI: data.heldInWallet,
+          stakedIAI: data.actuallyStaked,
+          stakedCollateralA0G: data.stakedCollateralA0G,
+          eligibleStakedAmount: data.eligibleStakedAmount,
+          stakingStatus: data.isStakingVerified ? 'verified' : 'not_detected',
+          indicativeDailyCredits: data.indicativeDailyCredits,
+          lastCreditRefresh: data.lastCreditRefresh
+        }
+      }));
+    } catch (err) {
+      console.warn('Error refreshing iAI status:', err);
+    }
+  },
+  refreshIAIUsage: async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/iai/usage');
+      if (res.ok) {
+        const usage = await res.json();
+        set((st) => ({
+          iai: {
+            ...st.iai,
+            totalInferenceRequests: usage.totalRequests,
+            totalTokensUsed: usage.totalTokens,
+            totalCostMicroUsd: usage.totalCostMicroUsd,
+            lastRequestId: usage.lastRequestId || st.iai.lastRequestId
+          }
+        }));
+      }
+    } catch {}
+  },
+  runTestInference: async (prompt = 'Say hello in 3 words') => {
+    try {
+      const res = await fetch('http://localhost:8000/api/zg/test-inference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model: 'glm-5.3-flash' })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        set((st) => ({
+          iai: {
+            ...st.iai,
+            lastInferenceStatus: 'successful',
+            lastInferenceError: null,
+            totalInferenceRequests: data.usage?.totalRequests ?? st.iai.totalInferenceRequests + 1,
+            totalTokensUsed: data.usage?.totalTokens ?? st.iai.totalTokensUsed + (data.result?.tokensIn || 0) + (data.result?.tokensOut || 0),
+            totalCostMicroUsd: data.usage?.totalCostMicroUsd ?? st.iai.totalCostMicroUsd,
+            lastRequestId: data.result?.requestId || st.iai.lastRequestId
+          }
+        }));
+        return { ok: true, status: 'successful', result: data.result };
+      } else {
+        set((st) => ({
+          iai: {
+            ...st.iai,
+            lastInferenceStatus: 'failed',
+            lastInferenceError: data.error || '0G inference failed'
+          }
+        }));
+        return { ok: false, status: 'failed', error: data.error };
+      }
+    } catch (err: any) {
+      set((st) => ({
+        iai: {
+          ...st.iai,
+          lastInferenceStatus: 'failed',
+          lastInferenceError: err.message || 'Network error'
+        }
+      }));
+      return { ok: false, status: 'failed', error: err.message };
+    }
   },
   set: (p) => set(p),
   resetRun: (goal) => set({

@@ -46,6 +46,7 @@ export function Toolbar() {
         <button
           type="button"
           onClick={() => useStore.setState({ zgModalOpen: true })}
+          title="0G Private Computer & iAI Staking Hub"
           className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono whitespace-nowrap transition-transform hover:scale-105 ${
             s.zgConnection?.isVerified
               ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-700'
@@ -57,10 +58,14 @@ export function Toolbar() {
               s.zgConnection?.isVerified ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
             }`}
           />
-          <span>0G Compute</span>
+          <span>0G · iAI</span>
           <span className="opacity-40">·</span>
           <span className="font-semibold uppercase">
-            {s.zgConnection?.isVerified ? (s.zgConnection.maskedKey ? s.zgConnection.maskedKey : 'Verified') : 'Config'}
+            {s.iai?.stakingStatus === 'verified'
+              ? `${s.iai.indicativeDailyCredits.toFixed(1)} cr/d`
+              : s.zgConnection?.isVerified
+              ? (s.zgConnection.maskedKey ? s.zgConnection.maskedKey : 'Verified')
+              : 'Config'}
           </span>
         </button>
 

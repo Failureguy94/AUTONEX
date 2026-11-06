@@ -20,6 +20,11 @@ export interface ApiClient {
   get0GStatus(): Promise<{ status: string; isVerified: boolean; maskedKey: string | null; lastVerifiedAt: string | null; lastRequestId: string | null }>;
   verify0GKey(apiKey: string): Promise<{ valid: boolean; status: string; message: string; maskedKey?: string; requestId?: string }>;
   disconnect0G(): Promise<{ ok: boolean; status: string }>;
+  getAuthNonce(address: string): Promise<{ nonce: string; issuedAt: string; address: string }>;
+  verifyAuth(address: string, signature: string, message: string, nonce: string): Promise<{ verified: boolean; token: string; message: string }>;
+  getIAIStatus(address: string): Promise<any>;
+  getIAIUsage(): Promise<any>;
+  test0GInference(prompt?: string): Promise<any>;
 }
 export interface EventStream {
   start(runId: string, sinceSeq: number, onEvent: (e: Envelope) => void): void;
@@ -74,6 +79,21 @@ export class HttpClient implements ApiClient {
   }
   disconnect0G() {
     return this.req('/api/config/0g', { method: 'DELETE' });
+  }
+  getAuthNonce(address: string) {
+    return this.req(`/api/auth/nonce?address=${encodeURIComponent(address)}`);
+  }
+  verifyAuth(address: string, signature: string, message: string, nonce: string) {
+    return this.req('/api/auth/verify', { method: 'POST', body: JSON.stringify({ address, signature, message, nonce }) });
+  }
+  getIAIStatus(address: string) {
+    return this.req(`/api/iai/status?address=${encodeURIComponent(address)}`);
+  }
+  getIAIUsage() {
+    return this.req('/api/iai/usage');
+  }
+  test0GInference(prompt?: string) {
+    return this.req('/api/zg/test-inference', { method: 'POST', body: JSON.stringify({ prompt }) });
   }
 }
 
