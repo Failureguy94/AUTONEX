@@ -104,6 +104,7 @@ export function formatArkivError(error: unknown): string {
     lower.includes('wallet switch required') ||
     lower.includes('unrecognized chain') ||
     lower.includes('chain not found') ||
+    lower.includes('0x76edaf') ||
     lower.includes('0x76ee8f') ||
     lower.includes('7794095')
   ) {

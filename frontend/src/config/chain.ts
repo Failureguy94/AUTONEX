@@ -48,7 +48,7 @@ export async function switchOrAddRabdiNetwork(): Promise<void> {
     throw new Error('No EVM wallet detected in browser. Please install MetaMask or another browser wallet.');
   }
 
-  const chainIdHex = '0x76ee8f'; // 7794095 in hex
+  const chainIdHex = `0x${rabdiChain.id.toString(16)}`; // '0x76edaf' (7794095)
 
   // Check current chain ID first! If already on Rabdi, return immediately without throwing switch prompt
   try {
