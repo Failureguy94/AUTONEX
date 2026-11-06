@@ -632,15 +632,15 @@ export function ZGConfigModal() {
                   <div className="grid grid-cols-3 gap-2.5 pt-1 text-center font-mono">
                     <div className="p-2.5 rounded-lg bg-ink/5">
                       <span className="text-[10px] text-ink/40 uppercase block">Total Requests</span>
-                      <span className="font-bold text-base text-ink">{iai.totalInferenceRequests}</span>
+                      <span className="font-bold text-base text-ink">{iai.totalInferenceRequests || 0}</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-ink/5">
                       <span className="text-[10px] text-ink/40 uppercase block">Total Tokens</span>
-                      <span className="font-bold text-base text-ink">{iai.totalTokensUsed}</span>
+                      <span className="font-bold text-base text-ink">{iai.totalTokensUsed || 0}</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-emerald-500/10">
                       <span className="text-[10px] text-emerald-800 uppercase block font-semibold">Cost (Micro-USD)</span>
-                      <span className="font-bold text-base text-emerald-900">${(iai.totalCostMicroUsd / 1_000_000).toFixed(6)}</span>
+                      <span className="font-bold text-base text-emerald-900">${((iai.totalCostMicroUsd || 0) / 1_000_000).toFixed(6)}</span>
                     </div>
                   </div>
 
