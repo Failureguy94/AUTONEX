@@ -269,23 +269,48 @@ export function ReportView() {
         throw new Error('Please connect your Web3 wallet first.');
       }
 
-      const payload = JSON.stringify(
-        {
-          goal,
-          report: report?.report_markdown || 'Autonomous Run Incomplete',
-          files,
-          timestamp: new Date().toISOString(),
+      // Prepare file inventory with line counts and sizes instead of raw file contents
+      const fileInventory = Object.entries(files).map(([path, content]) => ({
+        path,
+        lines: (content || '').split('\n').length,
+        bytes: new TextEncoder().encode(content || '').length,
+      }));
+
+      const taskSummaries = Object.values(tasks).map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        agent: t.assignee_name || t.assigned_agent_id,
+        outputPreview: (typeof (t as any).output === 'string' ? (t as any).output : JSON.stringify((t as any).output || '')).slice(0, 150),
+      }));
+
+      // Package structured context manifest (ZERO raw code dumps)
+      const contextPayload = {
+        type: 'autonex_project_context',
+        version: '1.0.0',
+        projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        projectName,
+        goal,
+        timestamp: new Date().toISOString(),
+        signer,
+        milestones: taskSummaries,
+        deliverableInventory: fileInventory,
+        totalFilesCataloged: fileInventory.length,
+        synthesisReport: report?.report_markdown || 'Autonomous Run Summary',
+        effort: {
+          logicalEffortSeconds: report?.effort_logical_s ?? effortLogical,
+          realElapsedSeconds: report?.effort_real_s ?? realElapsed,
         },
-        null,
-        2
-      );
+      };
+
+      const payload = JSON.stringify(contextPayload, null, 2);
 
       const res = await uploadContextWorkflow(client, payload, {
         projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         userId: signer,
-        fileName: `${projectName.toLowerCase()}-bundle.json`,
+        fileName: `${projectName.toLowerCase()}-context.json`,
         contentType: 'application/json',
-        summary: `Full deliverable and report for ${goal.slice(0, 50)}...`,
+        summary: `Project context & synthesis for ${projectName}: ${goal.slice(0, 60)}...`,
       });
 
       setStorageResult(res);
@@ -634,8 +659,16 @@ export function ReportView() {
                       <span className="font-semibold">{projectName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-ink/40">Files in Bundle:</span>
-                      <span className="font-semibold">{fileKeys.length} files</span>
+                      <span className="text-ink/40">Context Scope:</span>
+                      <span className="font-semibold text-emerald-800">
+                        Project Details, Milestones & Report ({fileKeys.length} files cataloged)
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Storage Policy:</span>
+                      <span className="font-semibold text-ink/80">
+                        Context manifest on Swarm · Verified pointer on Arkiv (No raw code dumps)
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-ink/40">Target Network:</span>
@@ -749,7 +782,7 @@ export function ReportView() {
                     ) : (
                       <>
                         <Icon d={I.database} size={14} />
-                        <span>Store Deliverable on Swarm & Anchor to Arkiv</span>
+                        <span>Store Project Context on Swarm & Anchor to Arkiv</span>
                       </>
                     )}
                   </button>

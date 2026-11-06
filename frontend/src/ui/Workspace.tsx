@@ -44,6 +44,26 @@ export function Workspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Long-running task watcher: Prompts user every 5 minutes if execution is still in progress
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const s = useStore.getState();
+      if (s.executionState !== 'running' && s.executionState !== 'waiting_0g') return;
+      if (s.errorCheckpointModalOpen) return;
+
+      const elapsedSec = s.realElapsed || (s.runStartedAt ? Math.floor((Date.now() - s.runStartedAt) / 1000) : 0);
+      const timeSinceLastPrompt = elapsedSec - s.lastTimeoutPromptAt;
+
+      // Trigger prompt every 5 minutes (300 seconds)
+      if (elapsedSec >= 300 && timeSinceLastPrompt >= 300) {
+        const elapsedMinutes = Math.floor(elapsedSec / 60);
+        s.promptTimeoutCheckpoint(elapsedMinutes);
+      }
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="h-full flex flex-col bg-paper">
       <Toolbar />

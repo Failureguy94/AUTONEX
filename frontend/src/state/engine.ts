@@ -158,6 +158,10 @@ class LiveEngine implements RunEngine {
       console.error('[LiveEngine] Task execution blocked or failed:', err);
       const msg = err?.message || 'Execution blocked: verification or input required';
       useStore.setState({ toast: msg, offline: false, demoMode: false, executionState: 'failed', executionError: msg });
+      useStore.getState().triggerErrorCheckpoint({
+        error: msg,
+        reason: /credit|balance|quota/i.test(msg) ? 'credit_depletion' : 'inference_error'
+      });
     }
   }
   stop() {

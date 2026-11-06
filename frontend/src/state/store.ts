@@ -58,6 +58,9 @@ export interface ErrorCheckpointData {
   recoveryAgentName?: string;
   requestId?: string;
   timestamp: string;
+  isTimeout?: boolean;
+  elapsedMinutes?: number;
+  reason?: 'credit_depletion' | 'inference_error' | 'task_failure' | 'timeout';
   checkpointSummary?: CheckpointSummary | null;
 }
 
@@ -105,8 +108,12 @@ interface Store {
   iai: IAIState;
   errorCheckpointModalOpen: boolean;
   errorCheckpointData: ErrorCheckpointData | null;
+  runStartedAt: number | null;
+  lastTimeoutPromptAt: number;
   setErrorCheckpointModalOpen: (open: boolean) => void;
-  triggerErrorCheckpoint: (info: { error: string; failedAgentId?: string; recoveryAgentId?: string; requestId?: string }) => void;
+  triggerErrorCheckpoint: (info: { error: string; failedAgentId?: string; recoveryAgentId?: string; requestId?: string; reason?: 'credit_depletion' | 'inference_error' | 'task_failure' | 'timeout' }) => void;
+  promptTimeoutCheckpoint: (minutes?: number) => void;
+  dismissTimeoutPrompt: () => void;
   executionState: ExecutionState;
   executionError: string | null;
   setExecutionState: (state: ExecutionState, error?: string | null) => void;
@@ -193,7 +200,48 @@ export const useStore = create<Store>((set, get) => ({
   },
   errorCheckpointModalOpen: false,
   errorCheckpointData: null,
+  runStartedAt: null,
+  lastTimeoutPromptAt: 0,
   setErrorCheckpointModalOpen: (open) => set({ errorCheckpointModalOpen: open }),
+  dismissTimeoutPrompt: () => {
+    const s = get();
+    set({
+      errorCheckpointModalOpen: false,
+      lastTimeoutPromptAt: (s.realElapsed || 0) + 300,
+    });
+  },
+  promptTimeoutCheckpoint: (minutes) => {
+    const s = get();
+    if (s.executionState !== 'running' && s.executionState !== 'waiting_0g') return;
+
+    const elapsed = minutes || Math.max(5, Math.floor(s.realElapsed / 60));
+    const summary = generateCheckpointSummary({
+      ...s,
+      executionState: 'running',
+    });
+
+    const activeWorkerId = s.selected || s.order.find((id) => s.agents[id]?.status === 'WORKING') || 'W_backend_0';
+    const activeWorker = s.agents[activeWorkerId];
+
+    const checkpointData: ErrorCheckpointData = {
+      error: `Execution in progress: Task has been running for ${elapsed} minutes without completion.`,
+      failedAgentId: activeWorkerId,
+      failedAgentName: activeWorker?.name || 'Rohan',
+      recoveryAgentId: 'M0',
+      recoveryAgentName: 'Diya',
+      timestamp: new Date().toISOString(),
+      isTimeout: true,
+      elapsedMinutes: elapsed,
+      reason: 'timeout',
+      checkpointSummary: summary,
+    };
+
+    set({
+      errorCheckpointModalOpen: true,
+      errorCheckpointData: checkpointData,
+      lastTimeoutPromptAt: s.realElapsed || (elapsed * 60),
+    });
+  },
   triggerErrorCheckpoint: (info) => {
     const s = get();
     // 1. Resolve failed agent
@@ -225,7 +273,11 @@ export const useStore = create<Store>((set, get) => ({
       else reqId = '47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5';
     }
 
-    // 4. Update 3D Director activities if running
+    // 4. Determine failure reason (e.g. credit depletion vs inference error)
+    const isCreditDepleted = /credit|quota|balance|402|insufficient.*credit/i.test(info.error);
+    const reason = info.reason || (isCreditDepleted ? 'credit_depletion' : 'inference_error');
+
+    // 5. Update 3D Director activities if running
     try {
       import('@/sim/director').then(({ director }) => {
         director.confuse(failedId);
@@ -233,7 +285,7 @@ export const useStore = create<Store>((set, get) => ({
       }).catch(() => {});
     } catch {}
 
-    // 5. Generate structured Checkpoint Summary from the frozen execution state
+    // 6. Generate structured Checkpoint Summary from the frozen execution state
     const summary = generateCheckpointSummary({
       ...s,
       executionState: 'failed',
@@ -248,6 +300,8 @@ export const useStore = create<Store>((set, get) => ({
       recoveryAgentName: recoveryName,
       requestId: reqId,
       timestamp: new Date().toISOString(),
+      reason,
+      isTimeout: false,
       checkpointSummary: summary
     };
 
@@ -256,7 +310,9 @@ export const useStore = create<Store>((set, get) => ({
       id: noteId,
       author_agent_id: recoveryId,
       topic: 'CHECKPOINT_RECOVERY',
-      note: `Execution halted: 0G Private Computer inference failed (Request ID: ${reqId}). Incident context captured by ${recoveryName}. Ready to anchor to Arkiv + Swarm.`,
+      note: isCreditDepleted
+        ? `Execution halted: 0G compute credits depleted. Incident context captured by ${recoveryName}. Ready to anchor to Arkiv + Swarm.`
+        : `Execution halted: 0G Private Computer inference failed (Request ID: ${reqId}). Incident context captured by ${recoveryName}. Ready to anchor to Arkiv + Swarm.`,
       ts: s.simClock || '09:12'
     };
 
@@ -641,6 +697,7 @@ export const useStore = create<Store>((set, get) => ({
     gate: { in_flight: 0, limit: 4, queue_depth: 0, backoff_active: false },
     llmByRole: {}, llmByModel: {}, terminal: {}, report: null, checkpointSummary: null, replanCount: 0,
     errorCheckpointModalOpen: false, errorCheckpointData: null,
+    runStartedAt: Date.now(), lastTimeoutPromptAt: 0,
     planOutline: [], selected: null, inspectorOpen: false, followId: null,
     triage: null, departments: {}, pendingPermissions: [], contextStages: {}, fileEdits: {}, checkpoint: null,
     simClock: '09:00', realElapsed: 0, effortLogical: 0, replayIdx: 0, replayPlaying: true, mode: 'live',

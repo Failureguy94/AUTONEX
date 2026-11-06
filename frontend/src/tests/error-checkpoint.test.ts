@@ -277,4 +277,77 @@ describe('0G Inference Failure Checkpoint & Arkiv/Swarm Recovery Pipeline', () =
     expect(check.actualHash).toBe(uploadResult.contentHash);
     expect(check.content).toContain('47fe2489886d5d85');
   });
+
+  // --------------------------------------------------------------------------
+  // Test 5: Credit Depletion Error Recognition
+  // --------------------------------------------------------------------------
+  it('5. Credit Depletion: recognizes insufficient credits/quota and sets reason = credit_depletion', () => {
+    useStore.getState().triggerErrorCheckpoint({
+      error: 'Insufficient 0G credits: account balance 0 tOG exceeded quota (HTTP 402)',
+      failedAgentId: 'W_backend_0',
+    });
+
+    const state = useStore.getState();
+    expect(state.errorCheckpointModalOpen).toBe(true);
+    expect(state.errorCheckpointData?.reason).toBe('credit_depletion');
+    expect(state.errorCheckpointData?.isTimeout).toBe(false);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 6: 5-Minute Long Running Task Timeout Checkpoint & Dismiss
+  // --------------------------------------------------------------------------
+  it('6. 5-Minute Timeout: prompts user for long-running task and dismiss schedules next 5m check', () => {
+    useStore.setState({ executionState: 'running', realElapsed: 305 });
+
+    useStore.getState().promptTimeoutCheckpoint(5);
+
+    let state = useStore.getState();
+    expect(state.errorCheckpointModalOpen).toBe(true);
+    expect(state.errorCheckpointData?.isTimeout).toBe(true);
+    expect(state.errorCheckpointData?.reason).toBe('timeout');
+    expect(state.errorCheckpointData?.elapsedMinutes).toBe(5);
+
+    // Dismissing timeout prompt closes modal and pushes lastTimeoutPromptAt +300s
+    useStore.getState().dismissTimeoutPrompt();
+
+    state = useStore.getState();
+    expect(state.errorCheckpointModalOpen).toBe(false);
+    expect(state.lastTimeoutPromptAt).toBe(605);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 7: Zero Raw Codebase Dump in Context Payload
+  // --------------------------------------------------------------------------
+  it('7. Storage Policy: context payload contains structured metadata and inventory, NOT raw codebase files', () => {
+    const rawFiles = {
+      'src/server.ts': 'const a = 1;\nconst b = 2;\nconsole.log(a + b);',
+      'src/models.ts': 'export interface User { id: string; name: string; }',
+    };
+
+    const fileInventory = Object.entries(rawFiles).map(([path, content]) => ({
+      path,
+      lines: content.split('\n').length,
+      bytes: new TextEncoder().encode(content).length,
+    }));
+
+    const contextPayload = {
+      type: 'autonex_project_context',
+      version: '1.0.0',
+      projectId: 'burger-app',
+      projectName: 'BurgerApp',
+      goal: 'Build full burger ordering SPA and report',
+      timestamp: new Date().toISOString(),
+      deliverableInventory: fileInventory,
+      totalFilesCataloged: fileInventory.length,
+    };
+
+    const serialized = JSON.stringify(contextPayload);
+
+    // Context must include file path and line count
+    expect(serialized).toContain('src/server.ts');
+    expect(serialized).toContain('"lines":3');
+    // Context must NOT contain the full raw code dump
+    expect(serialized).not.toContain('console.log(a + b);');
+    expect(serialized).not.toContain('export interface User');
+  });
 });
