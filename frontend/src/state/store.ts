@@ -99,6 +99,9 @@ interface Store {
   contextStages: Record<string, { stage: number; frac: number }>;
   fileEdits: Record<string, { path: string; line_ranges: [number, number][]; branch?: string; ts: string }[]>;
   checkpoint: { branch: string; start_commit: string } | null;
+  checkpointModalOpen: boolean;
+  selectedCheckpointId: string | null;
+  setCheckpointModalOpen: (open: boolean, checkpointId?: string | null) => void;
   settings: Settings;
   zgConnection: ZGConnectionState;
   zgModalOpen: boolean;
@@ -155,6 +158,10 @@ export const useStore = create<Store>((set, get) => ({
   contextStages: {},
   fileEdits: {},
   checkpoint: null,
+  checkpointModalOpen: false,
+  selectedCheckpointId: null,
+  setCheckpointModalOpen: (open: boolean, checkpointId?: string | null) =>
+    set({ checkpointModalOpen: open, selectedCheckpointId: checkpointId ?? null }),
   settings: { shadows: 'med', post: true, lodDist: 26, sound: true, reducedMotion: false, concurrency: 4, pricePerM: 0.6, showPaidCost: false },
   executionState: 'idle',
   executionError: null,

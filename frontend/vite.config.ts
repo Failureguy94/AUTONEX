@@ -4,7 +4,17 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      'events': path.resolve(__dirname, 'src/shims/events.ts'),
+      'node:events': path.resolve(__dirname, 'src/shims/events.ts'),
+      'stream': path.resolve(__dirname, 'src/shims/stream.ts'),
+      'node:stream': path.resolve(__dirname, 'src/shims/stream.ts'),
+      'crypto': path.resolve(__dirname, 'src/shims/crypto.ts'),
+      'node:crypto': path.resolve(__dirname, 'src/shims/crypto.ts'),
+    },
+  },
   server: {
     port: 5173,
     proxy: {

@@ -215,3 +215,48 @@ CREATE TABLE IF NOT EXISTS swarm_estimate (
   tokens_actual INTEGER DEFAULT 0,
   time_actual_s INTEGER DEFAULT 0
 );
+
+-- AUTONEX Checkpoint Engine (Phase 5)
+CREATE TABLE IF NOT EXISTS checkpoints (
+  checkpoint_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  parent_checkpoint_id TEXT,
+  agent_task_id TEXT,
+  owner_user_id TEXT NOT NULL,
+  description TEXT,
+  created_at REAL NOT NULL,
+  execution_status TEXT NOT NULL,
+  lifecycle_status TEXT NOT NULL,
+  archive_swarm_ref TEXT,
+  context_swarm_ref TEXT,
+  archive_checksum TEXT,
+  context_checksum TEXT,
+  archive_size INTEGER DEFAULT 0,
+  file_count INTEGER DEFAULT 0,
+  manifest_json TEXT,
+  storage_provider TEXT DEFAULT 'swarm',
+  schema_version TEXT DEFAULT '2.0.0',
+  encryption_metadata_json TEXT,
+  failure_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_chk_proj_created ON checkpoints(project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chk_owner ON checkpoints(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_chk_parent ON checkpoints(parent_checkpoint_id);
+
+CREATE TABLE IF NOT EXISTS restore_operations (
+  restore_id TEXT PRIMARY KEY,
+  checkpoint_id TEXT NOT NULL,
+  safety_checkpoint_id TEXT,
+  initiating_user TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at REAL NOT NULL,
+  completed_at REAL,
+  failure_details TEXT,
+  restored_files_count INTEGER DEFAULT 0,
+  FOREIGN KEY (checkpoint_id) REFERENCES checkpoints(checkpoint_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_restore_chk ON restore_operations(checkpoint_id);
+CREATE INDEX IF NOT EXISTS idx_restore_user ON restore_operations(initiating_user);
+

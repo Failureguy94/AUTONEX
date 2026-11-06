@@ -111,4 +111,33 @@ export const ContextRefSchema = defineSchema('autonex.context_ref', {
   summary: str().optional(),
 });
 
+/**
+ * 8. autonex.checkpoint_v2
+ * Checkpoint Engine Schema anchoring archive and context references on Arkiv Rabdi DB-Chain.
+ */
+export const CheckpointV2Schema = defineSchema('autonex.checkpoint_v2', {
+  checkpoint_id: str().indexed(),
+  project_id: str().indexed(),
+  parent_checkpoint_id: str().optional(),
+  agent_task_id: str().optional(),
+  owner: addr().indexed(),
+  run_id: str().indexed(),
+  status: str().indexed(),          // 'In Progress' | 'Interrupted' | 'Completed'
+  lifecycle_status: str().indexed(),// 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'FAILED'
+  created_at: u64().indexed(),
+  swarm_archive_ref: str().indexed(),
+  archive_sha256: str().indexed(),
+  archive_bytes_size: u64(),
+  swarm_context_ref: str().indexed(),
+  context_sha256: str().indexed(),
+  context_bytes_size: u64(),
+  encryption_iv: str().optional(),
+  cipher_auth_tag: str().optional(),
+  file_count: u64(),
+  storage_provider: str().indexed(),
+  schema_version: str(),
+  description: str().optional(),
+  manifest_json: bytes().optional(),
+});
+
 

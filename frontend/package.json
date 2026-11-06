@@ -17,6 +17,7 @@
   "dependencies": {
     "@arkiv-network/sdk": "^1.0.1",
     "@dagrejs/dagre": "^1.1.4",
+    "@ethersphere/bee-js": "^13.2.0",
     "@react-three/drei": "^9.114.3",
     "@react-three/fiber": "^8.17.10",
     "@tanstack/react-query": "^5.106.1",

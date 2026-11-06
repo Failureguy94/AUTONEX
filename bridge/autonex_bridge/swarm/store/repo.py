@@ -498,3 +498,148 @@ class SwarmRepository:
             r["refs"] = json.loads(r.get("refs_json") or "[]")
             r["payload"] = json.loads(r.get("payload_json") or "{}")
         return rows
+
+    # ---- Checkpoint Engine (Phase 5) ----
+    def insert_checkpoint(self, record: Dict[str, Any]) -> None:
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT OR REPLACE INTO checkpoints (
+                    checkpoint_id, project_id, parent_checkpoint_id, agent_task_id,
+                    owner_user_id, description, created_at, execution_status,
+                    lifecycle_status, archive_swarm_ref, context_swarm_ref,
+                    archive_checksum, context_checksum, archive_size, file_count,
+                    manifest_json, storage_provider, schema_version,
+                    encryption_metadata_json, failure_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["checkpoint_id"],
+                    record["project_id"],
+                    record.get("parent_checkpoint_id"),
+                    record.get("agent_task_id"),
+                    record["owner_user_id"],
+                    record.get("description", ""),
+                    record.get("created_at", time.time()),
+                    record.get("execution_status", "In Progress"),
+                    record.get("lifecycle_status", "PENDING"),
+                    record.get("archive_swarm_ref"),
+                    record.get("context_swarm_ref"),
+                    record.get("archive_checksum"),
+                    record.get("context_checksum"),
+                    record.get("archive_size", 0),
+                    record.get("file_count", 0),
+                    record.get("manifest_json"),
+                    record.get("storage_provider", "swarm"),
+                    record.get("schema_version", "2.0.0"),
+                    record.get("encryption_metadata_json"),
+                    record.get("failure_reason"),
+                ),
+            )
+
+    def update_checkpoint_lifecycle(
+        self,
+        checkpoint_id: str,
+        lifecycle_status: str,
+        updates: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        updates = updates or {}
+        fields = ["lifecycle_status = ?"]
+        values: List[Any] = [lifecycle_status]
+        for key in (
+            "archive_swarm_ref",
+            "context_swarm_ref",
+            "archive_checksum",
+            "context_checksum",
+            "archive_size",
+            "file_count",
+            "manifest_json",
+            "failure_reason",
+            "encryption_metadata_json",
+        ):
+            if key in updates:
+                fields.append(f"{key} = ?")
+                values.append(updates[key])
+        values.append(checkpoint_id)
+        with self.conn:
+            self.conn.execute(
+                f"UPDATE checkpoints SET {', '.join(fields)} WHERE checkpoint_id = ?",
+                tuple(values),
+            )
+
+    def get_checkpoint(self, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+        cur = self.conn.execute("SELECT * FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def list_checkpoints(
+        self, project_id: str, owner_user_id: Optional[str] = None, page: int = 1, limit: int = 20
+    ) -> Dict[str, Any]:
+        offset = (max(1, page) - 1) * max(1, limit)
+        params: List[Any] = [project_id]
+        where_clause = "WHERE project_id = ?"
+        if owner_user_id:
+            where_clause += " AND owner_user_id = ?"
+            params.append(owner_user_id)
+
+        cur_count = self.conn.execute(f"SELECT COUNT(*) as total FROM checkpoints {where_clause}", tuple(params))
+        total = cur_count.fetchone()["total"]
+
+        cur = self.conn.execute(
+            f"SELECT * FROM checkpoints {where_clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            tuple(params + [limit, offset]),
+        )
+        checkpoints = [dict(r) for r in cur.fetchall()]
+        return {
+            "checkpoints": checkpoints,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total + limit - 1) // limit if limit > 0 else 1,
+        }
+
+    def insert_restore_op(self, record: Dict[str, Any]) -> None:
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT OR REPLACE INTO restore_operations (
+                    restore_id, checkpoint_id, safety_checkpoint_id,
+                    initiating_user, status, started_at, completed_at,
+                    failure_details, restored_files_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["restore_id"],
+                    record["checkpoint_id"],
+                    record.get("safety_checkpoint_id"),
+                    record["initiating_user"],
+                    record.get("status", "PENDING"),
+                    record.get("started_at", time.time()),
+                    record.get("completed_at"),
+                    record.get("failure_details"),
+                    record.get("restored_files_count", 0),
+                ),
+            )
+
+    def update_restore_op(
+        self, restore_id: str, status: str, updates: Optional[Dict[str, Any]] = None
+    ) -> None:
+        updates = updates or {}
+        fields = ["status = ?"]
+        values: List[Any] = [status]
+        for key in ("completed_at", "failure_details", "restored_files_count"):
+            if key in updates:
+                fields.append(f"{key} = ?")
+                values.append(updates[key])
+        values.append(restore_id)
+        with self.conn:
+            self.conn.execute(
+                f"UPDATE restore_operations SET {', '.join(fields)} WHERE restore_id = ?",
+                tuple(values),
+            )
+
+    def get_restore_op(self, restore_id: str) -> Optional[Dict[str, Any]]:
+        cur = self.conn.execute("SELECT * FROM restore_operations WHERE restore_id = ?", (restore_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useStore } from '../state/store';
 import { applyEvent } from '../state/events';
 import { uploadContextWorkflow, retrieveContextWorkflow } from '../services/storageWorkflow';
-import { getFallbackStorage } from '../services/swarm/client';
+import { getActiveStorageProvider } from '../services/swarm/operations';
 import * as arkivOps from '../services/arkiv/operations';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { createWalletClient, http } from 'viem';
@@ -14,7 +14,6 @@ describe('0G Inference Failure Checkpoint & Arkiv/Swarm Recovery Pipeline', () =
     'Execution halted: 0G Private Computer inference failed (Request ID: 47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5)';
 
   beforeEach(() => {
-    getFallbackStorage().clear();
     vi.restoreAllMocks();
     useStore.getState().resetRun('Build verified smart contract deployment CLI');
     useStore.setState({
@@ -252,6 +251,22 @@ describe('0G Inference Failure Checkpoint & Arkiv/Swarm Recovery Pipeline', () =
       null,
       2
     );
+
+    const mockSwarmRef = 'ebb37e867f90bff371c628ad269d98360543f66c3e462e4186e2c2de1c9c2091';
+    const provider = getActiveStorageProvider();
+    vi.spyOn(provider, 'uploadBinary').mockResolvedValueOnce({
+      reference: mockSwarmRef,
+      contentHash: 'sha256:dummy',
+      byteSize: new TextEncoder().encode(payload).byteLength,
+      contentType: 'application/json',
+      timestamp: new Date().toISOString(),
+    });
+    vi.spyOn(provider, 'downloadBinary').mockResolvedValueOnce({
+      data: new TextEncoder().encode(payload),
+      contentHash: 'sha256:dummy',
+      byteSize: new TextEncoder().encode(payload).byteLength,
+      verified: true,
+    });
 
     // 1. Upload heavy context to Swarm and register reference on Arkiv
     const uploadResult = await uploadContextWorkflow(mockWalletClient, payload, {

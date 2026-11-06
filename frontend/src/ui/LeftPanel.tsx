@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useStore } from '@/state/store';
 import { DagView } from './DagView';
@@ -6,8 +6,9 @@ import { Icon, I } from './Icons';
 import { STATUS_COLORS, deptStyle } from './deptUtils';
 import { cameraCtl } from '@/three/cameraCtl';
 import { director } from '@/sim/director';
+import { CheckpointService, type CheckpointRecord } from '@/services/checkpoint';
 
-type Tab = 'org' | 'dag' | 'board';
+type Tab = 'org' | 'dag' | 'board' | 'checkpoints';
 
 export function LeftPanel() {
   const [tab, setTab] = useState<Tab>('dag');
@@ -22,23 +23,24 @@ export function LeftPanel() {
       {/* Header Tabs */}
       <div className="flex items-center border-b border-ink/10 bg-white/60 px-2 py-1.5 justify-between">
         {!collapsed && (
-          <div className="flex gap-1 flex-1">
+          <div className="flex gap-1 flex-1 overflow-x-auto no-scrollbar">
             {([
-              ['dag', 'Task DAG', I.chart],
-              ['org', 'Team Org', I.users],
-              ['board', 'Blackboard', I.pin],
+              ['dag', 'DAG', I.chart],
+              ['org', 'Org', I.users],
+              ['board', 'Board', I.pin],
+              ['checkpoints', 'Checkpoints', I.layers],
             ] as [Tab, string, string][]).map(([t, label, icon]) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 py-1.5 px-2 text-[11px] font-heading font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                className={`flex-1 py-1 px-1.5 text-[10.5px] font-heading font-medium rounded-lg flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
                   tab === t
                     ? 'bg-white text-ink shadow-xs border border-ink/10'
                     : 'text-ink/60 hover:text-ink hover:bg-white/40'
                 }`}
               >
-                <Icon d={icon} size={12} />
-                <span className="hidden sm:inline">{label}</span>
+                <Icon d={icon} size={11} />
+                <span>{label}</span>
               </button>
             ))}
           </div>
@@ -58,6 +60,7 @@ export function LeftPanel() {
           {tab === 'org' && <OrgChart />}
           {tab === 'dag' && <DagView />}
           {tab === 'board' && <Blackboard />}
+          {tab === 'checkpoints' && <CheckpointSidebarTimeline />}
         </div>
       )}
 
@@ -93,6 +96,16 @@ export function LeftPanel() {
             title="Blackboard"
           >
             <Icon d={I.pin} size={16} />
+          </button>
+          <button
+            onClick={() => {
+              setCollapsed(false);
+              setTab('checkpoints');
+            }}
+            className={`p-2 rounded-lg ${tab === 'checkpoints' ? 'bg-white shadow-xs text-ink' : 'text-ink/50'}`}
+            title="Checkpoints"
+          >
+            <Icon d={I.layers} size={16} />
           </button>
         </div>
       )}
@@ -292,6 +305,82 @@ function Blackboard() {
           </motion.div>
         ))}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function CheckpointSidebarTimeline() {
+  const goal = useStore((s) => s.goal) || 'AUTONEX Project';
+  const setStoreOpen = useStore((s) => s.setCheckpointModalOpen);
+  const projectId = goal.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 32) || 'autonex-project';
+
+  const service = useMemo(() => new CheckpointService(), []);
+  const [list, setList] = useState<CheckpointRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    try {
+      const res = service.listCheckpoints(projectId, { page: 1, limit: 10 });
+      setList(res.checkpoints || []);
+    } catch {
+      setList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  return (
+    <div className="p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="font-heading font-bold text-xs text-ink">Project Timeline</span>
+        <button
+          onClick={() => setStoreOpen(true)}
+          className="text-[10px] font-heading font-semibold text-blue-600 hover:underline flex items-center gap-1"
+        >
+          <span>Open Explorer</span>
+          <span>↗</span>
+        </button>
+      </div>
+
+      {loading && list.length === 0 ? (
+        <div className="text-center py-6 text-xs text-ink/40">Loading checkpoints...</div>
+      ) : list.length === 0 ? (
+        <div className="text-center py-8 text-xs text-ink/40 space-y-1">
+          <p className="font-semibold text-ink/60">No checkpoints recorded</p>
+          <p className="text-[10px]">Pre and post checkpoints are created automatically as tasks run.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {list.map((chk) => (
+            <div
+              key={chk.checkpointId}
+              onClick={() => setStoreOpen(true, chk.checkpointId)}
+              className="p-2.5 rounded-xl border border-ink/10 bg-white/80 hover:bg-white hover:border-ink/30 transition-all cursor-pointer space-y-1.5 shadow-xs"
+            >
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="font-bold text-ink">{chk.checkpointId.slice(0, 14)}...</span>
+                <span className={`px-1.5 py-0.2 rounded font-medium ${
+                  chk.executionStatus === 'Completed'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : chk.executionStatus === 'Failed'
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-amber-50 text-amber-700'
+                }`}>
+                  {chk.executionStatus}
+                </span>
+              </div>
+              <p className="text-[11px] font-body text-ink/75 line-clamp-2 leading-relaxed">
+                {chk.description}
+              </p>
+              <div className="flex items-center justify-between text-[9.5px] font-mono text-ink/40 pt-1 border-t border-ink/5">
+                <span>{chk.fileCount} files</span>
+                <span>{new Date(chk.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
