@@ -27,7 +27,7 @@ export function buildScript(goal: string): RawEv[] {
   const agentOf = (id: string) => org.find((a) => a.id === id)!;
   const deptModel = (id: string) => {
     const d = t.departments.find((x) => x.id === agentOf(id).department);
-    return d ? d.worker_model : 'groq/openai/gpt-oss-20b';
+    return d ? d.worker_model : '0g/qwen-flash';
   };
   const hire = (a: (typeof org)[number], time: number) =>
     S.push(ev(time, 'worker.hired', a.id, undefined, {
@@ -50,7 +50,7 @@ export function buildScript(goal: string): RawEv[] {
       edges: [], plan_meta: { intensity: t.intensity, break_policy: P, est_effort_s: t.est_effort_s },
     }));
     S.push(ev(1.4, 'agent.state_changed', 'M0', undefined, { agent_id: 'M0', from: 'ASSIGNED', to: 'WORKING' }));
-    S.push(ev(2.0, 'llm.call_started', 'M0', undefined, { call_id: 'c1', agent_id: 'M0', model: 'groq/openai/gpt-oss-20b', role: 'manager' }));
+    S.push(ev(2.0, 'llm.call_started', 'M0', undefined, { call_id: 'c1', agent_id: 'M0', model: '0g/glm-5.3-flash', role: 'manager' }));
     S.push(ev(2.1, 'gate.state', undefined, undefined, { in_flight: 1, limit: 4, queue_depth: 0, backoff_active: false }));
     S.push(ev(4.0, 'task.progress', 'M0', 'T1', { task_id: 'T1', pct: 45 }));
     S.push(ev(6.0, 'task.progress', 'M0', 'T1', { task_id: 'T1', pct: 90 }));

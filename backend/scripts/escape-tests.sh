@@ -31,7 +31,7 @@ fi
 # S2: No secrets in environment
 echo -n "[TEST S2] No leaked API keys in environment... "
 OUT=$(run_in_agent 'env; cat ~/.local/share/opencode/auth.json 2>&1 || true')
-if [[ ! "$OUT" =~ "sk-" ]] && [[ ! "$OUT" =~ "GO_API_KEY" ]] && [[ ! "$OUT" =~ "GROQ_API_KEY" ]] && [[ ! "$OUT" =~ "NVIDIA_API_KEY" ]] && [[ ! "$OUT" =~ "OPENROUTER_API_KEY" ]]; then
+if [[ ! "$OUT" =~ "ZG_API_KEY" ]]; then
   echo "PASS"; ((PASSED++))
 else
   echo "FAIL: Secret detected!"; ((FAILED++))
@@ -94,7 +94,7 @@ echo -n "[TEST S7] Agent config isolation from repo content... "
 OUT=$(run_in_agent '
   env | grep -i "key\|secret\|token\|pass" 2>&1 || true
 ')
-if [[ ! "$OUT" =~ "GO_API" ]] && [[ ! "$OUT" =~ "GROQ_API" ]] && [[ ! "$OUT" =~ "NVIDIA_API" ]] && [[ ! "$OUT" =~ "OPENROUTER_API" ]]; then
+if [[ ! "$OUT" =~ "ZG_API_KEY" ]]; then
   echo "PASS (no secrets in agent env)"; ((PASSED++))
 else
   echo "FAIL: secrets found in agent environment!"; ((FAILED++))

@@ -42,10 +42,10 @@ describe('triage heuristic', () => {
   });
   it('FIX: "build" no longer matches "ui" (word-boundary matching)', () => {
     expect(triage('Build a REST API with auth and tests').task_class).toBe('code_backend');
-    expect(triage('Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one').task_class).toBe('hybrid');
+    expect(triage('Research 0G Private Computer models and build a small routing verifier').task_class).toBe('hybrid');
   });
   it('FIX: every department of a run gets its own wing', () => {
-    for (const goal of ['Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one',
+    for (const goal of ['Research 0G Private Computer models and build a small routing verifier',
       'Build a website dashboard with a React frontend and a backend API server']) {
       const bays = triage(goal).departments.map((d) => d.bay);
       expect(new Set(bays).size).toBe(bays.length);
@@ -68,7 +68,7 @@ describe('simulator tapes', () => {
     expect(tape.filter((e) => e.type === 'agent.break_start' && e.payload.kind === 'lunch')).toHaveLength(0);
   });
   it('heavy tape: lunch + coffee + chat + reassignment + validation failure all present', () => {
-    const tape = tapeFor('Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one');
+    const tape = tapeFor('Research 0G Private Computer models and build a small routing verifier');
     const types = new Set(tape.map((e) => e.type));
     for (const t of ['agent.break_start', 'agent.chat', 'task.reassigned', 'validation.failed', 'task.rework',
       'permission.requested', 'file.edit', 'run.checkpoint', 'context.stage_changed', 'blackboard.note'])
@@ -77,7 +77,7 @@ describe('simulator tapes', () => {
   });
   it('seq is monotonic and every event validates against the zod contract', () => {
     for (const goal of ['Summarize this repo README in one paragraph', 'Add dark mode to the dashboard',
-      'Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one']) {
+      'Research 0G Private Computer models and build a small routing verifier']) {
       const tape = tapeFor(goal);
       tape.forEach((e, i) => {
         if (i > 0) expect(e.seq).toBeGreaterThan(tape[i - 1].seq);

@@ -27,6 +27,12 @@ def test_persona_seat_counts_and_adversarial_share():
     assert adversarial / 50.0 >= 0.38
 
 
+def test_persona_allocator_rejects_non_0g_model_assignments():
+    allocator = PersonaSeatAllocator()
+    with pytest.raises(ValueError, match="0G catalogue"):
+        allocator.allocate_seats("run_test", 10, available_models={"qwen": "groq/model"})
+
+
 def test_persona_distinctness_detects_collapse():
     # 1. Diverse proposals
     diverse_proposals = [

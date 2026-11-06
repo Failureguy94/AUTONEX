@@ -7,7 +7,7 @@ It has **no network API**. AUTONEX wants *many* workers and a live event stream.
 > **Principle: AUTONEX stays a black-box worker. The Bridge launches N headless sessions of it, points all their LLM traffic at the Bridge's Gateway,
 > adds ONE new plugin that reports what only the inside of a session knows, and reads the files AUTONEX already writes.**
 
-Only **code-editing workers** are AUTONEX sessions. Manager, leads, research, text, data and QA workers are *not* — they are structured LLM calls or deterministic code (see `TRIAGE_AND_PLANNING.md §6.1`). That is what keeps a heavy run affordable on free tiers.
+Only **code-editing workers** are AUTONEX sessions. Manager, leads, research, text, data and QA workers are *not* — they are structured LLM calls or deterministic code (see `TRIAGE_AND_PLANNING.md §6.1`). That keeps a heavy run within configured 0G Router quotas.
 
 Facts used here come from `reference/autonex_reference/` (the owner's spec, whitepaper, README). Anything marked **VERIFY** is *not* established by those documents.
 
@@ -43,7 +43,7 @@ These are unknowns. Resolve each, write the answer into `bridge/DISCOVERIES.md`,
 | D5 | Does the `session` event carry `sessionID`; is there a compaction event with the stage/fraction? | log real hook events to a fixture (`context/fixtures/event-1.json` per the spec) | derive stage from the Gateway's per-agent token fraction (works regardless) |
 | D6 | Behaviour of `ask` rules in **non-interactive** `run` (auto-deny? hang?) | run a strict-profile session on a scratch repo | never use `strict` headless without D4 |
 | D7 | Process-tree kill on Windows | `taskkill /T /F /PID` vs job objects | use `psutil` to kill children |
-| D8 | Real provider limits per key | `scripts/calibrate-limits` (`MODEL_ROUTING §9`) | start low |
+| D8 | 0G Router limits per key | `scripts/calibrate-limits` (`MODEL_ROUTING §9`) | start low |
 
 ## 3. Per-worker workspace and git
 Never run two sessions in the same directory. For a run `R` on project `P` (must be a git repo; `turbo` additionally requires a **clean** tree):

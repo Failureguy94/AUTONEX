@@ -1,23 +1,16 @@
 # AUTONEX (PAG Autonomous Coding Engine)
 
-A personal, terminal-first, autonomous coding agent that mirrors Google Antigravity's permissions, safety sandboxing, and diff visibility — powered by **free open-weight models** from Groq, NVIDIA NIM, OpenRouter, and OpenCode Go.
+A personal, terminal-first, autonomous coding agent that mirrors Google Antigravity's permissions, safety sandboxing, and diff visibility — powered exclusively by models from **0G Private Computer**.
 
-**Zero cost. Full privacy. Your machine, your rules.**
+**0G-powered inference. Privacy-first. Your machine, your rules.**
 
 ---
 
 ## Quick Start (5 minutes)
 
-### 1. Get your free API keys
+### 1. Configure 0G Private Computer
 
-| Provider | Free Tier | Get Key |
-|----------|-----------|---------|
-| **Groq** | Fastest inference, no credit card | [console.groq.com/keys](https://console.groq.com/keys) |
-| **NVIDIA NIM** | 1000 free credits | [build.nvidia.com](https://build.nvidia.com/) |
-| **OpenRouter** | Free models (`:free` suffix) | [openrouter.ai/keys](https://openrouter.ai/keys) |
-| **OpenCode Go** | Dollar-window free tier | [opencode.ai/v2/docs/console/go](https://opencode.ai/v2/docs/console/go) |
-
-You only need **one** key to start. Add more providers later.
+Create a 0G Private Computer API key and set it as `ZG_API_KEY` in `.env`.
 
 ### 2. Configure
 
@@ -25,7 +18,7 @@ You only need **one** key to start. Add more providers later.
 cd /mnt/d/AUTONEX
 cp .env.example .env
 chmod 600 .env
-# Edit .env — paste your key(s)
+# Edit .env — set ZG_API_KEY
 nano .env
 ```
 
@@ -56,10 +49,7 @@ You can also use the alias `autonex` instead of `pag`.
 
 ### Per-session override
 ```bash
-pag ~/myproject assist --model groq/llama-3.3-70b-versatile
-pag ~/myproject assist --model nvidia/meta/llama-3.1-70b-instruct
-pag ~/myproject assist --model openrouter/qwen/qwen-2.5-72b-instruct:free
-pag ~/myproject assist --model go/deepseek-v4-flash
+pag ~/myproject assist --model 0g/qwen3-coder-flash
 ```
 
 ### See all configured models
@@ -72,34 +62,11 @@ Edit `profiles/base.json` → `agents.build.model` and `agents.plan.model`.
 
 ---
 
-## Available Models (all free)
+## Available Models
 
-### Groq (fastest inference)
-| Model | Best For |
-|-------|----------|
-| `groq/llama-3.3-70b-versatile` | **Default.** Best free all-rounder |
-| `groq/llama-3.1-8b-instant` | Simple tasks, fastest response |
-| `groq/gemma2-9b-it` | Balanced quality/speed |
-
-### NVIDIA NIM (free prototyping)
-| Model | Best For |
-|-------|----------|
-| `nvidia/meta/llama-3.1-70b-instruct` | Strong reasoning |
-| `nvidia/nvidia/llama-3.1-nemotron-70b-instruct` | NVIDIA-tuned helpfulness |
-
-### OpenRouter (free models)
-| Model | Best For |
-|-------|----------|
-| `openrouter/qwen/qwen-2.5-72b-instruct:free` | Best free on OpenRouter |
-| `openrouter/google/gemma-2-9b-it:free` | Fast Google model |
-| `openrouter/meta-llama/llama-3.1-8b-instruct:free` | Quick tasks |
-
-### OpenCode Go (free tier)
-| Model | Best For |
-|-------|----------|
-| `go/deepseek-v4-flash` | Coding-focused, Go default |
-| `go/deepseek-v4-pro` | Stronger planning |
-| `go/glm-5.2` | Escalation |
+The supported model catalogue is maintained in `profiles/base.json` and contains
+only 0G Private Computer models. Run `pag --list-models` to see the configured
+models, or see `frontend/docs/MODEL_ROUTING_AND_RATE_LIMITS.md` for role routing.
 
 ---
 
@@ -133,8 +100,8 @@ On exit, a full `git diff -U0` summary is printed with one-command rollback.
 ## Privacy & Hosted Models
 
 - **Privacy gate:** Projects must be explicitly authorized before code is sent to any API
-- **All API keys stay on your machine** — injected by the nginx proxy, never inside the container
-- **Zero data retention:** All configured providers have 0-day retention policies
+- **The 0G API key stays outside the agent container** — injected by the local nginx proxy in Docker mode
+- **Data handling:** Review the current 0G Private Computer terms before sending sensitive project data
 - **No telemetry, no tracking, no cloud deployment**
 
 To authorize a new project:
@@ -218,13 +185,13 @@ cd /mnt/d/AUTONEX/plugins/context && npx tsx --test lib.test.ts
 
 ## Evaluation Harness
 
-Run benchmarks on any model:
+Run evaluations on configured 0G models:
 ```bash
 # Run evals with a specific model and profile
-/mnt/d/AUTONEX/evals/run.sh groq/llama-3.3-70b-versatile assist 3 1
+/mnt/d/AUTONEX/evals/run.sh 0g/glm-5.3-flash assist 3 1
 
-# Compare models
-/mnt/d/AUTONEX/evals/run.sh nvidia/meta/llama-3.1-70b-instruct assist 3 3
+# Evaluate the coding model
+/mnt/d/AUTONEX/evals/run.sh 0g/qwen3-coder-flash assist 3 3
 ```
 
 ---
@@ -244,4 +211,3 @@ git checkout main && git merge agent/<timestamp>
 ```
 
 ---
-

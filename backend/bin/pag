@@ -24,20 +24,16 @@ usage() {
   echo "  --allow-hosted        Authorize this project for hosted model access"
   echo "  --trust-repo-config   Don't mask project opencode.json (use only if you trust it)"
   echo "  --tier N              Context management tier (0-3, default: 3)"
-  echo "  --model PROVIDER/ID   Override the default model for this session"
-  echo "  --list-models         Show all configured models and exit"
+  echo "  --model 0g/ID         Override the default 0G model for this session"
+  echo "  --list-models         Show all configured 0G models and exit"
   echo "  -h, --help            Show this help"
   echo ""
-  echo -e "${BOLD}Available Providers:${NC}"
-  echo "  groq/*         Groq free tier (fastest inference)"
-  echo "  nvidia/*       NVIDIA NIM free prototyping"
-  echo "  openrouter/*   OpenRouter free models"
-  echo "  go/*           OpenCode Go (free tier)"
-  echo "  go-anthropic/* OpenCode Go (Anthropic protocol)"
+  echo -e "${BOLD}Model provider:${NC}"
+  echo "  0G Private Computer (router-api.0g.ai)"
   echo ""
   echo -e "${BOLD}Examples:${NC}"
   echo "  pag ~/myproject assist"
-  echo "  pag ~/myproject assist --model nvidia/meta/llama-3.1-70b-instruct"
+  echo "  pag ~/myproject assist --model 0g/qwen3-coder-flash"
   echo "  pag --list-models"
   exit 0
 }
@@ -60,7 +56,7 @@ list_models() {
   ' "$profile_file"
   echo ""
   echo -e "Set default: edit ${CYAN}profiles/base.json${NC} → agents.build.model"
-  echo -e "Per-session:  ${CYAN}pag <dir> <profile> --model <provider/model>${NC}"
+  echo -e "Per-session:  ${CYAN}pag <dir> <profile> --model 0g/<model-id>${NC}"
   exit 0
 }
 
@@ -168,41 +164,26 @@ if [ "$is_allowed" = false ]; then
   fi
 fi
 
-# DeepSeek retention warning
-CURRENT_DATE=$(date +%Y-%m-%d)
-if [[ "$CURRENT_DATE" > "2026-10-31" ]]; then
-  echo -e "${YELLOW}[NOTE] Verify DeepSeek retention on the Go privacy page before using DeepSeek on private code.${NC}"
-fi
-
 # ──────────────────────────────────────────────
-# 3. Provider health check
+# 3. 0G API key check
 # ──────────────────────────────────────────────
 ENV_FILE="${PAG_ROOT}/.env"
 if [ ! -f "$ENV_FILE" ]; then
   echo -e "${RED}[ERROR] No .env file found. Copy the template:${NC}"
   echo -e "  ${CYAN}cp .env.example .env && chmod 600 .env${NC}"
-  echo -e "  Then add at least one free API key."
+  echo -e "  Then add your ZG_API_KEY."
   exit 1
 fi
 
-# Source .env to check which providers are configured
+# Source .env and require the single supported provider.
 set +u
 source "$ENV_FILE"
 set -u
-CONFIGURED_PROVIDERS=()
-[ -n "${ZG_API_KEY:-}" ]        && CONFIGURED_PROVIDERS+=("0g")
-[ -n "${GO_API_KEY:-}" ]        && CONFIGURED_PROVIDERS+=("go")
-[ -n "${GROQ_API_KEY:-}" ]      && CONFIGURED_PROVIDERS+=("groq")
-[ -n "${NVIDIA_API_KEY:-}" ]    && CONFIGURED_PROVIDERS+=("nvidia")
-[ -n "${OPENROUTER_API_KEY:-}" ] && CONFIGURED_PROVIDERS+=("openrouter")
-
-if [ ${#CONFIGURED_PROVIDERS[@]} -eq 0 ]; then
-  echo -e "${RED}[ERROR] No API keys configured in .env${NC}"
-  echo -e "Add at least one free provider key. See: ${CYAN}.env.example${NC}"
+if [ -z "${ZG_API_KEY:-}" ]; then
+  echo -e "${RED}[ERROR] ZG_API_KEY is required in .env${NC}"
+  echo -e "Set your 0G Private Computer key. See: ${CYAN}.env.example${NC}"
   exit 1
 fi
-
-echo -e "${GREEN}[OK] Active providers: ${CONFIGURED_PROVIDERS[*]}${NC}"
 
 # Resolve smart model shorthands
 if [ -n "$MODEL_OVERRIDE" ]; then
@@ -216,38 +197,18 @@ if [ -n "$MODEL_OVERRIDE" ]; then
     fast|instant)
       MODEL_OVERRIDE="0g/qwen-flash"
       ;;
-    groq)
-      MODEL_OVERRIDE="groq/llama-3.3-70b-versatile"
-      ;;
-    nvidia)
-      MODEL_OVERRIDE="nvidia/meta/llama-3.3-70b-instruct"
-      ;;
-    openrouter)
-      MODEL_OVERRIDE="openrouter/qwen/qwen-2.5-coder-32b-instruct:free"
-      ;;
-    go)
-      MODEL_OVERRIDE="go/deepseek-v4-flash"
-      ;;
     r1|reasoning)
-      MODEL_OVERRIDE="groq/deepseek-r1-distill-llama-70b"
-      ;;
-    coder)
-      MODEL_OVERRIDE="openrouter/qwen/qwen-2.5-coder-32b-instruct:free"
-      ;;
-    fast|instant)
-      MODEL_OVERRIDE="groq/llama-3.1-8b-instant"
+      MODEL_OVERRIDE="0g/deepseek-v4.1-flash"
       ;;
   esac
-  SELECTED_PROVIDER=$(echo "$MODEL_OVERRIDE" | cut -d'/' -f1)
-  PROVIDER_HAS_KEY=false
-  for p in "${CONFIGURED_PROVIDERS[@]}"; do
-    if [ "$p" = "$SELECTED_PROVIDER" ]; then
-      PROVIDER_HAS_KEY=true
-      break
-    fi
-  done
-  if [ "$PROVIDER_HAS_KEY" = false ]; then
-    echo -e "${RED}[ERROR] Provider '${SELECTED_PROVIDER}' has no API key in .env${NC}"
+  if [[ ! "$MODEL_OVERRIDE" =~ ^0g/ ]]; then
+    echo -e "${RED}[ERROR] Only 0G models are supported: ${MODEL_OVERRIDE}${NC}"
+    exit 1
+  fi
+  if ! jq -e --arg model "$MODEL_OVERRIDE" \
+    '[.providers["0g"].models | keys[] | "0g/" + .] | index($model) != null' \
+    "${PAG_ROOT}/profiles/base.json" >/dev/null; then
+    echo -e "${RED}[ERROR] Model '${MODEL_OVERRIDE}' is not in the configured 0G catalogue${NC}"
     exit 1
   fi
 fi

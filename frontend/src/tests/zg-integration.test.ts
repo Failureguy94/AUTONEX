@@ -36,6 +36,7 @@ describe('0G Private Computer Centralized Integration Tests', { timeout: 25000 }
 
     // Local catalog inspection
     const catalog0G = MODELS.filter((m) => m.provider === '0g').map((m) => m.id.replace('0g/', ''));
+    expect(MODELS.every((m) => m.provider === '0g' && m.id.startsWith('0g/'))).toBe(true);
     for (const m of target0GModels) {
       expect(catalog0G).toContain(m);
     }
@@ -66,8 +67,17 @@ describe('0G Private Computer Centralized Integration Tests', { timeout: 25000 }
       const candidates = TASK_MODEL_ROUTING[task];
       expect(Array.isArray(candidates)).toBe(true);
       expect(candidates.length).toBeGreaterThan(0);
-      expect(['glm-5.3-flash', 'qwen3-coder-flash', 'kimi-k2.7-code', 'qwen3.7-flash', 'qwen-flash']).toContain(candidates[0]);
+      const catalogIds = MODELS.map((model) => model.id.replace('0g/', ''));
+      expect(candidates.every((candidate) => catalogIds.includes(candidate))).toBe(true);
     }
+  });
+
+  it('rejects model overrides outside the configured 0G catalogue', async () => {
+    await expect(zgClient.call({
+      task: 'planning',
+      prompt: 'Test model restriction',
+      model: 'groq/model'
+    })).rejects.toThrow('Unsupported model selection');
   });
 
   // 4. Agent-Specific Model Assignments

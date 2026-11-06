@@ -76,8 +76,7 @@ export function deskOf(id: string, org: AgentDef[]): { x: number; z: number } {
   return it?.seat ? { x: it.seat.x, z: it.seat.z } : { x: it!.x, z: it!.z };
 }
 
-// Model roster = the AUTONEX free-tier mesh (whitepaper §4). Context windows are real:
-// 0G Private Computer (Router: https://router-api.0g.ai/v1) & Fallbacks
+// All model selections and fallbacks are served by 0G Private Computer.
 export const MODELS: ModelInfo[] = [
   { id: '0g/glm-5.3-flash', label: '0G Private Computer · GLM 5.3 Flash (manager default)', provider: '0g', context_tokens: 1179648 },
   { id: '0g/qwen3-coder-flash', label: '0G Private Computer · Qwen 3 Coder Flash (engineer)', provider: '0g', context_tokens: 1000000 },
@@ -85,54 +84,33 @@ export const MODELS: ModelInfo[] = [
   { id: '0g/deepseek-v4.1-flash', label: '0G Private Computer · DeepSeek V4.1 Flash', provider: '0g', context_tokens: 1441792 },
   { id: '0g/qwen3.7-flash', label: '0G Private Computer · Qwen 3.7 Flash (swarm divergence)', provider: '0g', context_tokens: 1000000 },
   { id: '0g/qwen-flash', label: '0G Private Computer · Qwen Flash (quorum voting)', provider: '0g', context_tokens: 1000000 },
-  { id: 'openrouter/google/gemma-4-31b-it:free', label: 'OpenRouter · Gemma 4 31B (manager default)', provider: 'openrouter', context_tokens: 128000 },
-  { id: 'openrouter/qwen/qwen3.8-27b:free', label: 'OpenRouter · Qwen 3.8 27B (coder)', provider: 'openrouter', context_tokens: 128000 },
-  { id: 'openrouter/cohere/north-mini-code:free', label: 'OpenRouter · Cohere North Mini Code', provider: 'openrouter', context_tokens: 32000 },
-  { id: 'openrouter/nvidia/nemotron-3.5-lightning:free', label: 'OpenRouter · Nemotron 3.5 Lightning', provider: 'openrouter', context_tokens: 128000 },
-  { id: 'groq/openai/gpt-oss-120b', label: 'Groq · GPT-OSS 120B', provider: 'groq', context_tokens: 8000 },
-  { id: 'groq/qwen/qwen3.8-27b', label: 'Groq · Qwen 3.8 27B', provider: 'groq', context_tokens: 8000 },
-  { id: 'groq/openai/gpt-oss-20b', label: 'Groq · GPT-OSS 20B (fast)', provider: 'groq', context_tokens: 8000 },
-  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'NVIDIA NIM · Nemotron 70B', provider: 'nvidia', context_tokens: 128000 },
-  { id: 'nvidia/mistralai/codestral-22b-instruct-v0.1', label: 'NVIDIA NIM · Codestral 22B', provider: 'nvidia', context_tokens: 32000 },
-  { id: 'nvidia/deepseek-ai/deepseek-v4.1-flash', label: 'NVIDIA NIM · DeepSeek V4.1 Flash', provider: 'nvidia', context_tokens: 128000 },
-  { id: 'go/deepseek-v4-flash', label: 'OpenCode Go · DeepSeek V4 Flash', provider: 'go', context_tokens: 128000 },
-  { id: 'go/glm-5.3-flash', label: 'OpenCode Go · GLM 5.3 Flash', provider: 'go', context_tokens: 128000 },
 ];
 export const modelContext = (id: string) => MODELS.find((m) => id.endsWith(m.id) || m.id.endsWith(id))?.context_tokens ?? 32768;
 
 export const DAG_NODES = [
-  { id: 'T1', parent_id: 'M0', description: 'Survey the open-weight coding model landscape', owner_role: 'research', assigned_agent: 'W1', status: 'ready', priority: 2, depends_on: [], attempts: 0, progress_pct: 0, est_effort_s: 1800 },
+  { id: 'T1', parent_id: 'M0', description: 'Verify the 0G model integration and routing', owner_role: 'research', assigned_agent: 'W1', status: 'ready', priority: 2, depends_on: [], attempts: 0, progress_pct: 0, est_effort_s: 1800 },
 ];
 export const DAG_EDGES: { from: string; to: string }[] = [];
 
-export const REPORT_MD = `# Open-Weight Coding Models: Comparison & Benchmark CLI
+export const REPORT_MD = `# 0G Model Integration
 
 ## Summary
-We compared the three strongest open-weight coding model families — **Qwen2.5-Coder-32B**, **DeepSeek-Coder-V2-Lite (16B)**, and **StarCoder2-15B** — on HumanEval, MBPP, and a fresh 40-prompt internal suite, then shipped a tiny CLI (\`bench\`) that runs any of them through a standard harness.
+AUTONEX routes planning, coding, QA, and swarm requests through the 0G Private Computer Router.
 
 ## Findings
-- **Qwen2.5-Coder-32B** leads on HumanEval (86.9% pass@1) and long-context refactor tasks. Apache-2.0 license, 32k context.
-- **DeepSeek-Coder-V2-Lite** is the best quality-per-GB: 81.2% HumanEval at 16B active parameters, MIT license.
-- **StarCoder2-15B** trails on multilingual tasks (65.1%) but is the fastest at batch inference and has the most permissive training-data transparency.
-
-## The CLI
-\`bench --model qwen2.5-coder-32b --suite humaneval,mbpp\` produces a JSON + Markdown scorecard with tokens/s, cost proxy, and pass@1/pass@5. The harness pins prompts, seeds, and stop tokens for reproducibility.
+Each role selects from the supported 0G model catalogue, and all retries remain within that catalogue.
 
 ## Recommendation
-Default to **Qwen2.5-Coder-32B** where VRAM allows; use **DeepSeek-Coder-V2-Lite** on single-GPU boxes; keep **StarCoder2** for high-throughput batch labeling.
+Configure a 0G API key and choose an approved 0G model for each task role.
 `;
 
 export const SOLO_REPORT_MD = `# Quick draft
 
 Here is a short, self-contained draft written directly by the manager — no team was needed for a single-output task.
 
-> AUTONEX runs a terminal-first coding agent on free open-weight models, with a permission-gated sandbox, staged context discipline, and one-command rollback.
+> AUTONEX runs a terminal-first coding agent on 0G Private Computer models, with a permission-gated sandbox, staged context discipline, and one-command rollback.
 `;
 
 export const SOURCES = [
-  { title: 'Qwen2.5-Coder technical report', url: 'https://qwenlm.github.io/blog/qwen2.5-coder/', verified: true },
-  { title: 'DeepSeek-Coder-V2 repository', url: 'https://github.com/deepseek-ai/DeepSeek-Coder-V2', verified: true },
-  { title: 'StarCoder2 paper (arXiv:2402.19173)', url: 'https://arxiv.org/abs/2402.19173', verified: true },
-  { title: 'HumanEval benchmark suite', url: 'https://github.com/openai/human-eval', verified: true },
-  { title: 'Community inference throughput notes', url: 'https://example.com/community-notes', verified: false },
+  { title: '0G Private Computer Router', url: 'https://router-api.0g.ai/v1/models', verified: true },
 ];

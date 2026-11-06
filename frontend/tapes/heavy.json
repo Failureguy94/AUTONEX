@@ -1,5 +1,5 @@
 {
- "goal": "Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one",
+ "goal": "Research 0G Private Computer models and build a small routing verifier",
  "events": [
   {
    "seq": 1,
@@ -8,7 +8,7 @@
    "ts_sim": "09:00",
    "type": "task.created",
    "payload": {
-    "goal": "Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one"
+    "goal": "Research 0G Private Computer models and build a small routing verifier"
    }
   },
   {
@@ -22,7 +22,7 @@
     "intensity": "heavy",
     "est_effort_s": 15000,
     "est_workers": 8,
-    "rationale": "Multi-team code project — hiring a full team, this will take a workday.",
+    "rationale": "Multi-team code project \u2014 hiring a full team, this will take a workday.",
     "break_policy": {
      "coffee": "on_stage2",
      "meals": true,
@@ -35,8 +35,8 @@
       "name": "Research",
       "bay": "NW",
       "capability": "SearXNG-grounded gathering",
-      "lead_model": "openrouter/google/gemma-4-31b-it:free",
-      "worker_model": "openrouter/google/gemma-4-31b-it:free",
+      "lead_model": "0g/glm-5.3-flash",
+      "worker_model": "0g/deepseek-v4.1-flash",
       "est_workers": 2,
       "hue": 58
      },
@@ -45,8 +45,8 @@
       "name": "Data & Evals",
       "bay": "SW",
       "capability": "benchmarks, metrics, validation",
-      "lead_model": "openrouter/nvidia/nemotron-3.5-lightning:free",
-      "worker_model": "openrouter/nvidia/nemotron-3.5-lightning:free",
+      "lead_model": "0g/glm-5.3-flash",
+      "worker_model": "0g/qwen-flash",
       "est_workers": 2,
       "hue": 262
      },
@@ -55,8 +55,8 @@
       "name": "Backend",
       "bay": "NE",
       "capability": "APIs, services, CLI, core logic",
-      "lead_model": "openrouter/qwen/qwen3.8-27b:free",
-      "worker_model": "nvidia/deepseek-ai/deepseek-v4.1-flash",
+      "lead_model": "0g/glm-5.3-flash",
+      "worker_model": "0g/qwen3-coder-flash",
       "est_workers": 2,
       "hue": 150
      },
@@ -65,8 +65,8 @@
       "name": "Content & Docs",
       "bay": "SE",
       "capability": "synthesis, README, report",
-      "lead_model": "go/glm-5.3-flash",
-      "worker_model": "go/glm-5.3-flash",
+      "lead_model": "0g/glm-5.3-flash",
+      "worker_model": "0g/qwen-flash",
       "est_workers": 2,
       "hue": 20
      }
@@ -99,7 +99,7 @@
      "parent_id": null,
      "engine": {
       "kind": "llm",
-      "label": "llm:gemma-4-31b-it (manager)"
+      "label": "0G \u00b7 glm-5.3-flash (manager)"
      },
      "avatar_seed": 1,
      "chairId": "execChair_198",
@@ -126,7 +126,7 @@
      {
       "id": "T1",
       "parent_id": "M0",
-      "description": "Survey the landscape and gather inputs",
+      "description": "Architecture & spec for Research 0G Private Compute..",
       "owner_role": "research",
       "assigned_agent": "W_research_0",
       "status": "pending",
@@ -139,7 +139,7 @@
      {
       "id": "T2",
       "parent_id": null,
-      "description": "Deep-dive component A",
+      "description": "Configure environment for Research 0G Private Compute..",
       "owner_role": "research",
       "assigned_agent": "W_research_1",
       "status": "pending",
@@ -154,7 +154,7 @@
      {
       "id": "T3",
       "parent_id": null,
-      "description": "Deep-dive component B",
+      "description": "Implement core logic for Research 0G Private Compute..",
       "owner_role": "data",
       "assigned_agent": "W_data_0",
       "status": "pending",
@@ -169,7 +169,7 @@
      {
       "id": "T4",
       "parent_id": null,
-      "description": "Design the architecture",
+      "description": "Build primary component for Research 0G Private Compute..",
       "owner_role": "data",
       "assigned_agent": "W_data_1",
       "status": "pending",
@@ -184,7 +184,7 @@
      {
       "id": "T5",
       "parent_id": null,
-      "description": "Implement the core module",
+      "description": "Wire APIs & integration handlers",
       "owner_role": "backend",
       "assigned_agent": "W_backend_0",
       "status": "pending",
@@ -199,7 +199,7 @@
      {
       "id": "T6",
       "parent_id": null,
-      "description": "Implement the supporting module",
+      "description": "Write unit tests & assertions",
       "owner_role": "backend",
       "assigned_agent": "W_backend_1",
       "status": "pending",
@@ -214,7 +214,7 @@
      {
       "id": "T7",
       "parent_id": null,
-      "description": "Wire integration and tests",
+      "description": "Security audit & error handling",
       "owner_role": "content",
       "assigned_agent": "W_content_0",
       "status": "pending",
@@ -229,7 +229,7 @@
      {
       "id": "T8",
       "parent_id": null,
-      "description": "Collect metrics and validate",
+      "description": "Performance tuning & caching",
       "owner_role": "content",
       "assigned_agent": "W_content_1",
       "status": "pending",
@@ -244,7 +244,7 @@
      {
       "id": "T9",
       "parent_id": null,
-      "description": "Draft the report",
+      "description": "Compile technical documentation",
       "owner_role": "research",
       "assigned_agent": "W_research_0",
       "status": "pending",
@@ -259,7 +259,7 @@
      {
       "id": "T10",
       "parent_id": null,
-      "description": "Write the usage guide",
+      "description": "Lead code review & verification",
       "owner_role": "research",
       "assigned_agent": "W_research_1",
       "status": "pending",
@@ -362,7 +362,7 @@
      "parent_id": "M0",
      "engine": {
       "kind": "llm",
-      "label": "llm:gemma-4-31b-it:free"
+      "label": "llm:glm-5.3-flash"
      },
      "avatar_seed": 10,
      "chairId": "wchair_38",
@@ -394,7 +394,7 @@
      "parent_id": "L_research",
      "engine": {
       "kind": "tool",
-      "label": "llm:gemma-4-31b-it:free"
+      "label": "llm:deepseek-v4.1-flash"
      },
      "avatar_seed": 11,
      "chairId": "wchair_1",
@@ -426,7 +426,7 @@
      "parent_id": "L_research",
      "engine": {
       "kind": "tool",
-      "label": "llm:gemma-4-31b-it:free"
+      "label": "llm:deepseek-v4.1-flash"
      },
      "avatar_seed": 12,
      "chairId": "wchair_4",
@@ -458,7 +458,7 @@
      "parent_id": "M0",
      "engine": {
       "kind": "llm",
-      "label": "llm:nemotron-3.5-lightning:free"
+      "label": "llm:glm-5.3-flash"
      },
      "avatar_seed": 13,
      "chairId": "wchair_138",
@@ -490,7 +490,7 @@
      "parent_id": "L_data",
      "engine": {
       "kind": "tool",
-      "label": "llm:nemotron-3.5-lightning:free"
+      "label": "llm:qwen-flash"
      },
      "avatar_seed": 14,
      "chairId": "wchair_101",
@@ -522,7 +522,7 @@
      "parent_id": "L_data",
      "engine": {
       "kind": "tool",
-      "label": "llm:nemotron-3.5-lightning:free"
+      "label": "llm:qwen-flash"
      },
      "avatar_seed": 15,
      "chairId": "wchair_104",
@@ -554,7 +554,7 @@
      "parent_id": "M0",
      "engine": {
       "kind": "llm",
-      "label": "llm:qwen3.8-27b:free"
+      "label": "llm:glm-5.3-flash"
      },
      "avatar_seed": 16,
      "chairId": "wchair_90",
@@ -586,7 +586,7 @@
      "parent_id": "L_backend",
      "engine": {
       "kind": "code",
-      "label": "code:deepseek-v4.1-flash"
+      "label": "code:qwen3-coder-flash"
      },
      "avatar_seed": 17,
      "chairId": "wchair_49",
@@ -618,7 +618,7 @@
      "parent_id": "L_backend",
      "engine": {
       "kind": "code",
-      "label": "code:deepseek-v4.1-flash"
+      "label": "code:qwen3-coder-flash"
      },
      "avatar_seed": 18,
      "chairId": "wchair_52",
@@ -682,7 +682,7 @@
      "parent_id": "L_content",
      "engine": {
       "kind": "llm",
-      "label": "llm:glm-5.3-flash"
+      "label": "llm:qwen-flash"
      },
      "avatar_seed": 20,
      "chairId": "wchair_149",
@@ -714,7 +714,7 @@
      "parent_id": "L_content",
      "engine": {
       "kind": "llm",
-      "label": "llm:glm-5.3-flash"
+      "label": "llm:qwen-flash"
      },
      "avatar_seed": 21,
      "chairId": "wchair_152",
@@ -741,7 +741,7 @@
     "from_agent_id": "M0",
     "to_agent_id": "L_research",
     "kind": "task",
-    "preview": "Plan is on the whiteboard — take your branch."
+    "preview": "Plan is on the whiteboard \u2014 take your branch."
    }
   },
   {
@@ -755,7 +755,7 @@
     "from_agent_id": "M0",
     "to_agent_id": "L_data",
     "kind": "task",
-    "preview": "Plan is on the whiteboard — take your branch."
+    "preview": "Plan is on the whiteboard \u2014 take your branch."
    }
   },
   {
@@ -769,7 +769,7 @@
     "from_agent_id": "M0",
     "to_agent_id": "L_backend",
     "kind": "task",
-    "preview": "Plan is on the whiteboard — take your branch."
+    "preview": "Plan is on the whiteboard \u2014 take your branch."
    }
   },
   {
@@ -783,7 +783,7 @@
     "from_agent_id": "M0",
     "to_agent_id": "L_content",
     "kind": "task",
-    "preview": "Plan is on the whiteboard — take your branch."
+    "preview": "Plan is on the whiteboard \u2014 take your branch."
    }
   },
   {
@@ -850,7 +850,7 @@
    "payload": {
     "call_id": "c_T1",
     "agent_id": "W_research_0",
-    "model": "openrouter/google/gemma-4-31b-it:free",
+    "model": "0g/deepseek-v4.1-flash",
     "role": "worker"
    }
   },
@@ -983,8 +983,8 @@
    "payload": {
     "agent_id": "W_research_0",
     "energy": 75,
-    "context_tokens": 32000,
-    "context_max": 128000,
+    "context_tokens": 360448,
+    "context_max": 1441792,
     "pending": 1,
     "done": 0,
     "failed": 0
@@ -1040,7 +1040,7 @@
    "payload": {
     "call_id": "c_T2",
     "agent_id": "W_research_1",
-    "model": "openrouter/google/gemma-4-31b-it:free",
+    "model": "0g/deepseek-v4.1-flash",
     "role": "worker"
    }
   },
@@ -1173,8 +1173,8 @@
    "payload": {
     "agent_id": "W_research_1",
     "energy": 66,
-    "context_tokens": 43520,
-    "context_max": 128000,
+    "context_tokens": 490209,
+    "context_max": 1441792,
     "pending": 1,
     "done": 1,
     "failed": 0
@@ -1230,7 +1230,7 @@
    "payload": {
     "call_id": "c_T3",
     "agent_id": "W_data_0",
-    "model": "openrouter/nvidia/nemotron-3.5-lightning:free",
+    "model": "0g/qwen-flash",
     "role": "worker"
    }
   },
@@ -1363,8 +1363,8 @@
    "payload": {
     "agent_id": "W_data_0",
     "energy": 57,
-    "context_tokens": 55040,
-    "context_max": 128000,
+    "context_tokens": 430000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 2,
     "failed": 0
@@ -1381,7 +1381,7 @@
     "agent_id": "W_data_0",
     "with_agent_id": "W_data_1",
     "duration_ms": 5500,
-    "line": "Handing over T3 — watch the citation format."
+    "line": "Handing over T3 \u2014 watch the citation format."
    }
   },
   {
@@ -1449,7 +1449,7 @@
    "task_id": "T4",
    "payload": {
     "task_id": "T4",
-    "reason": "context overflow — switching model",
+    "reason": "context overflow \u2014 switching model",
     "attempt": 1,
     "will_retry": false
    }
@@ -1478,7 +1478,7 @@
    "task_id": "T4",
    "payload": {
     "task_id": "T4",
-    "reason": "Reassigned — summarize sources first"
+    "reason": "Reassigned \u2014 summarize sources first"
    }
   },
   {
@@ -1530,7 +1530,7 @@
    "payload": {
     "call_id": "c_T4",
     "agent_id": "W_data_0",
-    "model": "openrouter/nvidia/nemotron-3.5-lightning:free",
+    "model": "0g/qwen-flash",
     "role": "worker"
    }
   },
@@ -1663,8 +1663,8 @@
    "payload": {
     "agent_id": "W_data_0",
     "energy": 48,
-    "context_tokens": 66560,
-    "context_max": 128000,
+    "context_tokens": 520000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 3,
     "failed": 1
@@ -1736,7 +1736,7 @@
    "payload": {
     "call_id": "c_T5",
     "agent_id": "W_backend_0",
-    "model": "nvidia/deepseek-ai/deepseek-v4.1-flash",
+    "model": "0g/qwen3-coder-flash",
     "role": "worker"
    }
   },
@@ -1931,8 +1931,8 @@
    "payload": {
     "agent_id": "W_backend_0",
     "energy": 39,
-    "context_tokens": 78080,
-    "context_max": 128000,
+    "context_tokens": 610000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 4,
     "failed": 0
@@ -1999,7 +1999,7 @@
     "agent_id": "W_backend_0",
     "with_agent_id": "W_backend_1",
     "duration_ms": 6200,
-    "line": "Handing over T5 — watch the citation format."
+    "line": "Handing over T5 \u2014 watch the citation format."
    }
   },
   {
@@ -2067,7 +2067,7 @@
    "payload": {
     "call_id": "c_T6",
     "agent_id": "W_backend_1",
-    "model": "nvidia/deepseek-ai/deepseek-v4.1-flash",
+    "model": "0g/qwen3-coder-flash",
     "role": "worker"
    }
   },
@@ -2289,8 +2289,8 @@
    "payload": {
     "agent_id": "W_backend_1",
     "energy": 30,
-    "context_tokens": 89600,
-    "context_max": 128000,
+    "context_tokens": 700000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 5,
     "failed": 0
@@ -2410,7 +2410,7 @@
    "payload": {
     "call_id": "c_T7",
     "agent_id": "W_content_0",
-    "model": "go/glm-5.3-flash",
+    "model": "0g/qwen-flash",
     "role": "worker"
    }
   },
@@ -2569,8 +2569,8 @@
    "payload": {
     "agent_id": "W_content_0",
     "energy": 21,
-    "context_tokens": 101120,
-    "context_max": 128000,
+    "context_tokens": 790000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 6,
     "failed": 0
@@ -2637,7 +2637,7 @@
     "agent_id": "W_content_0",
     "with_agent_id": "W_content_1",
     "duration_ms": 6900,
-    "line": "Handing over T7 — watch the citation format."
+    "line": "Handing over T7 \u2014 watch the citation format."
    }
   },
   {
@@ -2705,7 +2705,7 @@
    "payload": {
     "call_id": "c_T8",
     "agent_id": "W_content_1",
-    "model": "go/glm-5.3-flash",
+    "model": "0g/qwen-flash",
     "role": "worker"
    }
   },
@@ -2838,8 +2838,8 @@
    "payload": {
     "agent_id": "W_content_1",
     "energy": 12,
-    "context_tokens": 112640,
-    "context_max": 128000,
+    "context_tokens": 880000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 7,
     "failed": 0
@@ -2945,7 +2945,7 @@
    "payload": {
     "call_id": "c_T9",
     "agent_id": "W_research_0",
-    "model": "openrouter/google/gemma-4-31b-it:free",
+    "model": "0g/deepseek-v4.1-flash",
     "role": "worker"
    }
   },
@@ -3078,8 +3078,8 @@
    "payload": {
     "agent_id": "W_research_0",
     "energy": 10,
-    "context_tokens": 115200,
-    "context_max": 128000,
+    "context_tokens": 1297613,
+    "context_max": 1441792,
     "pending": 1,
     "done": 8,
     "failed": 0
@@ -3146,7 +3146,7 @@
     "agent_id": "W_research_0",
     "with_agent_id": "W_research_1",
     "duration_ms": 5500,
-    "line": "Handing over T9 — watch the citation format."
+    "line": "Handing over T9 \u2014 watch the citation format."
    }
   },
   {
@@ -3214,7 +3214,7 @@
    "payload": {
     "call_id": "c_T10",
     "agent_id": "W_research_1",
-    "model": "openrouter/google/gemma-4-31b-it:free",
+    "model": "0g/deepseek-v4.1-flash",
     "role": "worker"
    }
   },
@@ -3347,8 +3347,8 @@
    "payload": {
     "agent_id": "W_research_1",
     "energy": 10,
-    "context_tokens": 115200,
-    "context_max": 128000,
+    "context_tokens": 1297613,
+    "context_max": 1441792,
     "pending": 1,
     "done": 9,
     "failed": 0
@@ -3773,7 +3773,7 @@
     "id": "note_review",
     "author_agent_id": "M0",
     "topic": "review",
-    "note": "Review done — structure approved, proceed to synthesis.",
+    "note": "Review done \u2014 structure approved, proceed to synthesis.",
     "ts": "--:--"
    }
   },
@@ -3784,32 +3784,12 @@
    "ts_sim": "10:59",
    "type": "result.final",
    "payload": {
-    "report_markdown": "# Open-Weight Coding Models: Comparison & Benchmark CLI\n\n## Summary\nWe compared the three strongest open-weight coding model families — **Qwen2.5-Coder-32B**, **DeepSeek-Coder-V2-Lite (16B)**, and **StarCoder2-15B** — on HumanEval, MBPP, and a fresh 40-prompt internal suite, then shipped a tiny CLI (`bench`) that runs any of them through a standard harness.\n\n## Findings\n- **Qwen2.5-Coder-32B** leads on HumanEval (86.9% pass@1) and long-context refactor tasks. Apache-2.0 license, 32k context.\n- **DeepSeek-Coder-V2-Lite** is the best quality-per-GB: 81.2% HumanEval at 16B active parameters, MIT license.\n- **StarCoder2-15B** trails on multilingual tasks (65.1%) but is the fastest at batch inference and has the most permissive training-data transparency.\n\n## The CLI\n`bench --model qwen2.5-coder-32b --suite humaneval,mbpp` produces a JSON + Markdown scorecard with tokens/s, cost proxy, and pass@1/pass@5. The harness pins prompts, seeds, and stop tokens for reproducibility.\n\n## Recommendation\nDefault to **Qwen2.5-Coder-32B** where VRAM allows; use **DeepSeek-Coder-V2-Lite** on single-GPU boxes; keep **StarCoder2** for high-throughput batch labeling.\n",
+    "report_markdown": "# Project Report: Research 0G Private Computer models and build a small routing verifier\n\n## Executive Summary\nThe engineering team assembled and successfully completed the user objective:\n> **\"Research 0G Private Computer models and build a small routing verifier\"**\n\nAll deliverables have been synthesized, peer-reviewed by department leads, and validated through automated test gates.\n\n## Key Delivered Milestones\n- **T1: Architecture & spec for Research 0G Private Compute..** (Assigned: W_research_0, Status: DONE)\n- **T2: Configure environment for Research 0G Private Compute..** (Assigned: W_research_1, Status: DONE)\n- **T3: Implement core logic for Research 0G Private Compute..** (Assigned: W_data_0, Status: DONE)\n- **T4: Build primary component for Research 0G Private Compute..** (Assigned: W_data_1, Status: DONE)\n- **T5: Wire APIs & integration handlers** (Assigned: W_backend_0, Status: DONE)\n- **T6: Write unit tests & assertions** (Assigned: W_backend_1, Status: DONE)\n- **T7: Security audit & error handling** (Assigned: W_content_0, Status: DONE)\n- **T8: Performance tuning & caching** (Assigned: W_content_1, Status: DONE)\n- **T9: Compile technical documentation** (Assigned: W_research_0, Status: DONE)\n- **T10: Lead code review & verification** (Assigned: W_research_1, Status: DONE)\n\n## Architecture & Code Quality\n- **Specification:** Implementation meets all user constraints without scope creep.\n- **Validation:** Type-checks and unit tests executed with 100% passing assertions.\n- **Handoff:** Lead approved the pull requests and merged all worktrees into the main branch.\n\n## Status\nReady for deployment and execution.\n",
     "sources": [
      {
-      "title": "Qwen2.5-Coder technical report",
-      "url": "https://qwenlm.github.io/blog/qwen2.5-coder/",
+      "title": "0G Private Computer Router",
+      "url": "https://router-api.0g.ai/v1/models",
       "verified": true
-     },
-     {
-      "title": "DeepSeek-Coder-V2 repository",
-      "url": "https://github.com/deepseek-ai/DeepSeek-Coder-V2",
-      "verified": true
-     },
-     {
-      "title": "StarCoder2 paper (arXiv:2402.19173)",
-      "url": "https://arxiv.org/abs/2402.19173",
-      "verified": true
-     },
-     {
-      "title": "HumanEval benchmark suite",
-      "url": "https://github.com/openai/human-eval",
-      "verified": true
-     },
-     {
-      "title": "Community inference throughput notes",
-      "url": "https://example.com/community-notes",
-      "verified": false
      }
     ],
     "effort_logical_s": 15000,

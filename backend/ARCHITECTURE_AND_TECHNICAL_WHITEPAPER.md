@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-**AUTONEX** is a production-grade autonomous coding and multi-agent engineering platform engineered from first principles to replicate the capabilities, safety sandboxing, context discipline, and diff visibility of advanced agentic systems on personal hardware and distributed multi-agent floors with **zero operational cost**.
+**AUTONEX** is an autonomous coding and multi-agent engineering platform engineered from first principles to replicate the capabilities, safety sandboxing, context discipline, and diff visibility of advanced agentic systems on personal hardware and distributed multi-agent floors.
 
 Commercial AI coding assistants frequently suffer from four critical architectural deficiencies:
 1. **Opaque Execution & Data Insecurity:** Code and system credentials are broadcast to third-party proprietary services without transparent egress control.
@@ -20,7 +20,7 @@ Commercial AI coding assistants frequently suffer from four critical architectur
 4. **Heavyweight Virtualization Overhead:** Standard containerized agents require 4 GB to 8 GB of host RAM, making them unusable on standard developer PCs.
 
 AUTONEX resolves these challenges through a dual-engine architecture:
-- **A Multi-Provider Open-Source LLM Mesh:** Accessing 24 frontier open-weight models (Groq LPU, NVIDIA NIM, OpenRouter Free Tier, OpenCode Go) with zero subscriptions.
+- **0G Private Computer Inference:** A single hosted model provider, with all role-specific model selection and fallbacks confined to its catalogue.
 - **A 5-Tier Context Discipline System:** Implementing staged observation masking, output truncation, prompt cache prefix stabilization, and externalized notes.
 - **Granular Least-Privilege Policy Enforcement:** Spliced permission trees enforcing non-bypassable denials for high-consequence operations.
 - **Dual Runtime Engines:** A hardened, cap-dropped Docker sandbox alongside a lightning-fast **Native Mode** consuming just **~80 MB of RAM** with sub-second launch times.
@@ -51,11 +51,11 @@ AUTONEX resolves these challenges through a dual-engine architecture:
                                         │
                                         ▼
              ┌─────────────────────────────────────────────────────────┐
-             │       Multi-Provider Free Open-Source Model Mesh        │
-             │   • Groq LPU (GPT-OSS 120B, Qwen 3.8 27B, GPT-OSS 20B)  │
-             │   • OpenRouter Free (Qwen 3.8 27B, Gemma 4 31B, Cohere) │
-             │   • NVIDIA NIM (Nemotron 70B, Codestral, DeepSeek V4)   │
-             │   • OpenCode Go (DeepSeek V4 Flash, GLM 5.3 Flash)      │
+             │              0G Private Computer Models                 │
+             │   • GLM 5.3 Flash (planning and synthesis)              │
+             │   • Qwen 3 Coder Flash (engineering)                    │
+             │   • Kimi K2.7 Code (verification and QA)                │
+             │   • DeepSeek V4.1 Flash / Qwen Flash (fallbacks)         │
              └─────────────────────────────────────────────────────────┘
 ```
 
@@ -112,42 +112,31 @@ For untrusted repositories or strict isolation requirements, AUTONEX orchestrate
 
 ---
 
-## 4. Multi-Provider Open-Source Model Mesh
+## 4. 0G Private Computer Model Catalogue
 
-AUTONEX abstracts diverse inference providers into a unified schema defined in `profiles/base.json`. Every model is accessible via the `--model <provider/id>` CLI parameter or ergonomic shorthands.
+AUTONEX uses only 0G Private Computer for hosted inference. Its supported model
+catalogue and the CLI's allowlisted model overrides are defined in
+`profiles/base.json`.
 
-### 4.1. Supported Provider Matrix (100% Free Tiers)
+### 4.1. Supported 0G Models
 
 ```
-+─────────────────+──────────────────────────────────────────+─────────────────+───────────────────────────────+
-| Provider        | Representative Models                    | Context Window  | Architectural Role            |
-+─────────────────+──────────────────────────────────────────+─────────────────+───────────────────────────────+
-| OpenRouter Free | • qwen/qwen3.8-27b:free                  | 128,000 tokens  | Default general coding engine |
-|                 | • google/gemma-4-31b-it:free             | 128,000 tokens  | Reasoning and multi-file plan |
-|                 | • cohere/north-mini-code:free            |  32,000 tokens  | Specialized code generation   |
-|                 | • nvidia/nemotron-3.5-lightning:free     | 128,000 tokens  | Rapid instruction following   |
-+─────────────────+──────────────────────────────────────────+─────────────────+───────────────────────────────+
-| Groq LPU        | • openai/gpt-oss-120b                    |   8,000 tokens  | Frontier 120B reasoning       |
-|                 | • qwen/qwen3.8-27b                       |   8,000 tokens  | High-speed logic operations   |
-|                 | • openai/gpt-oss-20b                     |   8,000 tokens  | Instant low-latency edits     |
-+─────────────────+──────────────────────────────────────────+─────────────────+───────────────────────────────+
-| NVIDIA NIM      | • nvidia/llama-3.1-nemotron-70b-instruct | 128,000 tokens  | TensorRT-LLM aligned coding   |
-|                 | • mistralai/codestral-22b-instruct-v0.1  |  32,000 tokens  | Deep codebase comprehension   |
-|                 | • deepseek-ai/deepseek-v4.1-flash        | 128,000 tokens  | High-throughput generation    |
-+─────────────────+──────────────────────────────────────────+─────────────────+───────────────────────────────+
-| OpenCode Go     | • deepseek-v4-flash                      | 128,000 tokens  | Zero-retention coding model   |
-|                 | • glm-5.3-flash                          | 128,000 tokens  | Rapid code transformation     |
-+─────────────────+──────────────────────────────────────────+─────────────────+───────────────────────────────+
+0G model ID                    Context       Role
+0g/glm-5.3-flash               1,179,648     Planning and synthesis
+0g/qwen3-coder-flash           1,000,000     Code generation
+0g/kimi-k2.7-code                 262,144     Verification and QA
+0g/deepseek-v4.1-flash         1,441,792     Reasoning and fallback
+0g/qwen3.7-flash               1,000,000     Fast swarm calls
+0g/qwen-flash                  1,000,000     Triage and voting
 ```
 
-### 4.2. Ergonomic Model Shorthand Resolution
-To streamline developer workflow, the launcher parses intuitive shorthands into fully-qualified model identifiers:
+### 4.2. 0G Model Shorthand Resolution
+The launcher resolves shorthand names only to configured 0G models:
 
 ```bash
-pag D:\Django assist --model coder       # Resolves to: openrouter/qwen/qwen3.8-27b:free
-pag D:\Django assist --model 120b        # Resolves to: groq/openai/gpt-oss-120b
-pag D:\Django assist --model nvidia      # Resolves to: nvidia/llama-3.1-nemotron-70b-instruct
-pag D:\Django assist --model fast        # Resolves to: groq/openai/gpt-oss-20b
+pag D:\Django assist --model coder       # Resolves to: 0g/qwen3-coder-flash
+pag D:\Django assist --model reasoning   # Resolves to: 0g/deepseek-v4.1-flash
+pag D:\Django assist --model fast        # Resolves to: 0g/qwen-flash
 ```
 
 ---

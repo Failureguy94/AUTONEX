@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useBalance, useSwitchChain } from 'wagmi';
 import { formatEther } from 'viem';
-import { rabdiChain } from '@/config/chain';
+import { rabdiChain, switchOrAddRabdiNetwork } from '@/config/chain';
 import { RABDI_EXPLORER_URL, RABDI_FAUCET_URL } from '@/services/arkiv/balance';
 
 export function ConnectWalletButton() {
@@ -17,7 +17,9 @@ export function ConnectWalletButton() {
     chainId: rabdiChain.id,
   });
 
-  const isWrongNetwork = isConnected && chainId !== rabdiChain.id;
+  // Only flag wrong network when chainId is known (not undefined) AND differs from Rabdi DB-Chain.
+  // chainId is undefined while wagmi is resolving the active chain — guard against false positives.
+  const isWrongNetwork = isConnected && chainId !== undefined && chainId !== rabdiChain.id;
 
   const shortAddr = address
     ? `${address.slice(0, 5)}...${address.slice(-4)}`
@@ -58,7 +60,17 @@ export function ConnectWalletButton() {
   if (isWrongNetwork) {
     return (
       <button
-        onClick={() => switchChain({ chainId: rabdiChain.id })}
+        onClick={async () => {
+          try {
+            if (switchChain) {
+              switchChain({ chainId: rabdiChain.id });
+            } else {
+              await switchOrAddRabdiNetwork();
+            }
+          } catch {
+            await switchOrAddRabdiNetwork();
+          }
+        }}
         disabled={isSwitching}
         className="rounded-lg border border-red-400 bg-red-50 px-2 py-1 text-[10.5px] font-mono text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
         title="Switch to Rabdi DB-Chain Testnet (Chain ID 7794095)"

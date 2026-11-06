@@ -13,7 +13,7 @@ def test_estimator_deliberative_protocol_exact_formulas():
     # N=40: base 130, planned 150, tokens ~380k
     # N=50: base 161, planned 185, tokens ~460k
     cmap = CapacityMap()
-    cmap.add_bucket(CapacityBucket("groq", "gpt-oss", "g1", rpm=30, tpm=10000, tpd_remaining=2000000))
+    cmap.add_bucket(CapacityBucket("zg_compute", "0g/glm-5.3-flash", "g1", rpm=30, tpm=10000, tpd_remaining=2000000))
 
     est10 = RunEstimator.calculate_estimate(10, "deliberative", capacity_map=cmap)
     assert est10.planned_calls == 43
@@ -48,7 +48,7 @@ def test_estimator_build_task_adds_cells_calls():
 def test_admission_controller_fits_and_does_not_fit():
     cmap = CapacityMap()
     # Generous capacity
-    cmap.add_bucket(CapacityBucket("groq", "m1", "g1", rpm=60, tpm=50000, tpd_remaining=10_000_000))
+    cmap.add_bucket(CapacityBucket("zg_compute", "0g/glm-5.3-flash", "g1", rpm=60, tpm=50000, tpd_remaining=10_000_000))
     admit = AdmissionController(cmap)
     res_fits = admit.evaluate(n=30)
     assert res_fits.verdict == "FITS"
@@ -56,7 +56,7 @@ def test_admission_controller_fits_and_does_not_fit():
 
     # Exhausted capacity
     cmap_tight = CapacityMap()
-    cmap_tight.add_bucket(CapacityBucket("groq", "m1", "g1", rpm=5, tpm=500, tpd_remaining=50_000))
+    cmap_tight.add_bucket(CapacityBucket("zg_compute", "0g/glm-5.3-flash", "g1", rpm=5, tpm=500, tpd_remaining=50_000))
     admit_tight = AdmissionController(cmap_tight)
     res_tight = admit_tight.evaluate(n=50)
     assert res_tight.verdict == "DOES_NOT_FIT"
@@ -65,8 +65,8 @@ def test_admission_controller_fits_and_does_not_fit():
 
 def test_admission_shared_quota_group_warning():
     cmap = CapacityMap()
-    cmap.add_bucket(CapacityBucket("groq", "m1", "shared_org_A", rpm=30, tpm=10000))
-    cmap.add_bucket(CapacityBucket("groq", "m2", "shared_org_A", rpm=30, tpm=10000))
+    cmap.add_bucket(CapacityBucket("zg_compute", "0g/glm-5.3-flash", "shared_org_A", rpm=30, tpm=10000))
+    cmap.add_bucket(CapacityBucket("zg_compute", "0g/deepseek-v4.1-flash", "shared_org_A", rpm=30, tpm=10000))
     admit = AdmissionController(cmap)
     res = admit.evaluate(n=10)
     assert any("shared_org_A" in w for w in res.warnings)

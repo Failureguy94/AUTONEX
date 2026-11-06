@@ -13,7 +13,7 @@ on top of AUTONEX and translates everything that really happens into the event c
                                            │            └──────────►  PROVIDER GATEWAY  ◄──────────┘           │
                                            └──────────────────────────────┬───────────────────────────────────┘
                                                                           ▼
-                                             groq · openrouter · nvidia · opencode-go  (keys live only here)
+                                             0G Private Computer Router  (ZG_API_KEY lives only in the Bridge/PAG proxy)
 ```
 
 **Non-goals:** do not fork or edit AUTONEX (`opencode`, `bin/pag*`, profiles, plugins other than adding one new plugin);
@@ -26,7 +26,7 @@ Python ≥ 3.11 · FastAPI + uvicorn · asyncio · httpx (streaming) · pydantic
 bridge/
   pyproject.toml
   config/                      providers.yaml · models.yaml · departments.yaml · triage.yaml   (templates provided)
-  .env.example                 GROQ_API_KEY= OPENROUTER_API_KEY= NVIDIA_API_KEY= GO_API_KEY=
+  .env.example                 ZG_API_KEY=
   autonex_bridge/
     main.py                    FastAPI app: REST + /ws/events + mounts the gateway router
     config.py                  load yaml + env; validate; hot-reload models.yaml

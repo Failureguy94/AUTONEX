@@ -42,11 +42,11 @@
 ## ⚡ Core Highlights
 
 - **Dual-Engine Workflows:** Switch between **AUTONEX Virtual Office** (manager + backend, frontend and QA engineers) and **Swarm Hall** (10, 20, 30, 40 or 50 agents at a grand oval conference table).
-- **Live LLM Execution:** In live mode, plans, proposals, critiques, votes and code deliverables are generated from your prompt through a multi-provider fallback chain (**DeepSeek-V3 / R1, Qwen-2.5-Coder, Llama-3.3-70B** via OpenRouter, DeepSeek direct, or Groq).
+- **Live LLM Execution:** Plans, proposals, critiques, votes and code deliverables use 0G Private Computer models exclusively, with role-specific fallbacks confined to the 0G model catalogue.
 - **Real Tool-Using Agents:** Agents read files and PDFs, write code to disk, run shell commands and execute tests, every action gated by a permission request.
-- **Visual Rate-Limit Backoff (Coffee Breaks):** On HTTP 429, the affected agent walks to the pantry, waits out the cooldown, and the bridge auto-switches to the next model in the chain.
+- **Visual Rate-Limit Backoff (Coffee Breaks):** On HTTP 429, the affected agent walks to the pantry, waits out the cooldown, and the bridge retries or switches to another configured 0G model.
 - **Human-in-the-Loop Safety:** Permission modals for `file.read`, `file.write` and `shell.exec` (approve once / always / reject), plus an instant **Emergency Stop** that broadcasts `system.halted`.
-- **Deep Reasoning Preservation:** 65-second request window so DeepSeek-R1 can finish its chain-of-thought before the response is cut.
+- **Long-Context Model Support:** 0G model context limits are used for routing and request budgeting.
 - **Replayable Event Stream:** Monotonic, seq-tracked WebSocket events with `since_seq` resume. Reconnects produce zero duplicate and zero missing events (tested).
 - **Exportable Reports:** Final report view with PDF export (jsPDF), project bundle download (JSZip), and one-click git merge / discard of the agent branch.
 
@@ -65,7 +65,7 @@
 | Swarm Hall live run | ✅ Done | Proposals, critiques, weighted Borda voting, agreement % and final synthesis all run on live LLM calls through the Python engine |
 | Provider Gateway (Python) | ✅ Done | Token bucket, TPM window, priority queue with aging, AIMD on 429, circuit breaker, fallback chain. 16 tests |
 | Swarm Engine (Python / FastAPI) | ✅ Done | Full 6-phase engine, real Borda tally, clustering, verification, supervisor, privacy firewall. 29 tests. Wired to live provider adapters |
-| Real provider HTTP adapters in the Python gateway | ✅ Done | OpenRouter, DeepSeek and Groq adapters run behind the gateway's rate limiter, breaker and fallback chain |
+| 0G model routing | ✅ Done | Role-specific 0G model catalogue and same-provider fallback chains |
 | AUTONEX / PAG terminal agent (`backend/`) | ✅ Done | Docker sandbox, `strict` / `assist` / `turbo` profiles, egress allowlist, eval harness |
 | Git merge / discard from the UI report | ✅ Done | Report buttons merge or discard the `agent/<timestamp>` branch |
 | 0G Private Computer & iAI Hub | ✅ Done | 0G model inference (GLM-5.3, Qwen-3, Kimi), on-chain iAI staking verification (1.271 cr/day), personal_sign ownership challenge |
@@ -162,7 +162,7 @@ npm run check
 ## 🤖 Honest AI Usage Disclosure
 
 In compliance with ETHGlobal hackathon rules:
-- **Autonomous Simulation Logic:** GravityDesk uses open-weight LLMs (DeepSeek-R1 / V3, Qwen-2.5-Coder-32B, Llama-3.3-70B via Groq/OpenRouter) to generate plans, code deliverables, and multi-agent swarm debates.
+- **Autonomous Simulation Logic:** GravityDesk uses 0G Private Computer models to generate plans, code deliverables, and multi-agent swarm debates.
 - **Development Assistance:** AI coding assistants (Google Antigravity / Claude) were used as pair-programming tools during development to assist with TypeScript boilerplate, Three.js shaders, and test creation.
 - **Architecture & Web3 Integration:** All schema designs (`autonex.*`), Arkiv SDK implementation, wallet authorization flows, and consensus verification logic were architected, tested, and validated by the team.
 
@@ -250,10 +250,10 @@ flowchart TB
         Gateway["Provider Gateway<br/>Rate limiter · Breaker · Fallback chain"]
     end
 
-    subgraph Models["Tier 3: Multi-Model Mesh"]
-        DS["DeepSeek-V3 / R1"]
-        Qwen["Qwen-2.5-Coder-32B"]
-        Groq["Groq Llama-3.3-70B"]
+    subgraph Models["Tier 3: 0G Model Catalogue"]
+        GLM["0G GLM 5.3 Flash"]
+        Qwen["0G Qwen 3 Coder Flash"]
+        Kimi["0G Kimi K2.7 Code"]
         Backoff["Backoff & Coffee Break Trigger"]
     end
 
@@ -309,7 +309,7 @@ sequenceDiagram
 
 Implemented in `bridge/autonex_bridge/gateway/` and covered by 16 tests:
 
-- Real HTTP adapters for OpenRouter, DeepSeek and Groq
+- 0G-only model catalogue and role-based fallback chains
 - Token-bucket limiter with safety margin and a sliding **TPM window**
 - Priority queue with **aging** (no starvation), per-lane and global concurrency caps
 - `429` / `Retry-After` handling with **AIMD** backoff
@@ -324,7 +324,7 @@ Implemented in `bridge/autonex_bridge/gateway/` and covered by 16 tests:
 
 ### 1. Prerequisites
 - **Node.js** 20+ & **npm** 10+
-- *(Optional, for live mode)* an API key for OpenRouter, DeepSeek or Groq
+- *(Required, for live mode)* a 0G Private Computer API key (`ZG_API_KEY`)
 - *(Optional, for the Python swarm engine)* Python 3.11+
 
 ### 2. Setup
@@ -374,7 +374,7 @@ cd bridge
 pip install -e ".[dev]"
 uvicorn autonex_bridge.main:app --port 8001
 ```
-Exposes `/api/swarm/estimate`, `/api/swarm/{run_id}/admission`, `/consent`, `/steer`, `/board`, `/egress`, `/phase`, `/ideas`, `/api/providers/health` and `/ws/events`. Provider keys are read from the same `.env`.
+Exposes `/api/swarm/estimate`, `/api/swarm/{run_id}/admission`, `/consent`, `/steer`, `/board`, `/egress`, `/phase`, `/ideas`, `/api/providers/health` and `/ws/events`. The 0G API key is read from the same `.env`.
 
 ### 6. Run the AUTONEX Terminal Agent
 ```bash
@@ -444,7 +444,7 @@ python -m pytest -q
 |---|---|
 | `frontend/src/` | 3D office, swarm hall, UI panels, state store, A* navigation, simulator |
 | `frontend/tools/mock-bridge/` | Node/TS live bridge: REST + WS server, agent loop, real runner, swarm runner |
-| `bridge/autonex_bridge/gateway/` | Provider Gateway (provider adapters, rate limiting, breaker, routing) |
+| `bridge/autonex_bridge/gateway/` | 0G model gateway core (rate limiting, breaker, routing) |
 | `bridge/autonex_bridge/swarm/` | Phase engine, tally, clustering, verification, supervisor, privacy, store |
 | `bridge/config/` | `providers`, `models`, `departments`, `triage`, `swarm`, `personas` YAML |
 | `backend/` | AUTONEX / PAG terminal agent: Docker, profiles, plugins, evals |

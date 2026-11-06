@@ -23,11 +23,11 @@ Run: `npm run check` (frontend, 25 tests) · `cd bridge && python -m pytest -q` 
 | T3 | Sprint wall-clock ≤ 2× the LLM call time; no break events in the tape (assert on the tape) | ✅ tape part · ⬜ timing |
 | T4 | Heavy run at 50 % DAG → lunch for teams > 2; standard run → none | ✅ `triage.test.ts` |
 | T5 | Changing the company color mid-run re-tints active departments (shirts/carpet/signage) | 🟡 code path done (`departments.ts` subscribes to accent) · visual unverified |
-| T6 | Groq-backed workers show an 8k context meter; manager shows 128k | ✅ mock tape carries per-model `context_max` · ⬜ real |
-| T7 | Provider quota exhaustion → traffic shifts to other providers; workers visibly re-route; no `run.error` | ⬜ (Gateway chain ✅ tested) |
+| T6 | 0G-backed workers show catalogue context limits; manager shows 1.18M | ✅ mock tape carries per-model `context_max` · ⬜ real |
+| T7 | 0G model quota exhaustion → traffic shifts to another configured 0G model; workers visibly re-route; no `run.error` | ⬜ (Gateway chain ✅ tested) |
 
 ## Gateway tests (G-series, `bridge/tests/gateway`)
-G1 token-bucket pacing · G2 safety margin · G3 priority order · G4 aging/no starvation · G5 TPM window · G6 breaker open/half-open/close · G7 429 + Retry-After absorbed · G8 429 backoff + AIMD · G9 5xx retry→fallback · G10 context error → next model · G11 auth → provider dead, key never echoed · G12 over-context never routed to 8k model · G13 `ContextTooLong` when nothing fits · G14 `GatewayBusy` + retry_after · **G15 load: 50 concurrent @ 20 rpm → 0 provider 429s, concurrency ≤ cap, ≈ 167 s** · G16 estimator learns. All ✅.
+G1 token-bucket pacing · G2 safety margin · G3 priority order · G4 aging/no starvation · G5 TPM window · G6 breaker open/half-open/close · G7 429 + Retry-After absorbed · G8 429 backoff + AIMD · G9 5xx retry→fallback · G10 context error → next model · G11 0G auth failure disables routing, key never echoed · G12 over-context never routed to a smaller model · G13 `ContextTooLong` when nothing fits · G14 `GatewayBusy` + retry_after · **G15 load: 50 concurrent @ 20 rpm → 0 0G Router 429s, concurrency ≤ cap, ≈ 167 s** · G16 estimator learns. All ✅.
 
 ## Safety (S-series, AUTONEX's existing `scripts/escape-tests.sh` S1-S9 must still pass untouched)
 Plus Bridge-specific: no key in any event/log/tape (grep the tape for `sk-`, `gsk_`, `nvapi-`, `Bearer `); privacy gate 403 for unlisted paths (both `D:\x` and `/mnt/d/x` forms); cancel leaves no orphan process and no locked worktree; `turbo` refused on a dirty tree.

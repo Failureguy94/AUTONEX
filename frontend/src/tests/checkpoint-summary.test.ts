@@ -121,7 +121,7 @@ describe('Checkpoint Summary: Data Integrity & Real Execution State', () => {
       simClock: '09:15',
       realElapsed: 125,
       effortLogical: 340,
-      modelId: 'openrouter/google/gemma-4-31b-it:free',
+      modelId: '0g/glm-5.3-flash',
       triage: null,
       paused: true,
     };

@@ -22,7 +22,7 @@
     "intensity": "standard",
     "est_effort_s": 3600,
     "est_workers": 3,
-    "rationale": "Focused task — a small team, no meal breaks needed.",
+    "rationale": "Focused task \u2014 a small team, no meal breaks needed.",
     "break_policy": {
      "coffee": "on_compaction",
      "meals": false,
@@ -35,8 +35,8 @@
       "name": "Frontend",
       "bay": "NE",
       "capability": "UI code, components, styles",
-      "lead_model": "openrouter/qwen/qwen3.8-27b:free",
-      "worker_model": "groq/openai/gpt-oss-20b",
+      "lead_model": "0g/glm-5.3-flash",
+      "worker_model": "0g/qwen3-coder-flash",
       "est_workers": 2,
       "hue": 205
      },
@@ -45,8 +45,8 @@
       "name": "QA",
       "bay": "SW",
       "capability": "test runs, validation gates",
-      "lead_model": "openrouter/nvidia/nemotron-3.5-lightning:free",
-      "worker_model": "nvidia/deepseek-ai/deepseek-v4.1-flash",
+      "lead_model": "0g/kimi-k2.7-code",
+      "worker_model": "0g/deepseek-v4.1-flash",
       "est_workers": 1,
       "hue": 300
      }
@@ -79,7 +79,7 @@
      "parent_id": null,
      "engine": {
       "kind": "llm",
-      "label": "llm:gemma-4-31b-it (manager)"
+      "label": "0G \u00b7 glm-5.3-flash (manager)"
      },
      "avatar_seed": 1,
      "chairId": "execChair_198",
@@ -106,7 +106,7 @@
      {
       "id": "T1",
       "parent_id": "M0",
-      "description": "Survey the landscape and gather inputs",
+      "description": "Architecture & spec for dark mode to the dashboard",
       "owner_role": "frontend",
       "assigned_agent": "W_frontend_0",
       "status": "pending",
@@ -119,7 +119,7 @@
      {
       "id": "T2",
       "parent_id": null,
-      "description": "Deep-dive component A",
+      "description": "Configure environment for dark mode to the dashboard",
       "owner_role": "frontend",
       "assigned_agent": "W_frontend_1",
       "status": "pending",
@@ -134,7 +134,7 @@
      {
       "id": "T3",
       "parent_id": null,
-      "description": "Deep-dive component B",
+      "description": "Implement core logic for dark mode to the dashboard",
       "owner_role": "qa",
       "assigned_agent": "W_qa_0",
       "status": "pending",
@@ -149,7 +149,7 @@
      {
       "id": "T4",
       "parent_id": null,
-      "description": "Design the architecture",
+      "description": "Build primary component for dark mode to the dashboard",
       "owner_role": "frontend",
       "assigned_agent": "W_frontend_0",
       "status": "pending",
@@ -164,7 +164,7 @@
      {
       "id": "T5",
       "parent_id": null,
-      "description": "Implement the core module",
+      "description": "Wire APIs & integration handlers",
       "owner_role": "frontend",
       "assigned_agent": "W_frontend_1",
       "status": "pending",
@@ -247,7 +247,7 @@
      "parent_id": "M0",
      "engine": {
       "kind": "llm",
-      "label": "llm:qwen3.8-27b:free"
+      "label": "llm:glm-5.3-flash"
      },
      "avatar_seed": 10,
      "chairId": "wchair_90",
@@ -279,7 +279,7 @@
      "parent_id": "L_frontend",
      "engine": {
       "kind": "code",
-      "label": "code:gpt-oss-20b"
+      "label": "code:qwen3-coder-flash"
      },
      "avatar_seed": 11,
      "chairId": "wchair_49",
@@ -311,7 +311,7 @@
      "parent_id": "L_frontend",
      "engine": {
       "kind": "code",
-      "label": "code:gpt-oss-20b"
+      "label": "code:qwen3-coder-flash"
      },
      "avatar_seed": 12,
      "chairId": "wchair_52",
@@ -343,7 +343,7 @@
      "parent_id": "M0",
      "engine": {
       "kind": "llm",
-      "label": "llm:nemotron-3.5-lightning:free"
+      "label": "llm:kimi-k2.7-code"
      },
      "avatar_seed": 13,
      "chairId": "wchair_138",
@@ -402,7 +402,7 @@
     "from_agent_id": "M0",
     "to_agent_id": "L_frontend",
     "kind": "task",
-    "preview": "Plan is on the whiteboard — take your branch."
+    "preview": "Plan is on the whiteboard \u2014 take your branch."
    }
   },
   {
@@ -416,7 +416,7 @@
     "from_agent_id": "M0",
     "to_agent_id": "L_qa",
     "kind": "task",
-    "preview": "Plan is on the whiteboard — take your branch."
+    "preview": "Plan is on the whiteboard \u2014 take your branch."
    }
   },
   {
@@ -499,7 +499,7 @@
    "payload": {
     "call_id": "c_T1",
     "agent_id": "W_frontend_0",
-    "model": "groq/openai/gpt-oss-20b",
+    "model": "0g/qwen3-coder-flash",
     "role": "worker"
    }
   },
@@ -694,8 +694,8 @@
    "payload": {
     "agent_id": "W_frontend_0",
     "energy": 75,
-    "context_tokens": 2000,
-    "context_max": 8000,
+    "context_tokens": 250000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 0,
     "failed": 0
@@ -751,7 +751,7 @@
    "payload": {
     "call_id": "c_T2",
     "agent_id": "W_frontend_1",
-    "model": "groq/openai/gpt-oss-20b",
+    "model": "0g/qwen3-coder-flash",
     "role": "worker"
    }
   },
@@ -946,8 +946,8 @@
    "payload": {
     "agent_id": "W_frontend_1",
     "energy": 66,
-    "context_tokens": 2720,
-    "context_max": 8000,
+    "context_tokens": 340000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 1,
     "failed": 0
@@ -1003,7 +1003,7 @@
    "payload": {
     "call_id": "c_T3",
     "agent_id": "W_qa_0",
-    "model": "nvidia/deepseek-ai/deepseek-v4.1-flash",
+    "model": "0g/deepseek-v4.1-flash",
     "role": "worker"
    }
   },
@@ -1136,8 +1136,8 @@
    "payload": {
     "agent_id": "W_qa_0",
     "energy": 57,
-    "context_tokens": 55040,
-    "context_max": 128000,
+    "context_tokens": 619971,
+    "context_max": 1441792,
     "pending": 1,
     "done": 2,
     "failed": 0
@@ -1154,7 +1154,7 @@
     "agent_id": "W_qa_0",
     "with_agent_id": "W_frontend_0",
     "duration_ms": 5500,
-    "line": "Handing over T3 — watch the test suite."
+    "line": "Handing over T3 \u2014 watch the test suite."
    }
   },
   {
@@ -1236,7 +1236,7 @@
    "payload": {
     "call_id": "c_T4",
     "agent_id": "W_frontend_0",
-    "model": "groq/openai/gpt-oss-20b",
+    "model": "0g/qwen3-coder-flash",
     "role": "worker"
    }
   },
@@ -1431,8 +1431,8 @@
    "payload": {
     "agent_id": "W_frontend_0",
     "energy": 48,
-    "context_tokens": 4160,
-    "context_max": 8000,
+    "context_tokens": 520000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 3,
     "failed": 0
@@ -1538,7 +1538,7 @@
    "payload": {
     "call_id": "c_T5",
     "agent_id": "W_frontend_1",
-    "model": "groq/openai/gpt-oss-20b",
+    "model": "0g/qwen3-coder-flash",
     "role": "worker"
    }
   },
@@ -1733,8 +1733,8 @@
    "payload": {
     "agent_id": "W_frontend_1",
     "energy": 39,
-    "context_tokens": 4880,
-    "context_max": 8000,
+    "context_tokens": 610000,
+    "context_max": 1000000,
     "pending": 1,
     "done": 4,
     "failed": 0
@@ -1751,7 +1751,7 @@
     "agent_id": "W_frontend_1",
     "with_agent_id": "W_qa_0",
     "duration_ms": 6200,
-    "line": "Handing over T5 — watch the test suite."
+    "line": "Handing over T5 \u2014 watch the test suite."
    }
   },
   {
@@ -1776,32 +1776,12 @@
    "ts_sim": "10:03",
    "type": "result.final",
    "payload": {
-    "report_markdown": "# Open-Weight Coding Models: Comparison & Benchmark CLI\n\n## Summary\nWe compared the three strongest open-weight coding model families — **Qwen2.5-Coder-32B**, **DeepSeek-Coder-V2-Lite (16B)**, and **StarCoder2-15B** — on HumanEval, MBPP, and a fresh 40-prompt internal suite, then shipped a tiny CLI (`bench`) that runs any of them through a standard harness.\n\n## Findings\n- **Qwen2.5-Coder-32B** leads on HumanEval (86.9% pass@1) and long-context refactor tasks. Apache-2.0 license, 32k context.\n- **DeepSeek-Coder-V2-Lite** is the best quality-per-GB: 81.2% HumanEval at 16B active parameters, MIT license.\n- **StarCoder2-15B** trails on multilingual tasks (65.1%) but is the fastest at batch inference and has the most permissive training-data transparency.\n\n## The CLI\n`bench --model qwen2.5-coder-32b --suite humaneval,mbpp` produces a JSON + Markdown scorecard with tokens/s, cost proxy, and pass@1/pass@5. The harness pins prompts, seeds, and stop tokens for reproducibility.\n\n## Recommendation\nDefault to **Qwen2.5-Coder-32B** where VRAM allows; use **DeepSeek-Coder-V2-Lite** on single-GPU boxes; keep **StarCoder2** for high-throughput batch labeling.\n",
+    "report_markdown": "# Project Report: Add dark mode to the dashboard\n\n## Executive Summary\nThe engineering team assembled and successfully completed the user objective:\n> **\"Add dark mode to the dashboard\"**\n\nAll deliverables have been synthesized, peer-reviewed by department leads, and validated through automated test gates.\n\n## Key Delivered Milestones\n- **T1: Architecture & spec for dark mode to the dashboard** (Assigned: W_frontend_0, Status: DONE)\n- **T2: Configure environment for dark mode to the dashboard** (Assigned: W_frontend_1, Status: DONE)\n- **T3: Implement core logic for dark mode to the dashboard** (Assigned: W_qa_0, Status: DONE)\n- **T4: Build primary component for dark mode to the dashboard** (Assigned: W_frontend_0, Status: DONE)\n- **T5: Wire APIs & integration handlers** (Assigned: W_frontend_1, Status: DONE)\n\n## Architecture & Code Quality\n- **Specification:** Implementation meets all user constraints without scope creep.\n- **Validation:** Type-checks and unit tests executed with 100% passing assertions.\n- **Handoff:** Lead approved the pull requests and merged all worktrees into the main branch.\n\n## Status\nReady for deployment and execution.\n",
     "sources": [
      {
-      "title": "Qwen2.5-Coder technical report",
-      "url": "https://qwenlm.github.io/blog/qwen2.5-coder/",
+      "title": "0G Private Computer Router",
+      "url": "https://router-api.0g.ai/v1/models",
       "verified": true
-     },
-     {
-      "title": "DeepSeek-Coder-V2 repository",
-      "url": "https://github.com/deepseek-ai/DeepSeek-Coder-V2",
-      "verified": true
-     },
-     {
-      "title": "StarCoder2 paper (arXiv:2402.19173)",
-      "url": "https://arxiv.org/abs/2402.19173",
-      "verified": true
-     },
-     {
-      "title": "HumanEval benchmark suite",
-      "url": "https://github.com/openai/human-eval",
-      "verified": true
-     },
-     {
-      "title": "Community inference throughput notes",
-      "url": "https://example.com/community-notes",
-      "verified": false
      }
     ],
     "effort_logical_s": 3600,

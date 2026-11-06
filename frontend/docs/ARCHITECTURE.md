@@ -27,7 +27,7 @@
 │ breaker · budget · accounting → llm.call_*, gate.state                   │   │ audit.jsonl, git branch, walkthrough.md   │
 └──────────────┬──────────────────────────────────────────────────────────┘   └───────────────────────────────────────────┘
                ▼
-   groq · openrouter · nvidia · opencode-go (+ optional extra providers, local Ollama)   ← keys live ONLY here
+   0G Private Computer Router (ZG_API_KEY)   ← key lives only in the Bridge/PAG proxy
 ```
 
 ## 2. Who does what (and why)
@@ -48,11 +48,11 @@
 | Separate leads: frontend / backend / text-generation… each with their own workers | dynamic departments (`§3` of that doc); bays are slots, departments are tenants |
 | Simple fast work: no breaks, workers just finish; very heavy project: breaks, coffee, lunch | `intensity → break_policy` (`§2.1`); sprint tape contains **zero** break events — enforced by tests |
 | Manager works alone for tiny text tasks | `text_gen`+`light` → `departments:[]`, manager types at her own desk |
-| Different models for different leads; manager = the best free model | `MODEL_ROUTING §2` role→model table + fallback chains |
+| Different 0G models for different leads; manager = the selected 0G model | `MODEL_ROUTING §2` role→model table + same-provider fallback chains |
 | Coffee/lunch/chat must mean something | `BRIDGE_SPEC §7`: coffee = real context compaction, chat = real hand-off, energy = real context fraction |
 | Click an employee → live status (progress, energy, context, engine) | Inspector (done) fed by `agent.metrics`, `task.progress`, `file.edit` |
 | AUTONEX gets a GUI (permissions, diffs, rollback) | Permission Desk, Inspector Live tab, Merge/Discard (frontend done; Bridge relay specified) |
-| One API/account hits the per-minute limit | Gateway (`MODEL_ROUTING`): limiter, queue, backoff, fallback, budget pre-check, **more providers** (`00_START_HERE A1`) |
+| One API/account hits the per-minute limit | Gateway (`MODEL_ROUTING`): limiter, queue, backoff, same-provider model fallback, budget pre-check |
 
 ## 4. Ports & processes (local only)
 | Process | Port | Notes |

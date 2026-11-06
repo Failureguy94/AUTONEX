@@ -1,7 +1,7 @@
 swarm:
   sizes: [10, 20, 30, 40, 50]
   supervisor:
-    chain: ["mistral/large", "openrouter/qwen/qwen3.8-27b:free", "groq/openai/gpt-oss-120b"]
+    chain: ["0g/glm-5.3-flash", "0g/deepseek-v4.1-flash", "0g/qwen3-coder-flash"]
     reserve_pct: 15
     policy: balanced
   rounds:
@@ -88,9 +88,3 @@ privacy:
   pseudonymize: true
   egress_allowlist_hosts:
     - router-api.0g.ai
-    - api.groq.com
-    - api.cerebras.ai
-    - integrate.api.nvidia.com
-    - openrouter.ai
-    - api.mistral.ai
-    - generativelanguage.googleapis.com

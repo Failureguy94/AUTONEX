@@ -5,13 +5,13 @@ OPENCODE_BINARY_SOURCE=npm/@opencode/cli/2.0.22
 PAG_CTX_TIER=3
 CONTEXT_CAP=128000
 
-# Default models (all free tier)
-DEFAULT_BUILD_MODEL=groq/llama-3.3-70b-versatile
-DEFAULT_PLAN_MODEL=groq/llama-3.3-70b-versatile
-DEFAULT_EXPLORE_MODEL=groq/llama-3.1-8b-instant
+# Default models (0G Private Computer)
+DEFAULT_BUILD_MODEL=0g/qwen3-coder-flash
+DEFAULT_PLAN_MODEL=0g/glm-5.3-flash
+DEFAULT_EXPLORE_MODEL=0g/qwen-flash
 
-# Providers configured (all free, no paid services)
-PROVIDERS=groq,nvidia,openrouter,go,go-anthropic
+# The only supported model provider
+PROVIDERS=zg_compute
 
 # Resource optimization
 AGENT_MEM_LIMIT=2g
@@ -28,4 +28,4 @@ DEVIATIONS=
 - Fixed launcher hardcoded-index security bug (now dynamically finds deny block)
 - Fixed context plugin double-mask bug (stored replacements instead of recomputing)
 - Added bare-form deny policies for git push and git reset --hard
-- Added NVIDIA NIM, Groq, OpenRouter free-tier providers
+- Routed inference exclusively through the 0G Private Computer Router
