@@ -5,6 +5,11 @@ import { Icon, I } from './Icons';
 import { ensureRabdiWalletClient, rabdiChain } from '@/config/chain';
 import { uploadContextWorkflow, retrieveContextWorkflow } from '@/services/storageWorkflow';
 import { formatArkivError } from '@/services/arkiv/balance';
+import {
+  generateCheckpointSummary,
+  formatCheckpointSummaryMarkdown,
+  type CheckpointSummary,
+} from '@/services/checkpointSummary';
 
 export function ErrorCheckpointModal() {
   const { data: wagmiWalletClient } = useWalletClient();
@@ -60,10 +65,89 @@ export function ErrorCheckpointModal() {
         throw new Error('Please connect your Web3 wallet first.');
       }
 
-      // 2. Prepare comprehensive checkpoint context payload
-      const checkpointPayload = {
+      // 2. Prepare AI-generated summary/checkpoint context payload (NO raw codebase files)
+      const storeSnapshot = useStore.getState();
+      const summary: CheckpointSummary = data?.checkpointSummary || generateCheckpointSummary(storeSnapshot) || {
         metadata: {
           checkpointId: `chk_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          version: 'v1.0',
+          timestamp: new Date().toISOString(),
+          createdAtFormatted: new Date().toLocaleString(),
+          runId: `run_${Date.now()}`,
+          status: 'Interrupted',
+          executionState: 'failed',
+        },
+        projectOverview: {
+          projectName: (goal ? goal.slice(0, 30) : 'AUTONEX-Checkpoint').trim(),
+          objective: goal || 'Autonomous task execution',
+          status: 'Interrupted',
+          progressPct: Math.round((tasksDone.length / (taskList.length || 1)) * 100),
+          tasksTotal: taskList.length,
+          tasksDone: tasksDone.length,
+          tasksRunning: 0,
+          tasksPending: taskList.length - tasksDone.length,
+          tasksFailed: 1,
+          elapsedRealSeconds: 0,
+          elapsedLogicalSeconds: 0,
+          simClock: '09:00',
+          outputDirectory: '',
+        },
+        workCompleted: {
+          tasks: tasksDone.map((t) => ({
+            id: t.id,
+            description: t.description,
+            status: 'done',
+            progressPct: 100,
+          })),
+          majorFeatures: [],
+          filesCreatedOrModified: Object.keys(files || {}),
+          architecturalDecisions: [],
+          integrationsCompleted: [],
+          relevantOutputs: [],
+        },
+        currentState: {
+          implemented: tasksDone.map((t) => t.description),
+          partiallyImplemented: [],
+          incomplete: taskList.filter((t) => t.status !== 'done').map((t) => t.description),
+          knownLimitations: [`Interrupted by 0G Private Computer inference failure: ${errorText}`],
+        },
+        agentExecution: {
+          contributors: [],
+          totalLlmCalls: 0,
+          totalToolCalls: 0,
+          totalTokensIn: 0,
+          totalTokensOut: 0,
+        },
+        pendingTasksAndNextSteps: {
+          inProgressTasks: [],
+          pendingTasks: taskList
+            .filter((t) => t.status !== 'done')
+            .map((t) => ({ id: t.id, description: t.description, status: t.status, progressPct: t.progress_pct })),
+          blockers: [errorText],
+          recommendedNextActions: ['Retry inference with alternate agent', 'Resume from stored checkpoint'],
+        },
+        technicalContext: {
+          technologies: ['0G Private Compute', 'Arkiv Rabdi DB-Chain', 'Ethereum Swarm'],
+          architecture: ['Dual-Engine Autonomous Multi-Agent System'],
+          configurationAndEnvironment: [
+            `Failed Agent: ${failedAgent}`,
+            `Recovery Agent: ${recoveryAgent}`,
+            `0G Request ID: ${requestId}`,
+          ],
+          integrations: ['Arkiv Rabdi DB-Chain (Chain ID: 7794095)', 'Ethereum Swarm (BZZ)'],
+          criticalContinuationNotes: [`Halted at request ${requestId}`],
+          gitCheckpoint: null,
+        },
+      };
+
+      const summaryMarkdown = formatCheckpointSummaryMarkdown(summary);
+
+      // Payload strictly contains the AI summary / checkpoint context — no raw codebase files
+      const checkpointPayload = {
+        type: 'autonex_incident_checkpoint_context',
+        version: '1.0.0',
+        metadata: {
+          checkpointId: summary.metadata.checkpointId,
           incidentType: '0g_inference_failure_recovery',
           timestamp: new Date().toISOString(),
           error: errorText,
@@ -72,28 +156,9 @@ export function ErrorCheckpointModal() {
           recoveryAgent,
           signerAddress,
         },
-        executionSnapshot: {
-          goal: goal || 'Autonomous task execution',
-          status: 'Interrupted',
-          tasksCompletedCount: tasksDone.length,
-          tasksTotalCount: taskList.length,
-          tasks: taskList.map((t) => ({
-            id: t.id,
-            description: t.description,
-            status: t.status,
-            progressPct: t.progress_pct,
-            assignedAgent: t.assigned_agent,
-          })),
-          blackboardNotesCount: notes.length,
-          recentNotes: notes.slice(-10),
-          fileEditsRecorded: Object.keys(files).length,
-          fileSummary: files,
-          zgConnection: {
-            isVerified: zgConnection.isVerified,
-            maskedKey: zgConnection.maskedKey,
-            lastVerifiedAt: zgConnection.lastVerifiedAt,
-          },
-        },
+        checkpointSummary: summary,
+        checkpointMarkdown: summaryMarkdown,
+        fileInventory: Object.keys(files || {}), // Only file path strings, no raw codebase text
         technicalContext: {
           runtime: 'AUTONEX Dual-Engine Spatial Floor',
           computeProvider: '0G Private Computer (Router: https://router-api.0g.ai/v1)',
@@ -105,14 +170,14 @@ export function ErrorCheckpointModal() {
       const payloadString = JSON.stringify(checkpointPayload, null, 2);
       const cleanProjectSlug = (goal.replace(/[^a-zA-Z0-9]/g, '-').slice(0, 24) || 'autonex-checkpoint').toLowerCase();
 
-      // 3. Upload heavy context to Swarm and register pointer on Arkiv Rabdi DB-Chain
+      // 3. Upload summary/checkpoint context to Swarm and register pointer on Arkiv Rabdi DB-Chain
       const res = await uploadContextWorkflow(walletClient, payloadString, {
         projectId: cleanProjectSlug,
         userId: signerAddress,
         reportId: checkpointPayload.metadata.checkpointId,
-        fileName: `checkpoint-${cleanProjectSlug}-context.json`,
+        fileName: `checkpoint-${cleanProjectSlug}-summary.json`,
         contentType: 'application/json',
-        summary: `Recovery checkpoint for 0G Private Computer inference halt (Req: ${requestId.slice(0, 16)}...)`,
+        summary: `AI Checkpoint context for 0G inference halt (Req: ${requestId.slice(0, 16)}...)`,
       });
 
       setSaveResult(res);
@@ -275,7 +340,7 @@ export function ErrorCheckpointModal() {
                 <div className="p-2.5 rounded-lg bg-white/90 border border-emerald-500/20">
                   <span className="font-bold text-emerald-800 block mb-0.5">📦 Ethereum Swarm (BZZ)</span>
                   <span className="text-[10px] text-ink/70">
-                    Stores the full context manifest, code diffs, logs, and telemetry off-chain.
+                    Stores the structured AI checkpoint summary, task progress, and execution context off-chain.
                   </span>
                 </div>
                 <div className="p-2.5 rounded-lg bg-white/90 border border-emerald-500/20">

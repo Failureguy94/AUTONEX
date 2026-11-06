@@ -269,12 +269,25 @@ export function ReportView() {
         throw new Error('Please connect your Web3 wallet first.');
       }
 
+      // Package strictly the AI-generated summary/checkpoint context (no raw codebase file dumps)
+      const summary = activeSummary || generateCheckpointSummary(useStore.getState(), files, localOutputDir);
+      const summaryMarkdown = summary ? formatCheckpointSummaryMarkdown(summary) : (report?.report_markdown || 'Autonomous Run Summary');
+
       const payload = JSON.stringify(
         {
+          type: 'autonex_summary_checkpoint_context',
+          version: '1.0.0',
           goal,
-          report: report?.report_markdown || 'Autonomous Run Incomplete',
-          files,
           timestamp: new Date().toISOString(),
+          checkpointSummary: summary,
+          summaryMarkdown,
+          fileInventory: fileKeys, // Only list of file paths/names, no code contents
+          metadata: {
+            projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            projectName,
+            signer,
+            modelId: useStore.getState().modelId,
+          },
         },
         null,
         2
@@ -283,9 +296,9 @@ export function ReportView() {
       const res = await uploadContextWorkflow(client, payload, {
         projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         userId: signer,
-        fileName: `${projectName.toLowerCase()}-bundle.json`,
+        fileName: `${projectName.toLowerCase()}-summary-context.json`,
         contentType: 'application/json',
-        summary: `Full deliverable and report for ${goal.slice(0, 50)}...`,
+        summary: `AI Summary & Context Checkpoint for ${goal.slice(0, 50)}...`,
       });
 
       setStorageResult(res);

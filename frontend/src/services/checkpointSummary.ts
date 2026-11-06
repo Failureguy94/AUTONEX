@@ -661,3 +661,6 @@ export function formatCheckpointSummaryMarkdown(s: CheckpointSummary): string {
 
   return lines.join('\n');
 }
+
+export const checkpointSummaryToMarkdown = formatCheckpointSummaryMarkdown;
+
