@@ -202,7 +202,7 @@ export function Toolbar() {
           onClick={() => useStore.setState({ reportOpen: true })}
           icon={I.download}
           label="Export"
-          disabled={!s.report}
+          disabled={!s.report && !s.checkpointSummary && Object.keys(s.tasks).length === 0}
         />
 
         <ToolbarBtn
@@ -210,6 +210,8 @@ export function Toolbar() {
           icon={I.database}
           label="Arkiv"
         />
+
+        <ConnectWalletButton />
 
         <ToolbarBtn
           active={s.dev}
@@ -236,8 +238,6 @@ export function Toolbar() {
             </option>
           ))}
         </select>
-
-        <ConnectWalletButton />
 
         {USE_MOCK ? (
           <span

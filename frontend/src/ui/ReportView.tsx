@@ -7,7 +7,10 @@ import { fmtEffort } from '@/state/events';
 import { jsPDF } from 'jspdf';
 import { generateProjectFiles, downloadProjectZip, downloadMarkdownReport, downloadSingleFile } from '@/services/projectBundle';
 import { uploadContextWorkflow, retrieveContextWorkflow } from '@/services/storageWorkflow';
-import { RABDI_EXPLORER_URL, formatArkivError } from '@/services/arkiv/balance';
+import { RABDI_EXPLORER_URL, RABDI_FAUCET_URL, fetchTglmBalance, formatArkivError } from '@/services/arkiv/balance';
+import { rabdiChain, switchOrAddRabdiNetwork, ensureRabdiWalletClient } from '@/config/chain';
+import { CheckpointSummaryView } from './CheckpointSummaryView';
+import { generateCheckpointSummary, formatCheckpointSummaryMarkdown, type CheckpointSummary } from '@/services/checkpointSummary';
 
 function Md({ text }: { text: string }) {
   const lines = text.split('\n');
@@ -35,21 +38,58 @@ function inline(s: string) {
 }
 
 export function ReportView() {
-  const { address, isConnected } = useAccount();
+  const { address: wagmiAddress, isConnected, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
+
+  // Active address from wagmi or direct window.ethereum
+  const activeAddress = useMemo(() => {
+    if (wagmiAddress) return wagmiAddress;
+    if (typeof window !== 'undefined' && (window as any).ethereum?.selectedAddress) {
+      return (window as any).ethereum.selectedAddress as string;
+    }
+    return null;
+  }, [wagmiAddress]);
+
+  const isWrongNetwork = Boolean(
+    activeAddress && chainId !== undefined && chainId !== rabdiChain.id
+  );
+
+  const [tglmBalance, setTglmBalance] = useState<string | null>(null);
+  const [switchingNetwork, setSwitchingNetwork] = useState(false);
 
   const open = useStore((s) => s.reportOpen);
   const report = useStore((s) => s.report);
+  const checkpointSummaryFromStore = useStore((s) => s.checkpointSummary);
   const goal = useStore((s) => s.goal) || 'Build a real-time crypto price tracker in React with the name of project as "CRYPTracker"';
   const agents = useStore((s) => s.agents);
   const tasks = useStore((s) => s.tasks);
-  const departments = useStore((s) => s.departments);
+  const edges = useStore((s) => s.edges);
+  const notes = useStore((s) => s.notes);
+  const runEvents = useStore((s) => s.runEvents);
+  const metrics = useStore((s) => s.metrics);
+  const executionState = useStore((s) => s.executionState);
+  const executionError = useStore((s) => s.executionError);
+  const contextStages = useStore((s) => s.contextStages);
+  const fileEdits = useStore((s) => s.fileEdits);
+  const checkpoint = useStore((s) => s.checkpoint);
+  const simClock = useStore((s) => s.simClock);
+  const realElapsed = useStore((s) => s.realElapsed);
+  const effortLogical = useStore((s) => s.effortLogical);
+  const modelId = useStore((s) => s.modelId);
+  const triage = useStore((s) => s.triage);
+  const paused = useStore((s) => s.paused);
 
-  const [activeTab, setActiveTab] = useState<'report' | 'files' | 'storage'>('report');
+  const [activeTab, setActiveTab] = useState<'report' | 'files' | 'checkpoint' | 'storage'>('report');
   const [selectedFile, setSelectedFile] = useState<string>('src/App.tsx');
   const [copied, setCopied] = useState(false);
   const [building, setBuilding] = useState(0);
   const [zipping, setZipping] = useState(false);
+
+  // Checkpoint Summary local states
+  const [manualSummary, setManualSummary] = useState<CheckpointSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [jsonCopied, setJsonCopied] = useState(false);
 
   // Decentralized Swarm + Arkiv Storage State
   const [uploadingStorage, setUploadingStorage] = useState(false);
@@ -57,6 +97,16 @@ export function ReportView() {
   const [storageError, setStorageError] = useState<string | null>(null);
   const [verifyingSwarm, setVerifyingSwarm] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeAddress && open) {
+      fetchTglmBalance(activeAddress as any)
+        .then((b) => setTglmBalance(b.formatted))
+        .catch(() => setTglmBalance('0.000'));
+    } else {
+      setTglmBalance(null);
+    }
+  }, [activeAddress, open, activeTab]);
 
   const dirMatch = report?.report_markdown?.match(/\*\*Output Directory:\*\*\s*`([^`]+)`/);
   const localOutputDir = dirMatch
@@ -85,7 +135,100 @@ export function ReportView() {
   const files = realFiles || fallbackFiles;
   const fileKeys = useMemo(() => Object.keys(files), [files]);
 
-  if (!open || !report) return null;
+  // Derived real-time Checkpoint Summary
+  const activeSummary = useMemo<CheckpointSummary | null>(() => {
+    if (manualSummary) return manualSummary;
+    if (checkpointSummaryFromStore) return checkpointSummaryFromStore;
+    try {
+      return generateCheckpointSummary(
+        {
+          goal,
+          tasks,
+          edges,
+          agents,
+          notes,
+          runEvents,
+          metrics,
+          executionState,
+          executionError,
+          contextStages,
+          fileEdits,
+          checkpoint,
+          report,
+          simClock,
+          realElapsed,
+          effortLogical,
+          modelId,
+          triage,
+          paused,
+        },
+        files,
+        localOutputDir
+      );
+    } catch (err: any) {
+      console.error('Failed to generate checkpoint summary:', err);
+      return null;
+    }
+  }, [
+    manualSummary,
+    checkpointSummaryFromStore,
+    goal,
+    tasks,
+    edges,
+    agents,
+    notes,
+    runEvents,
+    metrics,
+    executionState,
+    executionError,
+    contextStages,
+    fileEdits,
+    checkpoint,
+    report,
+    simClock,
+    realElapsed,
+    effortLogical,
+    modelId,
+    triage,
+    paused,
+    files,
+    localOutputDir,
+  ]);
+
+  if (!open) return null;
+  // If no report and no tasks/events at all, do not open empty modal
+  if (!report && !activeSummary && Object.keys(tasks).length === 0) return null;
+
+  const handleRefreshSummary = () => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setTimeout(() => {
+      try {
+        const fresh = generateCheckpointSummary(
+          useStore.getState(),
+          files,
+          localOutputDir
+        );
+        if (!fresh) {
+          setSummaryError('Cannot generate checkpoint summary: No active or past agent execution data found.');
+        } else {
+          setManualSummary(fresh);
+          useStore.setState({ checkpointSummary: fresh });
+        }
+      } catch (err: any) {
+        setSummaryError(err?.message || 'Failed to refresh checkpoint summary');
+      } finally {
+        setSummaryLoading(false);
+      }
+    }, 250);
+  };
+
+  const handleCopyJson = () => {
+    if (!activeSummary) return;
+    navigator.clipboard.writeText(JSON.stringify(activeSummary, null, 2));
+    setJsonCopied(true);
+    setTimeout(() => setJsonCopied(false), 2000);
+  };
 
   const handleDownloadZip = async () => {
     setZipping(true);
@@ -96,6 +239,19 @@ export function ReportView() {
     }
   };
 
+  const handleDownloadMarkdown = () => {
+    let md = report?.report_markdown || '';
+    if (activeSummary) {
+      const summaryMd = formatCheckpointSummaryMarkdown(activeSummary);
+      if (md) {
+        md = `${md}\n\n---\n\n${summaryMd}`;
+      } else {
+        md = summaryMd;
+      }
+    }
+    downloadMarkdownReport(goal, md);
+  };
+
   const handleCopyPath = () => {
     navigator.clipboard.writeText(localOutputDir);
     setCopied(true);
@@ -103,17 +259,20 @@ export function ReportView() {
   };
 
   const handleStoreOnSwarmAndArkiv = async () => {
-    if (!walletClient) {
-      setStorageError('Please connect your Web3 wallet first in the top toolbar.');
-      return;
-    }
     setUploadingStorage(true);
     setStorageError(null);
     try {
+      // Ensure we have an active, Rabdi-configured wallet client
+      const client = await ensureRabdiWalletClient(walletClient);
+      const signer = client.account?.address || activeAddress;
+      if (!signer) {
+        throw new Error('Please connect your Web3 wallet first.');
+      }
+
       const payload = JSON.stringify(
         {
           goal,
-          report: report.report_markdown,
+          report: report?.report_markdown || 'Autonomous Run Incomplete',
           files,
           timestamp: new Date().toISOString(),
         },
@@ -121,15 +280,16 @@ export function ReportView() {
         2
       );
 
-      const res = await uploadContextWorkflow(walletClient, payload, {
+      const res = await uploadContextWorkflow(client, payload, {
         projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        userId: address || 'user-1',
+        userId: signer,
         fileName: `${projectName.toLowerCase()}-bundle.json`,
         contentType: 'application/json',
         summary: `Full deliverable and report for ${goal.slice(0, 50)}...`,
       });
 
       setStorageResult(res);
+      fetchTglmBalance(signer as any).then((b) => setTglmBalance(b.formatted)).catch(() => {});
     } catch (err: any) {
       setStorageError(formatArkivError(err));
     } finally {
@@ -165,19 +325,26 @@ export function ReportView() {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor('#E4572E');
     doc.text('AUTONEX - Final Synthesis Report', 40, y); y += 26;
     doc.setTextColor('#2B2B2E'); doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-    doc.text(`Organizational effort ${fmtEffort(report.effort_logical_s)} vs real time ${(report.effort_real_s / 60).toFixed(1)} min`, 40, y); y += 24;
-    for (const line of report.report_markdown.split('\n')) {
-      if (!line.trim()) { y += 8; continue; }
-      const h = line.startsWith('## '), h1 = line.startsWith('# ');
-      doc.setFont('helvetica', h || h1 ? 'bold' : 'normal');
-      doc.setFontSize(h1 ? 15 : h ? 12 : 10);
-      const text = line.replace(/^#+ /, '').replace(/^> /, '').replace(/\*\*/g, '').replace(/`/g, '');
-      const wrapped = doc.splitTextToSize(text, W - 80) as string[];
-      doc.text(wrapped, 40, y);
-      y += wrapped.length * (h1 ? 20 : h ? 17 : 13) + 3;
-      if (y > 760) { doc.addPage(); y = 60; }
+
+    const effLog = report?.effort_logical_s ?? effortLogical;
+    const effReal = report?.effort_real_s ?? realElapsed;
+    doc.text(`Organizational effort ${fmtEffort(effLog)} vs real time ${(effReal / 60).toFixed(1)} min`, 40, y); y += 24;
+
+    if (report?.report_markdown) {
+      for (const line of report.report_markdown.split('\n')) {
+        if (!line.trim()) { y += 8; continue; }
+        const h = line.startsWith('## '), h1 = line.startsWith('# ');
+        doc.setFont('helvetica', h || h1 ? 'bold' : 'normal');
+        doc.setFontSize(h1 ? 15 : h ? 12 : 10);
+        const text = line.replace(/^#+ /, '').replace(/^> /, '').replace(/\*\*/g, '').replace(/`/g, '');
+        const wrapped = doc.splitTextToSize(text, W - 80) as string[];
+        doc.text(wrapped, 40, y);
+        y += wrapped.length * (h1 ? 20 : h ? 17 : 13) + 3;
+        if (y > 760) { doc.addPage(); y = 60; }
+      }
     }
-    if (report.sources.length) {
+
+    if (report?.sources?.length) {
       y += 14; doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('Sources', 40, y); y += 16;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
       for (const s of report.sources) {
@@ -200,10 +367,33 @@ export function ReportView() {
       y += 13;
       if (y > 760) { doc.addPage(); y = 60; }
     }
+
+    // Include Checkpoint Summary in PDF
+    if (activeSummary) {
+      if (y > 600) { doc.addPage(); y = 60; }
+      y += 14; doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor('#E4572E');
+      doc.text('Checkpoint Summary', 40, y); y += 18;
+      doc.setFontSize(9); doc.setTextColor('#2B2B2E'); doc.setFont('helvetica', 'normal');
+      doc.text(`Status: ${activeSummary.metadata.status} | Progress: ${activeSummary.projectOverview.progressPct}% | Updated: ${activeSummary.metadata.createdAtFormatted}`, 40, y); y += 14;
+      doc.text(`Completed Tasks: ${activeSummary.projectOverview.tasksDone}/${activeSummary.projectOverview.tasksTotal} (${activeSummary.projectOverview.tasksPending} queued, ${activeSummary.projectOverview.tasksRunning} active)`, 40, y); y += 14;
+      if (activeSummary.pendingTasksAndNextSteps.recommendedNextActions.length > 0) {
+        doc.setFont('helvetica', 'bold'); doc.text('Recommended Next Steps:', 40, y); y += 14;
+        doc.setFont('helvetica', 'normal');
+        for (const action of activeSummary.pendingTasksAndNextSteps.recommendedNextActions.slice(0, 4)) {
+          const wrapped = doc.splitTextToSize(`• ${action}`, W - 80) as string[];
+          doc.text(wrapped, 40, y);
+          y += wrapped.length * 12 + 2;
+          if (y > 760) { doc.addPage(); y = 60; }
+        }
+      }
+    }
+
     doc.save(`${projectName}-report.pdf`);
     await wait(300);
     setBuilding(0);
   };
+
+  const statusLabel = activeSummary?.metadata.status.toUpperCase() || (report ? 'COMPLETE' : 'IN PROGRESS');
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -218,10 +408,18 @@ export function ReportView() {
           <div className="flex-1">
             <h2 className="font-heading font-bold text-lg flex items-center gap-2">
               Deliverables & Final Report
-              <span className="text-xs bg-emerald-500/15 text-emerald-700 px-2 py-0.5 rounded font-mono font-medium">COMPLETE</span>
+              <span className={`text-xs px-2 py-0.5 rounded font-mono font-medium ${
+                statusLabel === 'COMPLETE' || statusLabel === 'COMPLETED'
+                  ? 'bg-emerald-500/15 text-emerald-700'
+                  : statusLabel === 'INTERRUPTED'
+                  ? 'bg-amber-500/15 text-amber-700'
+                  : 'bg-blue-500/15 text-blue-700'
+              }`}>
+                {statusLabel}
+              </span>
             </h2>
             <p className="text-xs font-mono text-ink/50">
-              Organizational effort {fmtEffort(report.effort_logical_s)} vs real time {(report.effort_real_s / 60).toFixed(1)} min
+              Organizational effort {fmtEffort(report?.effort_logical_s ?? effortLogical)} vs real time {(((report?.effort_real_s ?? realElapsed)) / 60).toFixed(1)} min
             </p>
           </div>
 
@@ -239,9 +437,9 @@ export function ReportView() {
             </button>
 
             <button
-              onClick={() => downloadMarkdownReport(goal, report.report_markdown)}
+              onClick={handleDownloadMarkdown}
               className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-ink/80 text-xs font-heading bg-ink/5 hover:bg-ink/10 transition-colors"
-              title="Download report as Markdown (.md)"
+              title="Download report with Checkpoint Summary as Markdown (.md)"
             >
               <Icon d={I.download} size={13} />
               Report (.md)
@@ -277,8 +475,9 @@ export function ReportView() {
           </button>
         </div>
 
-        {/* Tab Selector */}
+        {/* Tab Selector: 4 Tabs in exact required order */}
         <div className="flex items-center gap-4 px-6 pt-3 border-b border-ink/10 text-xs font-heading font-medium">
+          {/* Tab 1: Executive Synthesis Report */}
           <button
             onClick={() => setActiveTab('report')}
             className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
@@ -288,6 +487,8 @@ export function ReportView() {
             <Icon d={I.check} size={13} />
             Executive Synthesis Report
           </button>
+
+          {/* Tab 2: Project Deliverables & Source Code ({fileKeys.length} files) */}
           <button
             onClick={() => setActiveTab('files')}
             className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
@@ -297,6 +498,19 @@ export function ReportView() {
             <Icon d={I.layers} size={13} />
             Project Deliverables & Source Code ({fileKeys.length} files)
           </button>
+
+          {/* Tab 3: Checkpoint Summary */}
+          <button
+            onClick={() => setActiveTab('checkpoint')}
+            className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'checkpoint' ? 'border-[var(--accent)] text-ink font-bold' : 'border-transparent text-ink/50 hover:text-ink'
+            }`}
+          >
+            <Icon d={I.chart} size={13} />
+            Checkpoint Summary
+          </button>
+
+          {/* Tab 4: Decentralized Storage (Swarm + Arkiv) */}
           <button
             onClick={() => setActiveTab('storage')}
             className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
@@ -310,7 +524,16 @@ export function ReportView() {
 
         {/* Tab Content Body */}
         <div className="flex-1 overflow-y-auto px-8 py-5">
-          {activeTab === 'storage' ? (
+          {activeTab === 'checkpoint' ? (
+            <CheckpointSummaryView
+              summary={activeSummary}
+              loading={summaryLoading}
+              error={summaryError}
+              onRefresh={handleRefreshSummary}
+              onCopyJson={handleCopyJson}
+              jsonCopied={jsonCopied}
+            />
+          ) : activeTab === 'storage' ? (
             <div className="space-y-5 max-w-2xl py-2">
               <div className="space-y-1">
                 <h3 className="font-heading font-bold text-base text-ink">
@@ -415,14 +638,96 @@ export function ReportView() {
                       <span className="font-semibold">{fileKeys.length} files</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-ink/40">Network:</span>
+                      <span className="text-ink/40">Target Network:</span>
                       <span className="font-semibold text-emerald-700">Arkiv Rabdi DB-Chain (7794095) + Ethereum Swarm</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-ink/40">Signer Wallet:</span>
-                      <span className="font-semibold truncate max-w-[200px]">{address || 'Wallet not connected'}</span>
+                      {activeAddress ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold font-mono text-ink/90">
+                            {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}
+                          </span>
+                          <a
+                            href={`${RABDI_EXPLORER_URL}/address/${activeAddress}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-blue-600 hover:underline"
+                            title="View on Rabdi Explorer"
+                          >
+                            ↗
+                          </a>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setStorageError(null);
+                              await ensureRabdiWalletClient(walletClient);
+                            } catch (e: any) {
+                              setStorageError(formatArkivError(e));
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded text-[11px] font-heading font-semibold bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer"
+                        >
+                          Connect Wallet
+                        </button>
+                      )}
                     </div>
+                    {activeAddress && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-ink/40">tGLM Balance:</span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-semibold ${
+                              tglmBalance === '0.000' || tglmBalance === '0.0000'
+                                ? 'text-amber-600'
+                                : 'text-emerald-700'
+                            }`}
+                          >
+                            {tglmBalance !== null ? `${tglmBalance} tGLM` : 'Checking...'}
+                          </span>
+                          <a
+                            href={RABDI_FAUCET_URL}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] underline text-blue-600 font-sans hover:text-blue-800"
+                            title="Claim free testnet tGLM from Arkiv Hub"
+                          >
+                            Faucet ↗
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {isWrongNetwork && (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs font-mono flex items-center justify-between">
+                      <div>
+                        <span className="font-bold">Wrong Network:</span> Currently on Chain ID {chainId || 'unknown'}.
+                        <div className="text-[10px] opacity-80">Arkiv requires Rabdi DB-Chain (Chain ID {rabdiChain.id}).</div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={switchingNetwork}
+                        onClick={async () => {
+                          setSwitchingNetwork(true);
+                          try {
+                            setStorageError(null);
+                            await switchOrAddRabdiNetwork();
+                          } catch (e: any) {
+                            setStorageError(formatArkivError(e));
+                          } finally {
+                            setSwitchingNetwork(false);
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded bg-amber-600 text-white font-semibold text-xs hover:bg-amber-700 shrink-0 cursor-pointer"
+                      >
+                        {switchingNetwork ? 'Switching...' : 'Switch to Rabdi'}
+                      </button>
+                    </div>
+                  )}
 
                   {storageError && (
                     <div className="p-3 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs font-mono">
@@ -452,24 +757,45 @@ export function ReportView() {
               )}
             </div>
           ) : activeTab === 'report' ? (
-            <div>
-              <Md text={report.report_markdown} />
-              {report.sources.length > 0 && (
-                <>
-                  <h3 className="font-heading font-bold text-base mt-6 mb-2">Sources & References</h3>
-                  <div className="space-y-1.5">
-                    {report.sources.map((s) => (
-                      <div key={s.url} className="flex items-center gap-2 text-sm font-body">
-                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${s.verified ? 'bg-[#2f9e6e]/15 text-[#20714f]' : 'bg-ink/8 text-ink/50'}`}>
-                          {s.verified ? 'verified' : 'unverified'}
-                        </span>
-                        <a href={s.url} target="_blank" rel="noreferrer" className="underline decoration-dotted text-ink/80">{s.title}</a>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            report ? (
+              <div>
+                <Md text={report.report_markdown} />
+                {report.sources.length > 0 && (
+                  <>
+                    <h3 className="font-heading font-bold text-base mt-6 mb-2">Sources & References</h3>
+                    <div className="space-y-1.5">
+                      {report.sources.map((s) => (
+                        <div key={s.url} className="flex items-center gap-2 text-sm font-body">
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${s.verified ? 'bg-[#2f9e6e]/15 text-[#20714f]' : 'bg-ink/8 text-ink/50'}`}>
+                            {s.verified ? 'verified' : 'unverified'}
+                          </span>
+                          <a href={s.url} target="_blank" rel="noreferrer" className="underline decoration-dotted text-ink/80">{s.title}</a>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="p-8 text-center space-y-3">
+                <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-700 mb-1">
+                  <Icon d={I.chart} size={24} />
+                </div>
+                <h3 className="font-heading font-bold text-base text-ink">
+                  Synthesis Report Pending / Interrupted
+                </h3>
+                <p className="text-xs font-body text-ink/70 max-w-md mx-auto leading-relaxed">
+                  The final executive synthesis report is generated upon full project completion. Because execution is currently {activeSummary?.metadata.status.toLowerCase() || 'in progress'}, view the <strong>Checkpoint Summary</strong> tab to inspect completed and pending work.
+                </p>
+                <button
+                  onClick={() => setActiveTab('checkpoint')}
+                  className="px-4 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
+                  style={{ background: 'var(--accent)' }}
+                >
+                  View Checkpoint Summary →
+                </button>
+              </div>
+            )
           ) : (
             /* Deliverables / Source Code Tab */
             <div className="grid grid-cols-12 gap-4 h-[440px]">

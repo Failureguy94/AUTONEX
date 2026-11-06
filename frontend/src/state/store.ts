@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Agent, BlackboardNote, DepartmentDef, Envelope, FinalResult, Metrics, ModelInfo, PermissionRequest, Task, TriageResult, SwarmIdea, SwarmCluster, SwarmCritique } from '@/api/types';
 import { DEFAULT_ACCENT } from '@/config/office';
+import type { CheckpointSummary } from '@/services/checkpointSummary';
 
 export interface AgentUI extends Agent {
   pending: number; done: number; failed: number;
@@ -60,7 +61,7 @@ interface Store {
   notes: BlackboardNote[]; log: LogEntry[]; runEvents: Envelope[];
   metrics: Metrics; gate: GateState; llmByRole: Record<string, number>; llmByModel: Record<string, number>;
   terminal: Record<string, string[]>;
-  report: FinalResult | null; replanCount: number; planOutline: string[];
+  report: FinalResult | null; checkpointSummary: CheckpointSummary | null; replanCount: number; planOutline: string[];
   selected: string | null; inspectorOpen: boolean; drawerOpen: boolean; settingsOpen: boolean; reportOpen: boolean; arkivHistoryOpen: boolean;
   arkivActiveTab: 'public' | 'user' | 'swarm_context' | 'lookup';
   followId: string | null; toast: string | null; offline: boolean; demoMode: boolean;
@@ -118,7 +119,7 @@ export const useStore = create<Store>((set, get) => ({
   agents: {}, order: [], tasks: {}, edges: [], notes: [], log: [], runEvents: [],
   metrics: { llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 }, gate: { in_flight: 0, limit: 4, queue_depth: 0, backoff_active: false },
   llmByRole: {}, llmByModel: {}, terminal: {},
-  report: null, replanCount: 0, planOutline: [],
+  report: null, checkpointSummary: null, replanCount: 0, planOutline: [],
   selected: null, inspectorOpen: false, drawerOpen: false, settingsOpen: false, reportOpen: false, arkivHistoryOpen: false,
   arkivActiveTab: 'public',
   followId: null, toast: null, offline: false, demoMode: true,
@@ -542,7 +543,7 @@ export const useStore = create<Store>((set, get) => ({
     goal, executionState: 'idle', executionError: null, agents: {}, order: [], tasks: {}, edges: [], notes: [], log: [], runEvents: [],
     metrics: { llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 },
     gate: { in_flight: 0, limit: 4, queue_depth: 0, backoff_active: false },
-    llmByRole: {}, llmByModel: {}, terminal: {}, report: null, replanCount: 0,
+    llmByRole: {}, llmByModel: {}, terminal: {}, report: null, checkpointSummary: null, replanCount: 0,
     planOutline: [], selected: null, inspectorOpen: false, followId: null,
     triage: null, departments: {}, pendingPermissions: [], contextStages: {}, fileEdits: {}, checkpoint: null,
     simClock: '09:00', realElapsed: 0, effortLogical: 0, replayIdx: 0, replayPlaying: true, mode: 'live',

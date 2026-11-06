@@ -9,6 +9,7 @@ import { LAYOUT } from '@/config/layout';
 import { CHAIR_TYPES } from '@/config/furnitureDefs';
 import { swarmDirector } from '@/swarm/directorRef';
 import { voteFx } from '@/swarm/IdeaBoard';
+import { generateCheckpointSummary } from '@/services/checkpointSummary';
 
 const name = (id?: string) => useStore.getState().agents[id ?? '']?.name ?? id ?? '';
 
@@ -261,15 +262,22 @@ export function applyEvent(e: Envelope, instant = false) {
     case 'clock.tick':
       useStore.setState({ simClock: p.sim_time, realElapsed: p.real_elapsed_s });
       break;
-    case 'result.final':
+    case 'result.final': {
+      const finalReport = { report_markdown: p.report_markdown, sources: p.sources, effort_logical_s: p.effort_logical_s, effort_real_s: p.effort_real_s };
       useStore.setState({
-        report: { report_markdown: p.report_markdown, sources: p.sources, effort_logical_s: p.effort_logical_s, effort_real_s: p.effort_real_s },
-        effortLogical: p.effort_logical_s, reportOpen: true,
+        report: finalReport,
+        effortLogical: p.effort_logical_s,
+        reportOpen: true,
       });
+      const summary = generateCheckpointSummary(useStore.getState());
+      if (summary) {
+        useStore.setState({ checkpointSummary: summary });
+      }
       director.celebrate(e.agent_id ?? 'M0');
       sfx.ping();
       pushLog(e, `Final report delivered — organizational effort ${fmtEffort(p.effort_logical_s)} vs real ${(p.effort_real_s / 60).toFixed(1)} min`);
       break;
+    }
     case 'run.error':
       useStore.setState({ toast: p.message });
       pushLog(e, `Run error: ${p.message}`);
