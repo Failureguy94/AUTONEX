@@ -55,7 +55,7 @@ describe('frontend LiveEngine <-> contract server', () => {
     vi.stubEnv('VITE_API_URL', `http://localhost:${bridge.port}`);
     const { engine } = await import('@/state/engine');
     const { useStore } = await import('@/state/store');
-    const goal = 'Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one';
+    const goal = 'Research 0G Private Computer models and build a small routing verifier';
     await engine.start(goal);
     await until(() => useStore.getState().runEvents.length > 3, 8000, 'first events over WebSocket');
     engine.setSpeed(60); // advisory pacing message

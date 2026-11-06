@@ -46,7 +46,7 @@ def test_crossexam_codet_dual_agreement_and_quarantine():
     engine = CrossExamEngine(test_runner=runner)
 
     candidates = {"cand_1": "code_cand_1", "cand_2": "code_cand_2", "cand_3": "code_cand_3"}
-    families = {"cand_1": "qwen", "cand_2": "llama", "cand_3": "mistral"}
+    families = {"cand_1": "qwen", "cand_2": "glm", "cand_3": "kimi"}
     tests = {
         "test_1": "test_1 assert check()",
         "bad_test": "failing_everywhere",

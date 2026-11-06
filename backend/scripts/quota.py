@@ -42,15 +42,8 @@ def main():
 
             if len(parts) >= 3:
                 endpoint = parts[2]
-                # Categorize provider
-                if "/groq/" in endpoint:
-                    provider = "Groq"
-                elif "/nvidia/" in endpoint:
-                    provider = "NVIDIA NIM"
-                elif "/openrouter/" in endpoint:
-                    provider = "OpenRouter"
-                elif "/zen/go/" in endpoint:
-                    provider = "OpenCode Go"
+                if "/0g/" in endpoint or "router-api.0g.ai" in endpoint:
+                    provider = "0G Private Computer"
                 else:
                     provider = endpoint.split("/")[1] if len(endpoint.split("/")) > 1 else "Other"
                 requests_by_endpoint[provider] += 1

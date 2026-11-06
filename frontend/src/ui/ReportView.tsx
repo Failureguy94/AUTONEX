@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useAccount, useWalletClient } from 'wagmi';
+import { useAccount, useWalletClient, useSwitchChain } from 'wagmi';
 import { useStore } from '@/state/store';
 import { Icon, I } from './Icons';
 import { fmtEffort } from '@/state/events';
@@ -41,6 +41,7 @@ function inline(s: string) {
 export function ReportView() {
   const { address: wagmiAddress, isConnected, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const { switchChainAsync } = useSwitchChain();
 
   // Active address from wagmi or direct window.ethereum
   const activeAddress = useMemo(() => {
@@ -51,8 +52,14 @@ export function ReportView() {
     return null;
   }, [wagmiAddress]);
 
+  // Only flag wrong network when chainId is fully resolved (not undefined/null) AND differs from Rabdi.
+  // When chainId is undefined, wagmi hasn't resolved the chain yet — treat as not-yet-known, not wrong.
   const isWrongNetwork = Boolean(
-    activeAddress && chainId !== undefined && chainId !== rabdiChain.id
+    activeAddress &&
+    isConnected &&
+    chainId !== undefined &&
+    chainId !== null &&
+    chainId !== rabdiChain.id
   );
 
   const [tglmBalance, setTglmBalance] = useState<string | null>(null);
@@ -263,8 +270,21 @@ export function ReportView() {
     setUploadingStorage(true);
     setStorageError(null);
     try {
-      // Ensure we have an active, Rabdi-configured wallet client
-      const client = await ensureRabdiWalletClient(walletClient);
+      // If currently on a different network, attempt to switch to Rabdi first
+      if (isWrongNetwork) {
+        if (switchChainAsync) {
+          try {
+            await switchChainAsync({ chainId: rabdiChain.id });
+          } catch {
+            await switchOrAddRabdiNetwork(walletClient);
+          }
+        } else {
+          await switchOrAddRabdiNetwork(walletClient);
+        }
+      }
+
+      // Ensure we have an active, Rabdi-configured and authorized wallet client
+      const client = await ensureRabdiWalletClient(walletClient, activeAddress);
       const signer = client.account?.address || activeAddress;
       if (!signer) {
         throw new Error('Please connect your Web3 wallet first.');
@@ -735,9 +755,17 @@ export function ReportView() {
                         disabled={switchingNetwork}
                         onClick={async () => {
                           setSwitchingNetwork(true);
+                          setStorageError(null);
                           try {
-                            setStorageError(null);
-                            await switchOrAddRabdiNetwork();
+                            if (switchChainAsync) {
+                              try {
+                                await switchChainAsync({ chainId: rabdiChain.id });
+                                return;
+                              } catch (wagmiErr: any) {
+                                console.warn('[ReportView] switchChainAsync fallback:', wagmiErr);
+                              }
+                            }
+                            await switchOrAddRabdiNetwork(walletClient);
                           } catch (e: any) {
                             setStorageError(formatArkivError(e));
                           } finally {

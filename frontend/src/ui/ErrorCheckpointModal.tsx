@@ -50,8 +50,9 @@ export function ErrorCheckpointModal() {
       // 1. Ensure user has an authorized Rabdi wallet client
       const eth = typeof window !== 'undefined' ? (window as any).ethereum : null;
       let walletClient = null;
+      const expectedSigner = activeAddress || iai.walletAddress;
       try {
-        walletClient = await ensureRabdiWalletClient(wagmiWalletClient);
+        walletClient = await ensureRabdiWalletClient(wagmiWalletClient, expectedSigner);
       } catch (e: any) {
         throw new Error(
           eth

@@ -229,6 +229,17 @@ export function Toolbar() {
           <span>Sim 0G Error</span>
         </button>
 
+        {/* 3-Minute iAI Credit Optimization Demo Button */}
+        <button
+          type="button"
+          onClick={() => useStore.setState({ creditDemoOpen: true })}
+          title="Launch 3-Minute iAI Credit Optimization Demo"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/20 text-[10.5px] font-mono font-semibold transition-all shadow-xs"
+        >
+          <span>⚡</span>
+          <span>iAI Demo</span>
+        </button>
+
         <ConnectWalletButton />
 
         <ToolbarBtn

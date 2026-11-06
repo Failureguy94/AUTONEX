@@ -81,29 +81,35 @@ class PersonaSeatAllocator:
             counts = PERSONA_COUNTS_BY_N[closest_n]
 
         default_model_map = {
-            "qwen": "openrouter/qwen/qwen3.8-27b:free",
-            "gpt-oss": "groq/openai/gpt-oss-20b",
-            "llama": "nvidia/llama-3.1-nemotron-70b-instruct",
-            "mistral": "nvidia/mistralai/codestral-22b-instruct-v0.1",
-            "deepseek": "go/deepseek-v4-flash",
+            "glm": "0g/glm-5.3-flash",
+            "qwen": "0g/qwen3.7-flash",
+            "kimi": "0g/kimi-k2.7-code",
+            "deepseek": "0g/deepseek-v4.1-flash",
         }
-        try:
-            from pathlib import Path
-            import yaml
-            models_path = Path(__file__).resolve().parents[3] / "config" / "models.yaml"
-            if models_path.is_file():
-                with open(models_path, "r", encoding="utf-8") as f:
-                    cfg = yaml.safe_load(f) or {}
-                for m in cfg.get("models", []):
-                    mid = m.get("id", "")
-                    for fam in ("qwen", "gpt-oss", "llama", "mistral", "deepseek"):
-                        if fam in mid.lower():
-                            default_model_map[fam] = mid
-        except Exception:
-            pass
+        catalog_ids = set()
+        from pathlib import Path
+        import yaml
+        models_path = Path(__file__).resolve().parents[3] / "config" / "models.yaml"
+        if models_path.is_file():
+            with open(models_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+            for model_entry in cfg.get("models", []):
+                model_id = model_entry.get("id", "")
+                if model_entry.get("provider") != "zg_compute" or not model_id.startswith("0g/"):
+                    raise ValueError(f"non-0G model found in swarm catalogue: {model_id!r}")
+                catalog_ids.add(model_id)
+                for family in default_model_map:
+                    if family in model_id.lower():
+                        default_model_map[family] = model_id
+        else:
+            catalog_ids.update(default_model_map.values())
 
         families = available_families or list(default_model_map.keys())
-        model_map = available_models or default_model_map
+        model_map = available_models if available_models is not None else default_model_map
+        if not set(model_map.values()).issubset(catalog_ids):
+            raise ValueError("persona model assignments must use model IDs from the 0G catalogue")
+        if not families or any(family not in model_map for family in families):
+            raise ValueError("every persona family must have a configured 0G model")
 
         temps = [0.2, 0.5, 0.8]
         seats: List[SwarmSeat] = []

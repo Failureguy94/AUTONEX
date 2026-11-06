@@ -44,12 +44,12 @@ def test_canary_leak_protection():
 
     # Clean payload passes
     clean_msgs = [{"role": "user", "content": "How do I format dates in python?"}]
-    assert firewall.filter_payload("groq", "gpt-oss-20b", "k1", clean_msgs)
+    assert firewall.filter_payload("zg_compute", "0g/glm-5.3-flash", "k1", clean_msgs)
 
     # Leaked canary raises CanaryLeakViolation immediately
     leaked_msgs = [{"role": "user", "content": f"The secret key is {secret_token}"}]
     with pytest.raises(CanaryLeakViolation):
-        firewall.filter_payload("groq", "gpt-oss-20b", "k1", leaked_msgs)
+        firewall.filter_payload("zg_compute", "0g/glm-5.3-flash", "k1", leaked_msgs)
 
 
 def test_file_classification_restricted():
@@ -63,6 +63,7 @@ def test_file_classification_restricted():
 
 def test_trust_registry_strict_local():
     trust = TrustRegistry()
-    assert trust.is_provider_allowed("ollama_local", "strict_local") is True
+    assert trust.is_provider_allowed("zg_compute", "strict_local") is False
     assert trust.is_provider_allowed("groq", "strict_local") is False
-    assert trust.is_provider_allowed("groq", "free_with_redaction") is True
+    assert trust.is_provider_allowed("zg_compute", "free_with_redaction") is True
+    assert trust.is_provider_allowed("groq", "free_with_redaction") is False

@@ -15,15 +15,10 @@ class ProviderTrust:
     trains_on_prompts: bool  # False only if explicitly verified by terms
 
 
-# Default provider trust registry (unknown => treated as trains_on_prompts=True per §3.1)
+# Unknown providers are denied; 0G retention/training terms must be verified before
+# allowing the more restrictive no_train_only privacy mode.
 DEFAULT_TRUST_REGISTRY: Dict[str, ProviderTrust] = {
-    "groq": ProviderTrust("groq", retention_days=30, trains_on_prompts=True),
-    "cerebras": ProviderTrust("cerebras", retention_days=30, trains_on_prompts=True),
-    "nvidia": ProviderTrust("nvidia", retention_days=30, trains_on_prompts=True),
-    "openrouter": ProviderTrust("openrouter", retention_days=30, trains_on_prompts=True),
-    "mistral": ProviderTrust("mistral", retention_days=30, trains_on_prompts=True),
-    "gemini": ProviderTrust("gemini", retention_days=30, trains_on_prompts=True),
-    "ollama_local": ProviderTrust("ollama_local", retention_days=0, trains_on_prompts=False),
+    "zg_compute": ProviderTrust("zg_compute", retention_days=None, trains_on_prompts=True),
 }
 
 
@@ -32,11 +27,15 @@ class TrustRegistry:
         self.registry = dict(registry or DEFAULT_TRUST_REGISTRY)
 
     def is_provider_allowed(self, provider: str, mode: PrivacyMode) -> bool:
+        if provider != "zg_compute":
+            return False
+        trust = self.registry.get(provider)
+        if trust is None:
+            return False
         if mode == "strict_local":
-            return provider in ("ollama_local", "local")
+            return False
         if mode == "no_train_only":
-            trust = self.registry.get(provider)
-            return trust is not None and not trust.trains_on_prompts
+            return not trust.trains_on_prompts
         if mode == "free_with_redaction":
             return True
         return False

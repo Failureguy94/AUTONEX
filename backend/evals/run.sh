@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PAG_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-MODEL="${1:-groq/llama-3.3-70b-versatile}"
+MODEL="${1:-0g/qwen3-coder-flash}"
 PROFILE="${2:-assist}"
 TIER="${3:-3}"
 RUNS="${4:-1}"

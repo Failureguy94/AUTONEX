@@ -39,6 +39,63 @@ export async function assertSufficientTglm(
 }
 
 /**
+ * Safely extracts a meaningful error message from any error, object, or RPC response.
+ * Guarantees never returning '[object Object]'.
+ */
+function extractErrorMessage(error: unknown): string {
+  if (!error) return '';
+  if (typeof error === 'string') {
+    const trimmed = error.trim();
+    return trimmed === '[object Object]' ? '' : trimmed;
+  }
+  if (typeof error === 'object') {
+    const err = error as Record<string, any>;
+
+    const candidates = [
+      err.shortMessage,
+      err.message,
+      err.details,
+      err.reason,
+      err.data?.message,
+      err.data?.originalError?.message,
+      err.error?.message,
+    ];
+
+    for (const cand of candidates) {
+      if (typeof cand === 'string' && cand.trim() && cand.trim() !== '[object Object]') {
+        return cand.trim();
+      }
+    }
+
+    if (err.cause) {
+      const causeMsg = extractErrorMessage(err.cause);
+      if (causeMsg && causeMsg !== '[object Object]') return causeMsg;
+    }
+
+    try {
+      const json = JSON.stringify(err);
+      if (json && json !== '{}' && json !== '[]') {
+        return json;
+      }
+    } catch {
+      // Ignore cyclic structure
+    }
+
+    if (typeof err.toString === 'function') {
+      try {
+        const s = err.toString();
+        if (s && s !== '[object Object]') return s;
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  const fallback = String(error);
+  return fallback === '[object Object]' ? '' : fallback;
+}
+
+/**
  * User-friendly parser for Web3 and Arkiv RPC transaction errors
  */
 export function formatArkivError(error: unknown): string {
@@ -96,6 +153,7 @@ export function formatArkivError(error: unknown): string {
   if (lower.includes('insufficient funds') || lower.includes('insufficient tglm')) {
     return 'Insufficient tGLM balance for storage fee. Claim tokens from hub.arkiv.network.';
   }
+
   if (
     lower.includes('chainmismatcherror') ||
     lower.includes('wrong chain') ||

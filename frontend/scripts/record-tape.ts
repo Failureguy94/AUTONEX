@@ -5,7 +5,7 @@ import { MockSimulator } from '../src/mock/simulator';
 const GOALS: Record<string, string> = {
   sprint: 'Summarize this repo README in one paragraph',
   standard: 'Add dark mode to the dashboard',
-  heavy: 'Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one',
+  heavy: 'Research 0G Private Computer models and build a small routing verifier',
 };
 mkdirSync('tapes', { recursive: true });
 for (const [name, goal] of Object.entries(GOALS)) {

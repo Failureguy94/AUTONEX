@@ -31,10 +31,10 @@ class Pseudonymizer:
                 self._rev_map[placeholder] = match
             result = result.replace(match, self._fwd_map[match])
 
-        # URLs / hostnames (excluding api endpoints of known LLM providers)
+        # URLs / hostnames (preserve the configured 0G inference endpoint)
         host_pattern = re.compile(r"\b(?:https?://)?([a-zA-Z0-9-]+\.(?:[a-zA-Z0-9-]+\.)*(?:corp|internal|local|com|org|net|io|ai|dev))\b")
         for match in host_pattern.findall(result):
-            if any(p in match for p in ("groq.com", "cerebras.ai", "nvidia.com", "openrouter.ai", "mistral.ai", "googleapis.com")):
+            if "router-api.0g.ai" in match:
                 continue
             if match not in self._fwd_map:
                 placeholder = self._next_placeholder("HOST")

@@ -14,7 +14,7 @@ fastapi, uvicorn, httpx, pydantic, pyyaml, pytest, pytest-asyncio — MIT / BSD 
 No external 3D models or textures. All geometry is procedural; all textures are generated at runtime on `<canvas>`. Fonts are loaded from Google Fonts (Space Grotesk, Inter, JetBrains Mono — SIL OFL). No sounds are bundled (tiny WebAudio blips).
 
 ## Models
-Open-weight models are used through third-party hosted APIs on their free tiers; each model keeps its own license (Apache-2.0 / MIT / OpenRAIL-M / community licenses). Record each model's license in your submission.
+Models are selected exclusively from the 0G Private Computer catalogue. Each upstream model retains its own license (for example Apache-2.0, MIT, OpenRAIL-M, or a community license); verify and record the license for each model used in a submission. Router availability or pricing does not change those model licenses.
 
 ## AUTONEX reference files
 `reference/autonex_reference/` holds the owner's own documents, **unmodified**, for context. They are not part of the MIT grant unless the owner decides so.

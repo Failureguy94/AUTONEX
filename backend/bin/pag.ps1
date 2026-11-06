@@ -77,15 +77,14 @@ if ($Help) {
     Write-Host '  turbo    Auto-approve all actions (requires clean git repo)'
     Write-Host ''
     Write-Host 'Options:' -ForegroundColor Yellow
-    Write-Host '  --model [provider/id]   Override the default model (e.g. groq, nvidia, coder, r1)'
-    Write-Host '  --list-models           Show all configured open-source models'
+    Write-Host '  --model [0g/id]         Override the default 0G model (e.g. coder, fast, reasoning)'
+    Write-Host '  --list-models           Show all configured 0G models'
     Write-Host '  --docker                Run in Docker container sandbox instead of Native mode'
     Write-Host '  --tier [0-3]            Context management tier (default: 3)'
     Write-Host ''
     Write-Host 'Examples:' -ForegroundColor Green
     Write-Host '  pag D:\Django assist'
-    Write-Host '  pag D:\Django assist --model nvidia'
-    Write-Host '  pag D:\Django assist --model groq'
+    Write-Host '  pag D:\Django assist --model coder'
     Write-Host '  pag D:\AUTONEX\scratch-repo assist'
     Write-Host '  pag --list-models'
     exit 0
@@ -93,7 +92,7 @@ if ($Help) {
 
 if ($ListModels -or ($TargetDir -eq '--list-models')) {
     Write-Host ''
-    Write-Host '=== AUTONEX Available Models (Free Tier) ===' -ForegroundColor Cyan
+    Write-Host '=== AUTONEX Available 0G Models ===' -ForegroundColor Cyan
     Write-Host ''
     if (Test-Path $BASE_JSON) {
         $cfg = Get-Content $BASE_JSON -Raw | ConvertFrom-Json
@@ -139,12 +138,25 @@ if ($Model) {
         '0g-code'     { $Model = '0g/qwen3-coder-flash' }
         '0g-qa'       { $Model = '0g/kimi-k2.7-code' }
         'coder'       { $Model = '0g/qwen3-coder-flash' }
-        'groq'        { $Model = 'groq/openai/gpt-oss-120b' }
-        '120b'        { $Model = 'groq/openai/gpt-oss-120b' }
         'qwen'        { $Model = '0g/qwen3-coder-flash' }
-        'openrouter'  { $Model = 'openrouter/qwen/qwen3.8-27b:free' }
         'fast'        { $Model = '0g/qwen-flash' }
         'instant'     { $Model = '0g/qwen-flash' }
+        'reasoning'   { $Model = '0g/deepseek-v4.1-flash' }
+        'r1'          { $Model = '0g/deepseek-v4.1-flash' }
+    }
+    if (-not $Model.StartsWith('0g/')) {
+        Write-Host '[ERROR] Only 0G models are supported.' -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path $BASE_JSON)) {
+        Write-Host "[ERROR] Could not find $BASE_JSON" -ForegroundColor Red
+        exit 1
+    }
+    $cfg = Get-Content $BASE_JSON -Raw | ConvertFrom-Json
+    $ConfiguredModels = $cfg.providers.'0g'.models.PSObject.Properties.Name | ForEach-Object { "0g/$_" }
+    if ($ConfiguredModels -notcontains $Model) {
+        Write-Host "[ERROR] Model '$Model' is not in the configured 0G catalogue." -ForegroundColor Red
+        exit 1
     }
 }
 
@@ -197,6 +209,7 @@ if (Test-Path $GenScript) {
     } else {
         python $GenScript $Profile
     }
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 # 3. Privacy check & record
@@ -271,7 +284,7 @@ try {
     if ($Model) {
         Write-Host " Model:    $Model" -ForegroundColor Yellow
     } else {
-        Write-Host " Model:    openrouter/qwen/qwen3.8-27b:free (Default free - large context)" -ForegroundColor Yellow
+        Write-Host " Model:    0g/glm-5.3-flash" -ForegroundColor Yellow
     }
     Write-Host '================================================================' -ForegroundColor Cyan
     Write-Host ''

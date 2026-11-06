@@ -22,7 +22,9 @@ class PersonaCard(BaseModel):
 
 
 class SupervisorConfig(BaseModel):
-    chain: List[str] = Field(default_factory=lambda: ["mistral/large", "openrouter/qwen/qwen3.8-27b:free", "groq/openai/gpt-oss-120b"])
+    chain: List[str] = Field(default_factory=lambda: [
+        "0g/glm-5.3-flash", "0g/deepseek-v4.1-flash", "0g/qwen3-coder-flash"
+    ])
     reserve_pct: int = 15
     policy: Literal["balanced", "strict", "light"] = "balanced"
 
@@ -123,10 +125,7 @@ class PrivacySettings(BaseModel):
         "**/.env*", "**/*.pem", "**/*.key", "**/secrets/**", "**/*credential*", "**/id_rsa*"
     ])
     pseudonymize: bool = True
-    egress_allowlist_hosts: List[str] = Field(default_factory=lambda: [
-        "api.groq.com", "api.cerebras.ai", "integrate.api.nvidia.com",
-        "openrouter.ai", "api.mistral.ai", "generativelanguage.googleapis.com"
-    ])
+    egress_allowlist_hosts: List[str] = Field(default_factory=lambda: ["router-api.0g.ai"])
 
 
 class SwarmSettings(BaseModel):

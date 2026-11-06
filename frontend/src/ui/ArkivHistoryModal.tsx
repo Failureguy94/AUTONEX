@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
+import { useAccount, useWalletClient, useSwitchChain } from 'wagmi';
 import { type Hex } from 'viem';
-import { ensureRabdiWalletClient } from '@/config/chain';
+import { ensureRabdiWalletClient, rabdiChain, switchOrAddRabdiNetwork } from '@/config/chain';
 import {
   queryPublicRuns,
   queryUserRuns,
@@ -32,8 +32,28 @@ type TabType = 'public' | 'user' | 'swarm_context' | 'lookup';
 type DetailSubTab = 'files' | 'consensus' | 'audit' | 'raw';
 
 export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+
+  // True when wallet is connected but NOT on Rabdi DB-Chain (7794095)
+  const isWrongNetwork = isConnected && chainId !== undefined && chainId !== null && chainId !== rabdiChain.id;
+
+  /**
+   * Attempts to switch to Rabdi DB-Chain via wagmi first (smooth UX),
+   * then falls back to raw EIP-3326 / EIP-3085 request if wagmi fails.
+   */
+  const handleSwitchToRabdi = async () => {
+    try {
+      if (switchChain) {
+        switchChain({ chainId: rabdiChain.id });
+      } else {
+        await switchOrAddRabdiNetwork();
+      }
+    } catch {
+      await switchOrAddRabdiNetwork().catch(() => {});
+    }
+  };
 
   const storeTab = useStore((s) => s.arkivActiveTab);
 
@@ -221,7 +241,7 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
     setExtending(true);
     setStatusMsg(null);
     try {
-      const client = await ensureRabdiWalletClient(walletClient);
+      const client = await ensureRabdiWalletClient(walletClient, address);
       const res = await extendArkivEntity(client, selectedRun.key, 90);
       setStatusMsg({
         type: 'success',
@@ -241,7 +261,7 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
     setDeleting(true);
     setStatusMsg(null);
     try {
-      const client = await ensureRabdiWalletClient(walletClient);
+      const client = await ensureRabdiWalletClient(walletClient, address);
       const res = await deleteArkivEntity(client, selectedRun.key);
       setStatusMsg({
         type: 'success',
@@ -323,7 +343,7 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
     setUploadingContext(true);
     setStatusMsg(null);
     try {
-      const client = await ensureRabdiWalletClient(walletClient);
+      const client = await ensureRabdiWalletClient(walletClient, address);
       const res = await uploadContextWorkflow(client, newPayloadText, {
         projectId: newProjectId,
         userId: address || client.account?.address || 'user-1',
@@ -452,6 +472,27 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
             </a>
           </div>
         </div>
+
+        {/* ── Wrong Network Banner ─────────────────────────────────────── */}
+        {isWrongNetwork && (
+          <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-red-50 border-b border-red-200 text-red-800 text-xs font-body">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
+              <span className="font-medium">
+                Wrong network detected. Please switch your wallet to the{' '}
+                <strong>Rabdi DB-Chain Testnet (Chain ID 7794095)</strong> to perform write
+                operations on Arkiv.
+              </span>
+            </div>
+            <button
+              onClick={handleSwitchToRabdi}
+              disabled={isSwitchingChain}
+              className="shrink-0 rounded-lg border border-red-400 bg-white px-3 py-1 text-[11px] font-heading font-semibold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
+            >
+              {isSwitchingChain ? 'Switching…' : 'Switch to Rabdi'}
+            </button>
+          </div>
+        )}
 
         {/* Main Content Area */}
         <div className="flex-1 flex min-h-0 overflow-hidden">

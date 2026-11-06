@@ -1,5 +1,5 @@
 """
-Provider lane = one rate-limit bucket (per provider-key, or per provider+model when the provider enforces it that way).
+Provider lane = one rate-limit bucket for the configured 0G Router key or model.
 
 Owns: token bucket (RPM, smoothed), sliding TPM window, daily budget, concurrency, 429 pause, AIMD rate scaling,
 and a PRIORITY queue with aging. Callers `await lane.acquire(priority, est_tokens, max_wait)` and get a Lease.

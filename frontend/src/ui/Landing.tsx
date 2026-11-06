@@ -13,7 +13,7 @@ import { ZGConfigModal } from './ZGConfigModal';
 import { ConnectWalletButton } from './ConnectWalletButton';
 
 const CHIPS = [
-  'Compare top 3 open-weight coding models and build a tiny CLI that benchmarks one',
+  'Research 0G Private Computer models and build a small routing verifier',
   'Add dark mode to the dashboard',
   'Summarize this repo README in one paragraph',
   'Build a REST API with auth and tests',
@@ -30,8 +30,8 @@ const ESTIMATES: Record<number, { calls: number; tokens: string; time: string; w
   10: { calls: 43, tokens: '120k', time: '1–2 min' },
   20: { calls: 78, tokens: '210k', time: '2–4 min' },
   30: { calls: 114, tokens: '290k', time: '3–6 min' },
-  40: { calls: 150, tokens: '380k', time: '4–8 min', warning: 'Needs 3+ providers for a smooth run' },
-  50: { calls: 185, tokens: '460k', time: '5–10 min', warning: 'High token volume: 4+ providers recommended' },
+  40: { calls: 150, tokens: '380k', time: '4–8 min', warning: 'High 0G request volume; the gateway may queue calls' },
+  50: { calls: 185, tokens: '460k', time: '5–10 min', warning: 'Very high 0G request volume; the gateway may queue calls' },
 };
 
 const PROFILES = [
@@ -224,6 +224,17 @@ export function Landing() {
             <span>Arkiv & Swarm</span>
           </button>
 
+          {/* 3-Minute iAI Credit Optimization Demo */}
+          <button
+            type="button"
+            onClick={() => useStore.setState({ creditDemoOpen: true })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-mono font-semibold text-emerald-800 transition-transform hover:scale-105 shadow-xs"
+            title="Launch 3-Minute iAI Credit Optimization Demo"
+          >
+            <span>⚡</span>
+            <span>iAI Demo (3m)</span>
+          </button>
+
           {/* Connected Web3 Wallet for Arkiv */}
           <ConnectWalletButton />
 
@@ -274,6 +285,26 @@ export function Landing() {
                 ? 'Structured six-round deliberation protocol: Frame → Diverge → Cluster → Critique → Vote → Synthesize with diversity preservation.'
                 : 'The manager triages your task herself — a quick summary gets done solo before the coffee cools; a full build hires a team for a whole workday, breaks and all.'}
             </p>
+
+            {/* 3-Minute iAI Credit Optimization Demo Banner */}
+            <div
+              onClick={() => useStore.setState({ creditDemoOpen: true })}
+              className="cursor-pointer mb-5 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 transition-all shadow-xs flex items-center justify-between gap-3 group"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚡</span>
+                <div>
+                  <div className="text-xs font-heading font-bold text-emerald-950 flex items-center gap-2">
+                    <span>3-Minute iAI Credit Optimization Demo</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase font-bold">Judge Ready</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-900/80 mt-0.5">
+                    See how AUTONEX eliminates token waste & prevents daily 00:00 UTC credit expiry.
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-mono font-bold text-emerald-800 group-hover:translate-x-1 transition-transform whitespace-nowrap">Launch →</span>
+            </div>
 
             {/* Mode toggle */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-ink/10">
@@ -486,4 +517,3 @@ export function Landing() {
     </div>
   );
 }
-

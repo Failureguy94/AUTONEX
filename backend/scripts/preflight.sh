@@ -91,17 +91,10 @@ if [ -f "$ENV_FILE" ]; then
     echo "[OK] Generated SearXNG secret key in .env"
   fi
 
-  # Report configured providers
-  PROVIDERS=()
-  [ -n "${GO_API_KEY:-}" ]        && PROVIDERS+=("OpenCode Go")
-  [ -n "${GROQ_API_KEY:-}" ]      && PROVIDERS+=("Groq")
-  [ -n "${NVIDIA_API_KEY:-}" ]    && PROVIDERS+=("NVIDIA NIM")
-  [ -n "${OPENROUTER_API_KEY:-}" ] && PROVIDERS+=("OpenRouter")
-  if [ ${#PROVIDERS[@]} -gt 0 ]; then
-    echo "[OK] Configured providers: ${PROVIDERS[*]}"
+  if [ -n "${ZG_API_KEY:-}" ]; then
+    echo "[OK] 0G Private Computer API key is configured"
   else
-    echo "[WARN] No API keys configured! Add at least one to .env"
-    echo "  Free providers: Groq, NVIDIA NIM, OpenRouter, OpenCode Go"
+    echo "[WARN] ZG_API_KEY is not configured in .env"
   fi
 fi
 

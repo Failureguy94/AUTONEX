@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   RunSchema,
   SwarmRoundSchema,
@@ -8,11 +8,13 @@ import {
   ProjectSchema,
   ContextRefSchema,
 } from '../services/arkiv/schemas';
-import { rabdiChain, wagmiConfig } from '../config/chain';
+import { ensureRabdiWalletClient, rabdiChain, wagmiConfig, zeroGChain } from '../config/chain';
 import { arkivPublicClient } from '../services/arkiv/client';
 import { formatArkivError, assertSufficientTglm, RABDI_EXPLORER_URL } from '../services/arkiv/balance';
 import { MAX_ENTITY_BYTES, addr, dec, u64 } from '@arkiv-network/sdk';
+import { createWalletClient, custom } from 'viem';
 import { and, eq } from '@arkiv-network/sdk/query';
+import { getArkivWalletClient } from '../services/arkiv/client';
 
 describe('Arkiv Schemas & Constraints', () => {
   it('RunSchema has correct column types and indexing', () => {
@@ -105,6 +107,64 @@ describe('Arkiv Rabdi Testnet Configuration', () => {
     expect(typeof arkivPublicClient.query).toBe('function');
     expect(typeof arkivPublicClient.getEntity).toBe('function');
   });
+
+  it('Arkiv writes use the selected wallet transport, not another injected wallet', async () => {
+    const selectedRequest = vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'arkiv_query') return { data: [], blockNumber: '0x0' };
+      throw new Error(`Unexpected RPC method: ${method}`);
+    });
+    const otherInjectedRequest = vi.fn(async () => {
+      throw new Error('Unauthorized injected wallet');
+    });
+    vi.stubGlobal('window', { ethereum: { request: otherInjectedRequest } });
+
+    try {
+      const connectedClient = createWalletClient({
+        account: '0x1234567890123456789012345678901234567890',
+        chain: rabdiChain,
+        transport: custom({ request: selectedRequest }),
+      });
+      const arkivWallet = getArkivWalletClient(connectedClient);
+
+      await expect(
+        arkivWallet.request({ method: 'arkiv_query', params: ['{}'] })
+      ).resolves.toEqual({ data: [], blockNumber: '0x0' });
+      expect(selectedRequest).toHaveBeenCalledWith({ method: 'arkiv_query', params: ['{}'] }, undefined);
+      expect(otherInjectedRequest).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('switches the selected wallet to Rabdi without requesting accounts from another provider', async () => {
+    const selectedRequest = vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'eth_chainId') return '0x4165';
+      if (method === 'wallet_switchEthereumChain') return null;
+      throw new Error(`Unexpected RPC method: ${method}`);
+    });
+    const otherInjectedRequest = vi.fn(async () => {
+      throw new Error('Unauthorized injected wallet');
+    });
+    vi.stubGlobal('window', { ethereum: { request: otherInjectedRequest } });
+
+    try {
+      const connectedClient = createWalletClient({
+        account: '0x1234567890123456789012345678901234567890',
+        chain: zeroGChain,
+        transport: custom({ request: selectedRequest }),
+      });
+      const rabdiWallet = await ensureRabdiWalletClient(connectedClient);
+
+      expect(rabdiWallet.chain?.id).toBe(rabdiChain.id);
+      expect(selectedRequest).toHaveBeenNthCalledWith(
+        2,
+        { method: 'wallet_switchEthereumChain', params: [{ chainId: '0x76edaf' }] }
+      );
+      expect(otherInjectedRequest).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('Balance & Error Handling', () => {
@@ -123,6 +183,101 @@ describe('Balance & Error Handling', () => {
   it('formatArkivError maps network mismatch error', () => {
     const err = new Error('ChainMismatchError: Expected chain 7794095');
     expect(formatArkivError(err)).toContain('Rabdi DB-Chain Testnet');
+  });
+
+  it('formatArkivError safely unwraps plain objects without returning [object Object]', () => {
+    expect(formatArkivError({ code: 4001, message: 'User denied transaction signature.' })).toBe(
+      'Transaction cancelled by user in wallet.'
+    );
+    expect(formatArkivError({ code: 4902, message: 'Unrecognized chain ID 0x76edaf' })).toContain(
+      'Rabdi DB-Chain Testnet'
+    );
+    expect(formatArkivError({ shortMessage: 'User rejected the request' })).toBe(
+      'Transaction cancelled by user in wallet.'
+    );
+    expect(formatArkivError({})).not.toBe('[object Object]');
+    expect(formatArkivError({ foo: 'bar' })).not.toBe('[object Object]');
+    expect(formatArkivError('[object Object]')).not.toBe('[object Object]');
+  });
+
+  it('validates Rabdi chain hex ID calculation matches 7794095 (0x76edaf)', () => {
+    expect(`0x${rabdiChain.id.toString(16)}`).toBe('0x76edaf');
+  });
+
+  it('formatArkivError formats MetaMask RPC Error 4100 (Unauthorized) with clear guidance', () => {
+    const error4100 = {
+      code: 4100,
+      message: 'The requested account and/or method has not been authorized by the user.',
+    };
+    expect(formatArkivError(error4100)).toContain('MetaMask account unauthorized');
+    expect(formatArkivError(error4100)).toContain('eth_requestAccounts');
+  });
+
+  it('formatArkivError transforms generic "Execution error without revert data" into meaningful diagnosis', () => {
+    const revertErr = new Error('ContractFunctionExecutionError: Execution error without revert data');
+    const formatted = formatArkivError(revertErr);
+    expect(formatted).not.toBe('Execution error without revert data');
+    expect(formatted).toContain('Arkiv Rabdi DB-Chain transaction reverted');
+    expect(formatted).toContain('7794095');
+    expect(formatted).toContain('tGLM');
+  });
+});
+
+describe('MetaMask Authorization & Checkpoint Storage Flow', () => {
+  it('ensureRabdiWalletClient requests accounts via eth_requestAccounts before accessing signer', async () => {
+    const mockRequest = vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'eth_chainId') return '0x76edaf';
+      if (method === 'eth_requestAccounts') return ['0x999999cf1046e68e36E1aA2E0E07105eDDD1f08E'];
+      throw new Error(`Unexpected RPC method: ${method}`);
+    });
+    vi.stubGlobal('window', { ethereum: { request: mockRequest } });
+
+    try {
+      const client = await ensureRabdiWalletClient(null);
+      expect(mockRequest).toHaveBeenCalledWith({ method: 'eth_requestAccounts' });
+      expect(client.account?.address.toLowerCase()).toBe('0x999999cf1046e68e36e1aa2e0e07105eddd1f08e');
+      expect(client.chain?.id).toBe(7794095);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('ensureRabdiWalletClient throws error on expected address mismatch', async () => {
+    const mockRequest = vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'eth_chainId') return '0x76edaf';
+      if (method === 'eth_requestAccounts') return ['0x999999cf1046e68e36E1aA2E0E07105eDDD1f08E'];
+      throw new Error(`Unexpected RPC method: ${method}`);
+    });
+    vi.stubGlobal('window', { ethereum: { request: mockRequest } });
+
+    try {
+      await expect(
+        ensureRabdiWalletClient(null, '0x1111111111111111111111111111111111111111')
+      ).rejects.toThrow(/Wallet authorization mismatch/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('ensureRabdiWalletClient handles user rejection of eth_requestAccounts gracefully', async () => {
+    const mockRequest = vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'eth_chainId') return '0x76edaf';
+      if (method === 'eth_requestAccounts') {
+        const err: any = new Error('User rejected the request.');
+        err.code = 4001;
+        throw err;
+      }
+      throw new Error(`Unexpected RPC method: ${method}`);
+    });
+    vi.stubGlobal('window', { ethereum: { request: mockRequest } });
+
+    try {
+      await expect(ensureRabdiWalletClient(null)).rejects.toThrow(
+        /Wallet connection cancelled by user in wallet/
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -222,6 +377,3 @@ describe('Failure Mode & Security Validations', () => {
     expect(AuditLogSchema.columns.diff_preview.isIndexed).toBe(false);
   });
 });
-
-
-

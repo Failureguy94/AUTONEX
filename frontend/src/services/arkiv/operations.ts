@@ -2,7 +2,7 @@ import { ExpirationTime, addr, u64, dec } from '@arkiv-network/sdk';
 import { and, eq } from '@arkiv-network/sdk/query';
 import { getAddress, type Hex, type WalletClient } from 'viem';
 import { arkivPublicClient, getArkivWalletClient } from './client';
-import { assertSufficientTglm } from './balance';
+import { assertSufficientTglm, fetchTglmBalance } from './balance';
 import {
   RunSchema,
   DeliverableSchema,
@@ -381,6 +381,18 @@ export async function createArkivProject(walletClient: WalletClient, input: Crea
 export async function saveArkivContextRef(walletClient: WalletClient, input: SaveContextRefInput) {
   if (!walletClient.account) throw new Error('Wallet not connected.');
   const userAddress = getAddress(walletClient.account.address);
+
+  // Verify wallet is on Rabdi DB-Chain before creating entities.
+  // Also guard against walletClient.chain being undefined (wagmi not yet resolved),
+  // in which case the actual chain is unknown and we must treat it as a mismatch.
+  if (!walletClient.chain || walletClient.chain.id !== 7794095) {
+    const actualId = walletClient.chain?.id ?? 'unknown';
+    throw new Error(
+      `Chain ID mismatch: Wallet is connected to Chain ID ${actualId}. ` +
+      `Rabdi DB-Chain (Chain ID 7794095) is required to anchor checkpoints on Arkiv.`
+    );
+  }
+
   await assertSufficientTglm(userAddress);
 
   const arkivWallet = getArkivWalletClient(walletClient);
@@ -404,14 +416,48 @@ export async function saveArkivContextRef(walletClient: WalletClient, input: Sav
     values.summary = input.summary.slice(0, 120);
   }
 
-  const result = await arkivWallet.createEntity(ContextRefSchema, values, {
-    expiration: ExpirationTime.fromDays(90),
-  });
+  try {
+    const result = await arkivWallet.createEntity(ContextRefSchema, values, {
+      expiration: ExpirationTime.fromDays(90),
+    });
 
-  return {
-    entityKey: result.entityKey as Hex,
-    txHash: result.txHash as Hex,
-  };
+    return {
+      entityKey: result.entityKey as Hex,
+      txHash: result.txHash as Hex,
+    };
+  } catch (err: any) {
+    const code = err?.code ?? err?.cause?.code;
+    const msg = (err?.shortMessage || err?.message || String(err)).toLowerCase();
+
+    if (code === 4100 || msg.includes('4100') || msg.includes('unauthorized')) {
+      throw new Error(
+        `MetaMask RPC Error 4100: Unauthorized account or method. The active signer (${userAddress}) ` +
+        `has not been authorized by MetaMask. Please approve account access via eth_requestAccounts.`
+      );
+    }
+
+    if (
+      msg.includes('without revert data') ||
+      msg.includes('execution reverted') ||
+      msg.includes('contractfunctionexecutionerror')
+    ) {
+      let balanceInfo = '';
+      try {
+        const bal = await fetchTglmBalance(userAddress);
+        if (bal.value < 100_000_000_000_000n) {
+          balanceInfo = ` Current balance is ${bal.formatted} tGLM.`;
+        }
+      } catch {}
+
+      throw new Error(
+        `Arkiv Rabdi DB-Chain transaction reverted during execution.${balanceInfo} ` +
+        `Please ensure your wallet (${userAddress}) is connected to Rabdi DB-Chain (Chain ID 7794095) with sufficient tGLM for storage and gas fees. ` +
+        `Free testnet tGLM can be claimed at https://hub.arkiv.network/.`
+      );
+    }
+
+    throw err;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

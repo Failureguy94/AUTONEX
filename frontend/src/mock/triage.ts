@@ -8,12 +8,12 @@ export interface TriageOut {
 }
 
 const PRESETS: Record<string, Omit<DepartmentDef, 'hue'>> = {
-  frontend:  { id: 'frontend',  name: 'Frontend',  bay: 'NE', capability: 'UI code, components, styles',       lead_model: 'openrouter/qwen/qwen3.8-27b:free',        worker_model: 'groq/openai/gpt-oss-20b',                    est_workers: 2 },
-  backend:   { id: 'backend',   name: 'Backend',   bay: 'NW', capability: 'APIs, services, CLI, core logic',   lead_model: 'openrouter/qwen/qwen3.8-27b:free',        worker_model: 'nvidia/deepseek-ai/deepseek-v4.1-flash',    est_workers: 2 },
-  research:  { id: 'research',  name: 'Research',  bay: 'NW', capability: 'SearXNG-grounded gathering',        lead_model: 'openrouter/google/gemma-4-31b-it:free',   worker_model: 'openrouter/google/gemma-4-31b-it:free',     est_workers: 2 },
-  data:      { id: 'data',      name: 'Data & Evals', bay: 'SW', capability: 'benchmarks, metrics, validation', lead_model: 'openrouter/nvidia/nemotron-3.5-lightning:free', worker_model: 'openrouter/nvidia/nemotron-3.5-lightning:free', est_workers: 2 },
-  qa:        { id: 'qa',        name: 'QA',        bay: 'SW', capability: 'test runs, validation gates',       lead_model: 'openrouter/nvidia/nemotron-3.5-lightning:free', worker_model: 'nvidia/deepseek-ai/deepseek-v4.1-flash',  est_workers: 1 },
-  content:   { id: 'content',   name: 'Content & Docs', bay: 'SE', capability: 'synthesis, README, report',    lead_model: 'go/glm-5.3-flash',                        worker_model: 'go/glm-5.3-flash',                          est_workers: 2 },
+  frontend:  { id: 'frontend',  name: 'Frontend',  bay: 'NE', capability: 'UI code, components, styles',       lead_model: '0g/glm-5.3-flash',       worker_model: '0g/qwen3-coder-flash',    est_workers: 2 },
+  backend:   { id: 'backend',   name: 'Backend',   bay: 'NW', capability: 'APIs, services, CLI, core logic',   lead_model: '0g/glm-5.3-flash',       worker_model: '0g/qwen3-coder-flash',    est_workers: 2 },
+  research:  { id: 'research',  name: 'Research',  bay: 'NW', capability: 'SearXNG-grounded gathering',        lead_model: '0g/glm-5.3-flash',       worker_model: '0g/deepseek-v4.1-flash',  est_workers: 2 },
+  data:      { id: 'data',      name: 'Data & Evals', bay: 'SW', capability: 'benchmarks, metrics, validation', lead_model: '0g/glm-5.3-flash',       worker_model: '0g/qwen-flash',          est_workers: 2 },
+  qa:        { id: 'qa',        name: 'QA',          bay: 'SW', capability: 'test runs, validation gates',       lead_model: '0g/kimi-k2.7-code',      worker_model: '0g/deepseek-v4.1-flash',  est_workers: 1 },
+  content:   { id: 'content',   name: 'Content & Docs', bay: 'SE', capability: 'synthesis, README, report',    lead_model: '0g/glm-5.3-flash',       worker_model: '0g/qwen-flash',          est_workers: 2 },
 };
 
 // hue offsets spaced so any subset reads distinctly
