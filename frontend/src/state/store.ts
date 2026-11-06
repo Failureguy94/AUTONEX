@@ -339,27 +339,18 @@ export const useStore = create<Store>((set, get) => ({
     const masked = trimmed.length <= 8 ? '••••' + trimmed.slice(-2) : trimmed.slice(0, 4) + '••••••••' + trimmed.slice(-4);
 
     try {
-      // Direct live verification against 0G Private Computer Router API (supports CORS)
-      const zgRes = await fetch('https://router-api.0g.ai/v1/chat/completions', {
+      // Verify via backend bridge server to bypass browser CORS restrictions
+      const verifyRes = await fetch(apiUrl('/api/config/0g/verify'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${trimmed}`,
-          'X-0G-Provider-Trust-Mode': 'standard'
-        },
-        body: JSON.stringify({
-          model: 'qwen-flash',
-          messages: [{ role: 'user', content: 'ping' }],
-          max_tokens: 1
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: trimmed }),
         signal: AbortSignal.timeout(15000)
       });
 
-      const capturedRequestId = zgRes.headers.get('x-request-id') || zgRes.headers.get('request-id');
+      const data = await verifyRes.json().catch(() => null);
 
-      // HTTP 200 or 429 confirms valid token
-      if (zgRes.ok || zgRes.status === 429) {
-        const effectiveId = capturedRequestId || `req_0g_${Date.now()}`;
+      if (data && data.valid) {
+        const effectiveId = data.requestId || `req_0g_${Date.now()}`;
         try {
           if (typeof window !== 'undefined') {
             sessionStorage.setItem('zg_api_key', trimmed);
@@ -370,51 +361,42 @@ export const useStore = create<Store>((set, get) => ({
           zgConnection: {
             status: 'connected',
             isVerified: true,
-            maskedKey: masked,
+            maskedKey: data.maskedKey || masked,
             error: null,
             lastVerifiedAt: new Date().toISOString(),
             requestId: effectiveId
           }
         });
 
-        // Background sync to bridge server if online
-        fetch(apiUrl('/api/config/0g/verify'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: trimmed })
-        }).catch(() => {});
-
         return { valid: true, message: '0G Private Computer credentials successfully verified' };
       }
 
-      // HTTP 401 or 403: Invalid Key
-      if (zgRes.status === 401 || zgRes.status === 403) {
+      if (data && data.status === 'invalid_key') {
         set({
           zgConnection: {
             status: 'invalid_key',
             isVerified: false,
             maskedKey: null,
-            error: 'Invalid 0G API Key: authentication failed (401)',
+            error: data.message || 'Invalid 0G API Key: authentication failed (401)',
             lastVerifiedAt: null,
-            requestId: capturedRequestId || null
+            requestId: data.requestId || null
           }
         });
-        return { valid: false, message: 'Invalid 0G API Key: authentication failed (401)' };
+        return { valid: false, message: data.message || 'Invalid 0G API Key: authentication failed (401)' };
       }
 
-      // HTTP 5xx: Service unavailable
-      const errText = await zgRes.text();
+      const errMsg = data?.message || `0G service unavailable (HTTP ${verifyRes.status})`;
       set({
         zgConnection: {
           status: 'unavailable',
           isVerified: false,
           maskedKey: null,
-          error: `0G service unavailable (HTTP ${zgRes.status})`,
+          error: errMsg,
           lastVerifiedAt: null,
-          requestId: capturedRequestId || null
+          requestId: data?.requestId || null
         }
       });
-      return { valid: false, message: `0G service unavailable (HTTP ${zgRes.status}): ${errText.slice(0, 100)}` };
+      return { valid: false, message: errMsg };
     } catch (err: any) {
       const isAbort = err.name === 'AbortError' || err.name === 'TimeoutError';
       const errMsg = isAbort
