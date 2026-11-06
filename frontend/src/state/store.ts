@@ -103,6 +103,8 @@ interface Store {
   zgConnection: ZGConnectionState;
   zgModalOpen: boolean;
   iai: IAIState;
+  creditDemoOpen: boolean;
+  setCreditDemoOpen: (open: boolean) => void;
   errorCheckpointModalOpen: boolean;
   errorCheckpointData: ErrorCheckpointData | null;
   setErrorCheckpointModalOpen: (open: boolean) => void;
@@ -127,7 +129,7 @@ interface Store {
 let logId = 0;
 export const useStore = create<Store>((set, get) => ({
   phase: 'landing',
-  goal: '', modelId: 'openrouter/google/gemma-4-31b-it:free', models: [], mode: 'live',
+  goal: '', modelId: '0g/glm-5.3-flash', models: [], mode: 'live',
   view: '3d', night: false, flows: false, dev: false,
   speed: 1, paused: false, accent: DEFAULT_ACCENT,
   simClock: '09:00', realElapsed: 0, effortLogical: 0,
@@ -191,6 +193,8 @@ export const useStore = create<Store>((set, get) => ({
     totalCostMicroUsd: 0,
     lastRequestId: null
   },
+  creditDemoOpen: false,
+  setCreditDemoOpen: (open) => set({ creditDemoOpen: open }),
   errorCheckpointModalOpen: false,
   errorCheckpointData: null,
   setErrorCheckpointModalOpen: (open) => set({ errorCheckpointModalOpen: open }),

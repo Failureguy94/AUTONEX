@@ -5,6 +5,7 @@
  */
 
 import { loadEnv } from './env';
+import { MODELS } from '../../src/mock/data';
 
 loadEnv();
 
@@ -109,12 +110,12 @@ export interface ZGRequestRecord {
 
 // 1. Task-Based Model Router (Approved Step 3 Matrix)
 export const TASK_MODEL_ROUTING: Record<ZGTask, string[]> = {
-  planning:   ['glm-5.3-flash', 'kimi-k3', 'deepseek-v4.1-flash'],
-  framing:    ['glm-5.3-flash', 'kimi-k3', 'deepseek-v4.1-flash'],
-  code:       ['qwen3-coder-flash', 'deepseek-v4.1-flash', 'deepseek-v4-flash'],
+  planning:   ['glm-5.3-flash', 'deepseek-v4.1-flash'],
+  framing:    ['glm-5.3-flash', 'deepseek-v4.1-flash'],
+  code:       ['qwen3-coder-flash', 'deepseek-v4.1-flash', 'glm-5.3-flash'],
   qa:         ['kimi-k2.7-code', 'deepseek-v4.1-flash', 'qwen3-coder-flash'],
-  divergence: ['qwen3.7-flash', 'qwen-flash', 'qwen3.5-flash'],
-  critique:   ['glm-5.3-flash', 'minimax-m3.1-flash', 'deepseek-v4.1-flash'],
+  divergence: ['qwen3.7-flash', 'qwen-flash', 'glm-5.3-flash'],
+  critique:   ['glm-5.3-flash', 'deepseek-v4.1-flash', 'qwen3.7-flash'],
   voting:     ['qwen-flash', 'qwen3.7-flash'],
   synthesis:  ['qwen3-coder-flash', 'deepseek-v4.1-flash', 'glm-5.3-flash'],
   chat:       ['glm-5.3-flash', 'deepseek-v4.1-flash', 'qwen3-coder-flash'],
@@ -330,9 +331,15 @@ export class ZGInferenceClient {
    */
   public async call(options: ZGCallOptions): Promise<ZGInferenceResult> {
     const task = options.task || 'general';
-    const candidateModels = options.model
-      ? [options.model]
+    const requestedModel = options.model?.replace(/^0g\//, '');
+    const candidateModels = requestedModel
+      ? [requestedModel]
       : (TASK_MODEL_ROUTING[task] || TASK_MODEL_ROUTING.general);
+    const configuredModelIds = new Set(MODELS.map((model) => model.id.replace(/^0g\//, '')));
+    const unsupportedModels = candidateModels.filter((model) => !configuredModelIds.has(model));
+    if (unsupportedModels.length > 0) {
+      throw new Error(`Unsupported model selection; choose a configured 0G model: ${unsupportedModels.join(', ')}`);
+    }
     const trustMode = options.trustMode || this.defaultTrustMode;
     const timeoutMs = options.timeoutMs || this.defaultTimeoutMs;
 
@@ -862,4 +869,3 @@ export class ZGInferenceClient {
 
 // Global Singleton Instance
 export const zgClient = new ZGInferenceClient();
-

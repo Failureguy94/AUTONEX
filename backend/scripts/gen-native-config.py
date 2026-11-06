@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate native OpenCode configuration from profiles/base.json and .env.
-Points directly to official provider HTTPS endpoints with no Docker/proxy required.
+Points directly to the 0G Private Computer Router with no Docker/proxy required.
 Writes to %USERPROFILE%/.config/opencode/opencode.json and build/native-<profile>.json.
 """
 
@@ -39,20 +39,14 @@ def main():
     with open(base_file, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    # Replace proxy URLs with real endpoints and inject keys
-    endpoints = {
-        "groq": ("https://api.groq.com/openai/v1", env_vars.get("GROQ_API_KEY", "")),
-        "nvidia": ("https://integrate.api.nvidia.com/v1", env_vars.get("NVIDIA_API_KEY", "")),
-        "openrouter": ("https://openrouter.ai/api/v1", env_vars.get("OPENROUTER_API_KEY", "")),
-        "go": ("https://opencode.ai/zen/go/v1", env_vars.get("GO_API_KEY", "")),
-        "go-anthropic": ("https://opencode.ai/zen/go/v1", env_vars.get("GO_API_KEY", "")),
-    }
-
     providers = config.get("providers", {})
-    for p_name, (url, key) in endpoints.items():
-        if p_name in providers:
-            providers[p_name]["settings"]["baseURL"] = url
-            providers[p_name]["settings"]["apiKey"] = key
+    api_key = env_vars.get("ZG_API_KEY", "")
+    if not api_key:
+        raise SystemExit("ZG_API_KEY is required for 0G Private Computer inference")
+    if set(providers) != {"0g"}:
+        raise SystemExit("The AUTONEX model configuration must contain only the 0G provider")
+    providers["0g"]["settings"]["baseURL"] = "https://router-api.0g.ai/v1"
+    providers["0g"]["settings"]["apiKey"] = api_key
 
     # Merge permissions
     if os.path.isfile(rules_file):
@@ -61,6 +55,9 @@ def main():
 
     # Model override
     if model_override:
+        configured_models = {f"0g/{model_id}" for model_id in providers["0g"].get("models", {})}
+        if model_override not in configured_models:
+            raise SystemExit(f"Unsupported model '{model_override}'. Select a configured 0G model.")
         config["model"] = model_override
         if "agents" in config:
             for ag in ["build", "plan"]:

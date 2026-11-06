@@ -459,7 +459,7 @@ export function generateCheckpointSummary(
   if (detectedTech.size === 0) detectedTech.add('JavaScript / TypeScript');
 
   const archDetails: string[] = [
-    `Model: ${store.modelId || 'openrouter/google/gemma-4-31b-it:free'}`,
+    `Model: ${store.modelId || '0g/glm-5.3-flash'}`,
     `Agent departments: ${Object.keys(store.agents).length > 0 ? Array.from(new Set(agentList.map((a) => a.department || a.role))).join(', ') : 'Centralized Floor'}`,
   ];
   if (store.triage?.intensity) {
@@ -663,4 +663,3 @@ export function formatCheckpointSummaryMarkdown(s: CheckpointSummary): string {
 }
 
 export const checkpointSummaryToMarkdown = formatCheckpointSummaryMarkdown;
-

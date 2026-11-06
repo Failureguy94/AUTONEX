@@ -28,13 +28,15 @@ export function getArkivWalletClient(walletClient: WalletClient) {
     throw new Error('WalletClient must have an active account attached.');
   }
 
-  const eth = typeof window !== 'undefined' ? (window as any).ethereum : null;
-  const transportSource = eth || walletClient.transport;
+  const transport = walletClient.transport as any;
+  const provider =
+    (transport?.provider && typeof transport.provider.request === 'function' ? transport.provider : null) ||
+    (typeof transport?.request === 'function' ? { request: transport.request } : null) ||
+    (typeof window !== 'undefined' ? (window as any).ethereum : null);
 
   return createWalletClient({
     account: walletClient.account,
     chain: rabdi({ accessKey: getAccessKey() }),
-    transport: custom(transportSource),
+    transport: custom(provider),
   });
 }
-

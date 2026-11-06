@@ -12,11 +12,17 @@ REQ = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 100}
 
 def make(clock, *, rpm=None, lane_rpm=60, concurrency=2, max_conc=4, max_wait=180, latency=1.0, poll=0.05, events=None):
     models = [
-        ModelSpec("a/small", "a", 8_000), ModelSpec("a/big", "a", 128_000),
-        ModelSpec("b/main", "b", 128_000), ModelSpec("b/alt", "b", 128_000),
+        ModelSpec("0g/qwen-flash", "zg_compute", 8_000),
+        ModelSpec("0g/glm-5.3-flash", "zg_compute", 128_000),
+        ModelSpec("0g/deepseek-v4.1-flash", "zg_compute", 128_000),
+        ModelSpec("0g/kimi-k2.7-code", "zg_compute", 128_000),
     ]
-    router = ModelRouter(models, {"manager": ["a/big", "b/main"], "fast": ["a/small", "b/alt"], "x": ["a/small", "a/big"]})
-    lanes = {"a": LaneConfig("a", rpm=lane_rpm, concurrency=concurrency), "b": LaneConfig("b", rpm=lane_rpm, concurrency=concurrency)}
+    router = ModelRouter(models, {
+        "manager": ["0g/glm-5.3-flash", "0g/deepseek-v4.1-flash"],
+        "fast": ["0g/qwen-flash", "0g/kimi-k2.7-code"],
+        "x": ["0g/qwen-flash", "0g/glm-5.3-flash"],
+    })
+    lanes = {"zg_compute": LaneConfig("zg_compute", rpm=lane_rpm, concurrency=concurrency)}
     up = FakeUpstream(clock, rpm=rpm, latency=latency)
     ev = events if events is not None else []
     gw = Gateway(router, lanes, up, clock, max_concurrency=max_conc, max_wait_s=max_wait,
@@ -136,7 +142,7 @@ async def test_429_with_retry_after_is_absorbed_caller_sees_success():
     clock = FakeClock()
     ev = []
     gw, up, _ = make(clock, events=ev)
-    up.plan("a/big", UpstreamError("rate", 429, retry_after=20.0))
+    up.plan("0g/glm-5.3-flash", UpstreamError("rate", 429, retry_after=20.0))
     t = asyncio.create_task(gw.call("manager", REQ, priority=0, agent_id="M0", role="manager"))
     await clock.advance(10.0)
     assert not t.done()                                # waiting out Retry-After, no error surfaced
@@ -144,18 +150,18 @@ async def test_429_with_retry_after_is_absorbed_caller_sees_success():
     await clock.advance(40.0)
     resp = await t
     assert resp.content == "ok"
-    assert [m for _, m in up.calls].count("a/big") == 2   # exactly one retry, same model
+    assert [m for _, m in up.calls].count("0g/glm-5.3-flash") == 2   # exactly one retry, same model
     assert up.calls[1][0] >= 20.0                         # nothing was sent before Retry-After elapsed
 
 
 async def test_429_without_header_backs_off_exponentially_and_halves_rate():
     clock = FakeClock()
     gw, up, _ = make(clock)
-    up.plan("a/big", UpstreamError("rate", 429), UpstreamError("rate", 429))
+    up.plan("0g/glm-5.3-flash", UpstreamError("rate", 429), UpstreamError("rate", 429))
     t = asyncio.create_task(gw.call("manager", REQ))
     await clock.advance(120.0)
     await t
-    lane = gw.hub.lanes["a"]
+    lane = gw.hub.lanes["zg_compute"]
     assert lane.scale < 0.5                              # AIMD cut twice, only slightly regrown
     gaps = [b[0] - a[0] for a, b in zip(up.calls, up.calls[1:])]
     assert gaps[1] > gaps[0]                              # backoff grows
@@ -164,35 +170,37 @@ async def test_429_without_header_backs_off_exponentially_and_halves_rate():
 async def test_5xx_retries_same_model_twice_then_falls_back_to_next_model():
     clock = FakeClock()
     gw, up, _ = make(clock)
-    up.plan("a/big", *[UpstreamError("server", 503)] * 3)
+    up.plan("0g/glm-5.3-flash", *[UpstreamError("server", 503)] * 3)
     t = asyncio.create_task(gw.call("manager", REQ))
     await clock.advance(120.0)
     resp = await t
     models = [m for _, m in up.calls]
-    assert models[:3] == ["a/big"] * 3 and models[3] == "b/main" and resp.content == "ok"
+    assert models[:3] == ["0g/glm-5.3-flash"] * 3 and models[3] == "0g/deepseek-v4.1-flash" and resp.content == "ok"
 
 
 async def test_context_error_does_not_retry_and_advances_chain():
     clock = FakeClock()
     gw, up, _ = make(clock)
-    up.plan("a/big", UpstreamError("context", 400))
+    up.plan("0g/glm-5.3-flash", UpstreamError("context", 400))
     t = asyncio.create_task(gw.call("manager", REQ))
     await clock.advance(30.0)
     await t
-    assert [m for _, m in up.calls] == ["a/big", "b/main"]
+    assert [m for _, m in up.calls] == ["0g/glm-5.3-flash", "0g/deepseek-v4.1-flash"]
 
 
 async def test_auth_failure_kills_the_provider_for_the_run_and_reports_it():
     clock = FakeClock()
     ev = []
     gw, up, _ = make(clock, events=ev)
-    up.plan("a/big", UpstreamError("auth", 401))
+    up.plan("0g/glm-5.3-flash", UpstreamError("auth", 401))
     t = asyncio.create_task(gw.call("manager", REQ))
     await clock.advance(30.0)
-    await t
-    assert "a" in gw.dead_providers
+    with pytest.raises(AllModelsFailed):
+        await t
+    assert "zg_compute" in gw.dead_providers
+    assert [model for _, model in up.calls] == ["0g/glm-5.3-flash"]
     assert any(e[0] == "run.error" and "key" in e[1]["message"] and "sk-" not in e[1]["message"] for e in ev)
-    t2 = asyncio.create_task(gw.call("x", REQ))        # chain a/small -> a/big : both dead -> must fail, not hang
+    t2 = asyncio.create_task(gw.call("x", REQ))        # provider key rejected: must fail, not hang
     await clock.advance(5.0)
     with pytest.raises(AllModelsFailed):
         await t2
@@ -202,10 +210,10 @@ async def test_over_context_prompt_is_never_routed_to_small_model():
     clock = FakeClock()
     gw, up, _ = make(clock)
     big = {"messages": [{"role": "user", "content": "x" * 60_000}], "max_tokens": 100}   # ~17k tokens > 8k
-    t = asyncio.create_task(gw.call("x", big))          # chain: a/small (8k) -> a/big (128k)
+    t = asyncio.create_task(gw.call("x", big))          # chain: small context -> larger 0G model
     await clock.advance(5.0)
     await t
-    assert [m for _, m in up.calls] == ["a/big"]
+    assert [m for _, m in up.calls] == ["0g/glm-5.3-flash"]
 
 
 async def test_context_too_long_for_every_model_raises_clear_error():
@@ -217,7 +225,7 @@ async def test_context_too_long_for_every_model_raises_clear_error():
 
 
 async def _call_small_only(gw, req):
-    gw.router.aliases["tiny"] = ["a/small"]
+    gw.router.aliases["tiny"] = ["0g/qwen-flash"]
     return await gw.call("tiny", req)
 
 
@@ -240,7 +248,7 @@ async def test_load_50_concurrent_requests_rpm20_never_trips_the_provider_limit(
     ev = []
     gw, up, _ = make(clock, rpm={"a": 20, "b": 20}, lane_rpm=20, concurrency=3, max_conc=3, latency=2.0, poll=0.25, events=ev)
     # every call targets provider a only
-    gw.router.aliases["only_a"] = ["a/big"]
+    gw.router.aliases["only_a"] = ["0g/glm-5.3-flash"]
     tasks = [asyncio.create_task(gw.call("only_a", REQ, priority=3, agent_id=f"W{i}")) for i in range(50)]
     await clock.advance(400.0, step=0.25)
     results = await asyncio.gather(*tasks)

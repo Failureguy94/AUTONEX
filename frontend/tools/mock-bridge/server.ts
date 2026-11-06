@@ -200,11 +200,7 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
               live: zgClient.hasApiKey(),
               base_url: zgClient.getBaseURL(),
               primary_model: 'glm-5.3-flash'
-            },
-            groq: !!process.env.GROQ_API_KEY,
-            gemini: !!process.env.GEMINI_API_KEY,
-            nvidia_nim: !!process.env.NVIDIA_API_KEY,
-            openrouter: !!process.env.OPENROUTER_API_KEY,
+            }
           },
           active_runs: runs.size,
           endpoints: {
@@ -230,11 +226,7 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
               active: true,
               live: zgClient.hasApiKey(),
               base_url: zgClient.getBaseURL()
-            },
-            groq: !!process.env.GROQ_API_KEY,
-            gemini: !!process.env.GEMINI_API_KEY,
-            nvidia: !!process.env.NVIDIA_API_KEY,
-            openrouter: !!process.env.OPENROUTER_API_KEY
+            }
           }
         });
       }
@@ -311,6 +303,45 @@ export function createServer(port = Number(process.env.PORT ?? 8000)) {
       if (p === '/api/iai/balance' && req.method === 'GET') {
         const balance = await zgClient.checkAccountBalance();
         return json(res, 200, balance);
+      }
+
+      // ----------------------------------------------------------------------
+      // iAI Credit Optimization Demo Endpoints
+      // ----------------------------------------------------------------------
+      if (p === '/api/iai/credit-optimization/status' && req.method === 'GET') {
+        const address = url.searchParams.get('address') || '';
+        const mode = url.searchParams.get('mode') || 'demo';
+        try {
+          const { getDemoCreditAccount, getProductionCreditAccount } = await import('../../src/services/creditOptimization/creditManager');
+          const account = mode === 'demo'
+            ? getDemoCreditAccount()
+            : await getProductionCreditAccount(address || null);
+          return json(res, 200, account);
+        } catch (err: any) {
+          return json(res, 500, { error: err?.message || 'Error fetching credit status' });
+        }
+      }
+
+      if (p === '/api/iai/credit-optimization/prioritize' && req.method === 'POST') {
+        try {
+          const b = await readBody(req);
+          const { prioritizeTasks } = await import('../../src/services/creditOptimization/taskPrioritizer');
+          const result = prioritizeTasks(b.backlog, b.availableCreditBudget, b.secondsUntilExpiry);
+          return json(res, 200, result);
+        } catch (err: any) {
+          return json(res, 500, { error: err?.message || 'Error prioritizing tasks' });
+        }
+      }
+
+      if (p === '/api/iai/credit-optimization/checkpoint' && req.method === 'POST') {
+        try {
+          const b = await readBody(req);
+          const { storeAndVerifySwarmCheckpoint } = await import('../../src/services/creditOptimization/checkpointManager');
+          const result = await storeAndVerifySwarmCheckpoint(b.payload);
+          return json(res, 200, result);
+        } catch (err: any) {
+          return json(res, 500, { error: err?.message || 'Error storing checkpoint to Swarm' });
+        }
       }
 
       if (p === '/api/zg/test-inference' && req.method === 'POST') {

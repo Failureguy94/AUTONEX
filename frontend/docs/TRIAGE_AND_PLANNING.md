@@ -21,9 +21,9 @@ Two stages, both cheap, run before anything is spawned. Emits `task.triaged`.
 
 **Stage A — heuristic (zero cost, instant, offline).** Word-boundary keyword/structure signals. The reference implementation is
 `src/mock/triage.ts` (`triage()`), covered by `src/tests/triage.test.ts`. Port it verbatim to Python as `triage/heuristic.py`; it is
-also the fallback when every provider is down. **Word-boundary matching is mandatory** (the first draft matched `ui` inside `build`).
+also the fallback when the 0G Router is unavailable. **Word-boundary matching is mandatory** (the first draft matched `ui` inside `build`).
 
-**Stage B — LLM confirm.** One call to the fastest small model (default `groq/openai/gpt-oss-20b`, 8k context is plenty). Input: the goal
+**Stage B — LLM confirm.** One call to the fastest configured 0G model (default `0g/glm-5.3-flash`). Input: the goal
 (≤ 2k chars), optional repo-map summary (≤ 1k tokens), the Stage-A guess. Output: strict JSON, validated by pydantic, **one repair retry**, then fall back to Stage A:
 
 ```json

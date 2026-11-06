@@ -36,8 +36,8 @@ class UpstreamResponse:
 
 @dataclass(frozen=True)
 class ModelSpec:
-    id: str            # fully qualified, e.g. "openrouter/google/gemma-4-31b-it:free"
-    provider: str      # lane family, e.g. "openrouter"
+    id: str            # 0G catalogue ID, e.g. "0g/glm-5.3-flash"
+    provider: str      # always "zg_compute"
     context: int       # EFFECTIVE context window in tokens
     upstream_id: str = ""
     scope: str = "per_key"   # "per_key" -> one lane per provider; "per_model" -> one lane per model
@@ -49,6 +49,9 @@ class Upstream(Protocol):
 
 class ModelRouter:
     def __init__(self, models: list[ModelSpec], aliases: dict[str, list[str]]) -> None:
+        for model in models:
+            if model.provider != "zg_compute" or not model.id.startswith("0g/"):
+                raise ValueError(f"only 0G models are supported: {model.id!r}")
         self.models = {m.id: m for m in models}
         self.aliases = aliases
         for a, chain in aliases.items():

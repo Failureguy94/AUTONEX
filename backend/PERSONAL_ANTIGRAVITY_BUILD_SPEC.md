@@ -3,6 +3,11 @@
 **Audience:** the engineer (human or AI) who will build this system end to end.
 **Status:** final design, dated 2 Oct 2026. Decisions are made. Where something could not be confirmed from documentation, this spec gives a detection test and a prescribed fallback instead of an open question (Section 13).
 
+**Current model policy:** AUTONEX supports 0G Private Computer exclusively. The
+older OpenCode Go model and provider instructions in this historical build spec
+are superseded by `profiles/base.json`, `backend/README.md`, and
+`frontend/docs/MODEL_ROUTING_AND_RATE_LIMITS.md`.
+
 ---
 
 ## 1. Objective
@@ -70,8 +75,8 @@ An IDE or editor; a custom GUI; a vector database; local model serving; multi-us
 |---|---|---|
 | D1 | **Engine: OpenCode 2.x** (MIT), pinned. Do not write an agent loop | It already provides edit tools, permissions, MCP, plugins, snapshots/undo, compaction, TUI, headless run. Building these is months of work with no differentiation |
 | D2 | **Run in standalone mode inside Docker**: `opencode --standalone` | By default OpenCode starts one shared per-user background service that executes tools with the host user's authority. Standalone keeps it private and containerized |
-| D3 | **Model access: OpenCode Go** (open-weight models, published 0-day-retention table), through a **local nginx key-injecting proxy** | One key, many open models, predictable cost. The key never enters the sandbox |
-| D4 | **Model roster (Section 6)** with default `deepseek-v4-flash` for `build`, `deepseek-v4-pro` for `plan`, escalation to `glm-5.2` then `kimi-k3` | Cheap default for small edits; stronger models for planning and hard tasks. Final defaults are set by eval results (Section 12) |
+| D3 | **Model access: 0G Private Computer** through a local nginx key-injecting proxy in Docker mode | One supported model provider; the key never enters the sandbox |
+| D4 | **Model roster:** configured 0G models in `profiles/base.json`; role fallbacks remain within 0G | Every supported model and override is constrained to the 0G catalogue |
 | D5 | **Client: TUI in a tmux layout** (agent pane, live audit pane, live diff-stat pane) | Documented, reliable. Web client is not part of the MVP because diff display there is unverified |
 | D6 | **Sandbox: Docker Compose** with an internal-only network, an allowlist egress proxy (Squid), and a key-injecting model proxy (nginx) | Standard, testable, no extra daemons |
 | D7 | **Web search: SearXNG (self-hosted) registered as OpenCode's websearch provider via plugin** | Private, no API key, native `websearch` tool |
@@ -117,7 +122,10 @@ The builder may rely on these; they were read from `opencode.ai/v2/docs`.
 
 **Network**: `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` are honored; loopback must be in `NO_PROXY`.
 
-**OpenCode Go** (hosted open models): per-model endpoints under `https://opencode.ai/zen/go/v1/` (`/chat/completions` for OpenAI-compatible models, `/messages` for Anthropic-protocol models). Clients should send a stable `x-opencode-session` header and a descriptive user agent. Usage is limited by dollar windows (5-hour and weekly); free models remain usable when exhausted. Retention is 0 days for the models used here. DeepSeek's zero-data-retention agreement was stated valid through **31 Oct 2026**, renewed monthly (the launcher warns after that date).
+**0G Private Computer**: OpenAI-compatible inference is routed through
+`https://router-api.0g.ai/v1`. Docker mode sends requests through the local
+nginx proxy, which injects `ZG_API_KEY`; native mode uses the key from `.env`.
+Use only model IDs present in the checked-in 0G catalogue.
 
 ---
 
@@ -147,7 +155,7 @@ HOST (your machine)
 pag/
   README.md                 # how to run, upgrade, troubleshoot (generated from this spec)
   versions.lock             # OpenCode version, image digests, date, notes
-  .env                      # GO_API_KEY=...   (chmod 600, gitignored, created BY THE OWNER)
+  .env                      # ZG_API_KEY=...   (chmod 600, gitignored, created BY THE OWNER)
   hosted-allowed.txt        # absolute paths of projects allowed to use hosted models
   bin/pag                   # launcher
   docker/
@@ -178,21 +186,14 @@ pag/
 
 ## 6. Models
 
-All through OpenCode Go (open-weight). Prices per 1M tokens as listed on the Go page; monthly request estimates are Go-page figures for typical agent traffic and may change.
+The only supported model provider is 0G Private Computer. The concrete model
+catalogue, context windows, and role aliases are maintained in
+`profiles/base.json` and `bridge/config/models.yaml`. Available model IDs include
+`0g/glm-5.3-flash`, `0g/qwen3-coder-flash`, `0g/kimi-k2.7-code`,
+`0g/deepseek-v4.1-flash`, `0g/qwen3.7-flash`, and `0g/qwen-flash`.
 
-| Role | Model id | Protocol | Price in/out | ~req/month |
-|---|---|---|---|---|
-| `build` default (small edits) | `deepseek-v4-flash` | chat-completions | $0.15/$0.60 off-peak | ~65,000 |
-| `plan` default | `deepseek-v4-pro` | chat-completions | $0.66/$1.98 off-peak | ~5,200 |
-| Escalation 1 | `glm-5.2` | chat-completions | $1.40/$4.40 | ~4,300 |
-| Escalation 2 (rare) | `kimi-k3` | chat-completions | $3.00/$15.00 | ~490 |
-| Alternate fast | `glm-5.3-flash` | chat-completions | $0.15/$0.50 | ~31,600 |
-| Alternate (Anthropic protocol) | `qwen3.8-flash` | messages | $0.15/$0.47 | ~27,000 |
-| Alternate (Anthropic protocol) | `minimax-m3` | messages | $0.30/$1.20 | ~16,000 |
-
-Rules:
-- **Do not use** Go's non-open models or "Contributor" models that train on prompts.
-- Final defaults are chosen by Section 12's decision rule: the cheapest model whose eval pass rate is at least 85% of the best model's. The table above is the starting point.
+All fallbacks must remain inside this catalogue. Do not configure another
+provider or pass a model ID outside the 0G catalogue.
 - DeepSeek peak hours (01:00-04:00 and 06:00-10:00 UTC, weekdays) cost double. Heavy autonomous runs go off-peak.
 - Benchmarks in the public domain disagree widely for the same model. Never choose by leaderboard.
 
@@ -206,14 +207,14 @@ Work in order. Each phase ends with acceptance tests that must pass before conti
 1. Detect OS (`uname -a`). Windows without WSL: stop and tell the owner to install WSL2 Ubuntu.
 2. Require: `docker` with `docker compose` v2, `git`, `tmux`, `jq`, `curl`, `sqlite3`, `watch`. Install missing ones with the OS package manager (ask the owner first).
 3. Create `~/pag` with the layout in 5.1, `git init` it, and add `.env` and `build/` to `.gitignore`.
-4. **Ask the owner to create `~/pag/.env` themselves** containing `GO_API_KEY=<key>` and `chmod 600` it. The key must never be pasted into chat, logs, or committed files. The builder only checks that `.env` exists and is non-empty.
+4. **Ask the owner to create `~/pag/.env` themselves** containing `ZG_API_KEY=<key>` and `chmod 600` it. The key must never be pasted into chat, logs, or committed files.
 5. Create the scratch repo: Python package with 3 modules and pytest tests; plus a small TypeScript project with vitest tests. Commit.
 
 **Accept (A0):** all tools present; `docker run --rm hello-world` works; `.env` exists with mode 600.
 
 ### Phase 1. Host smoke test of OpenCode (30 min)
 1. Install on the host: `curl -fsSL https://opencode.ai/v2/install | bash`; record `opencode --version` in `versions.lock`.
-2. In the scratch repo run `opencode --standalone`, `/connect` OpenCode Go with the key (temporary, host only), run one task ("add a function and a test"), then **delete the host credential** afterwards (`/connect` removal or remove the auth file) so the key exists only in `.env`.
+2. In the scratch repo run `opencode --standalone` with the configured 0G Router endpoint and model, then run one task ("add a function and a test"). Keep `ZG_API_KEY` in the protected `.env` and never add another provider credential.
 3. Confirm: it reads files, proposes an edit, asks permission, and runs tests.
 
 **Accept (A1):** one successful edit-and-test cycle; host credential removed.
@@ -269,7 +270,7 @@ services:
 
   llmproxy:
     image: nginx:stable
-    environment: [ "GO_API_KEY=${GO_API_KEY}" ]
+    environment: [ "ZG_API_KEY=${ZG_API_KEY}" ]
     volumes:
       - ./llmproxy.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ../logs:/var/log/nginx
@@ -296,7 +297,7 @@ volumes:
 ```
 If OpenCode fails to start because of the read-only filesystem, add only the specific path it complains about as a `tmpfs` or named volume. **Never remove `read_only: true` globally.** Record every such change in `versions.lock`.
 
-**docker/llmproxy.conf.template** (nginx substitutes `${GO_API_KEY}`):
+**docker/llmproxy.conf.template** (nginx substitutes `${ZG_API_KEY}`):
 ```nginx
 log_format pag '$time_iso8601 $request_method $uri $status req=$request_length '
                'res=$bytes_sent t=$upstream_response_time sess=$http_x_opencode_session';
@@ -304,19 +305,17 @@ access_log /var/log/nginx/pag.log pag;
 client_max_body_size 50m;
 server {
   listen 8080;
-  location /zen/go/v1/ {
-    proxy_pass https://opencode.ai/zen/go/v1/;
-    proxy_set_header Host opencode.ai;
+  location /0g/v1/ {
+    proxy_pass https://router-api.0g.ai/v1/;
+    proxy_set_header Host router-api.0g.ai;
     proxy_set_header Authorization "Bearer ${GO_API_KEY}";
-    proxy_set_header x-api-key "${GO_API_KEY}";
+    proxy_set_header Authorization "Bearer ${ZG_API_KEY}";
     proxy_ssl_server_name on;
     proxy_buffering off;
     proxy_read_timeout 600s;
   }
 }
 ```
-(Both header forms are set because chat-completions models authenticate with `Authorization` and Anthropic-protocol models with `x-api-key`.)
-
 **docker/squid.conf**
 ```
 http_port 3128
@@ -340,6 +339,7 @@ raw.githubusercontent.com
 docs.python.org
 developer.mozilla.org
 nodejs.org
+router-api.0g.ai
 ```
 **docker/searxng/settings.yml**
 ```yaml
@@ -349,68 +349,59 @@ search: { formats: [html, json] }
 ```
 (Preflight generates the secret key with `openssl rand -hex 32`.)
 
-**Accept (A2):** `docker compose build` succeeds; stack starts; from inside `agent`: `curl -s http://llmproxy:8080/zen/go/v1/models` (or a minimal chat-completions request) returns a non-401 response; `curl -s "http://searxng:8080/search?q=test&format=json"` returns JSON.
+**Accept (A2):** `docker compose build` succeeds; stack starts; from inside `agent`: `curl -s http://llmproxy:8080/0g/v1/models` (or a minimal chat-completions request) returns a non-401 response; `curl -s "http://searxng:8080/search?q=test&format=json"` returns JSON.
 
-### Phase 3. Profiles and providers (2 hours)
+### Phase 3. Profiles and the 0G Router (2 hours)
 
 **profiles/base.json**
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "go/deepseek-v4-flash",
+  "model": "0g/glm-5.3-flash",
   "default_agent": "build",
   "share": "disabled",
   "autoupdate": false,
   "snapshots": true,
   "compaction": { "auto": true, "keep": { "tokens": 20000 }, "buffer": 20000 },
   "providers": {
-    "go": {
-      "name": "OpenCode Go (via local proxy)",
+    "0g": {
+      "name": "0G Private Computer (via local proxy)",
       "package": "aisdk:@ai-sdk/openai-compatible",
-      "settings": { "baseURL": "http://llmproxy:8080/zen/go/v1", "apiKey": "proxy-managed" },
+      "settings": { "baseURL": "http://llmproxy:8080/0g/v1", "apiKey": "proxy-managed" },
       "models": {
-        "deepseek-v4-flash": { "modelID": "deepseek-v4-flash", "name": "DeepSeek V4 Flash",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } },
-        "deepseek-v4-pro":   { "modelID": "deepseek-v4-pro", "name": "DeepSeek V4 Pro",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } },
-        "glm-5.2":           { "modelID": "glm-5.2", "name": "GLM-5.2",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } },
-        "glm-5.3-flash":     { "modelID": "glm-5.3-flash", "name": "GLM-5.3 Flash",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } },
-        "kimi-k3":           { "modelID": "kimi-k3", "name": "Kimi K3",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } }
-      }
-    },
-    "go-anthropic": {
-      "name": "OpenCode Go (Anthropic protocol, via local proxy)",
-      "package": "aisdk:@ai-sdk/anthropic",
-      "settings": { "baseURL": "http://llmproxy:8080/zen/go/v1", "apiKey": "proxy-managed" },
-      "models": {
-        "qwen3.8-flash": { "modelID": "qwen3.8-flash", "name": "Qwen3.8 Flash",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } },
-        "minimax-m3":    { "modelID": "minimax-m3", "name": "MiniMax M3",
-          "capabilities": { "tools": true }, "limit": { "context": 128000, "output": 16000 } }
+        "glm-5.3-flash": { "modelID": "glm-5.3-flash", "name": "GLM 5.3 Flash",
+          "capabilities": { "tools": true }, "limit": { "context": 1179648, "output": 8192 } },
+        "qwen3-coder-flash": { "modelID": "qwen3-coder-flash", "name": "Qwen 3 Coder Flash",
+          "capabilities": { "tools": true }, "limit": { "context": 1000000, "output": 8192 } },
+        "kimi-k2.7-code": { "modelID": "kimi-k2.7-code", "name": "Kimi K2.7 Code",
+          "capabilities": { "tools": true }, "limit": { "context": 262144, "output": 8192 } },
+        "deepseek-v4.1-flash": { "modelID": "deepseek-v4.1-flash", "name": "DeepSeek V4.1 Flash",
+          "capabilities": { "tools": true }, "limit": { "context": 1441792, "output": 8192 } },
+        "qwen3.7-flash": { "modelID": "qwen3.7-flash", "name": "Qwen 3.7 Flash",
+          "capabilities": { "tools": true }, "limit": { "context": 1000000, "output": 8192 } },
+        "qwen-flash": { "modelID": "qwen-flash", "name": "Qwen Flash",
+          "capabilities": { "tools": true }, "limit": { "context": 1000000, "output": 8192 } }
       }
     }
   },
   "agents": {
-    "build":   { "model": "go/deepseek-v4-flash" },
-    "plan":    { "model": "go/deepseek-v4-pro" },
-    "explore": { "model": "go/deepseek-v4-flash" }
+    "build":   { "model": "0g/qwen3-coder-flash" },
+    "plan":    { "model": "0g/glm-5.3-flash" },
+    "explore": { "model": "0g/glm-5.3-flash" }
   }
 }
 ```
-Notes: the `aisdk:` form is used because the documented migration guide shows it and a reported issue says the native OpenAI-compatible package did not register in an early 2.x build. Model ids must match the Go page's exact ids at build time (verify against `opencode.ai/v2/docs/console/go`; if an id differs, update this file and the table in Section 6). Every `limit.context` is the **effective cap** of decision D10, not the native window.
+The checked-in `profiles/base.json` is the source of truth for the 0G-only model catalogue. Verify 0G model IDs and context limits against the current router catalogue before changing it.
 
 **scripts/gen-profiles.sh**: for each profile, `jq -s '.[0] * {permissions: .[1]}' profiles/base.json profiles/<p>.rules.json > build/<p>.json`. Run it from the launcher on every start.
 
 **Permission rule files** are specified in Section 8.
 
-**Smoke tests (A2b):** run each three times, in `strict`, in the container: (1) "list the files and summarize the repo"; (2) "add `add(a,b)` to utils with a test"; (3) "run the tests"; (4) "break a test, then fix it". Also test one model from each provider (`go/...` and `go-anthropic/...`).
+**Smoke tests (A2b):** run each three times, in `strict`, in the container: (1) "list the files and summarize the repo"; (2) "add `add(a,b)` to utils with a test"; (3) "run the tests"; (4) "break a test, then fix it". Test the configured 0G model and a second model from the same 0G catalogue as fallback.
 
-**Tool-call failure ladder:** (1) confirm `capabilities.tools` is true; (2) switch to another model on the same provider; (3) switch protocol (other provider block) for that model if Go exposes both; (4) search OpenCode GitHub issues for the model; (5) drop that model from the roster and note it in `versions.lock`.
+**Tool-call failure ladder:** (1) confirm `capabilities.tools` is true; (2) switch to another model in the configured 0G catalogue; (3) verify the 0G Router's OpenAI-compatible request format; (4) search OpenCode GitHub issues for the model; (5) drop that model from the roster and note it in `versions.lock`.
 
-**Accept (A2b):** all four smoke tests pass 3/3 for `deepseek-v4-flash` and `glm-5.2`; at least one `go-anthropic` model passes or is dropped with a note.
+**Accept (A2b):** all four smoke tests pass 3/3 for `0g/deepseek-v4.1-flash` and `0g/glm-5.3-flash`; all requests use the 0G Router.
 
 ### Phase 4. Plugins (1 day)
 Create each plugin as `plugins/<name>/index.ts`. Plugins are mounted read-only into `~/.config/opencode/plugins`.
@@ -823,7 +814,7 @@ Each task directory: `repo/` (snapshot), `prompt.txt`, `check.sh` (exit 0 = pass
 
 **Token collection (`collect.py`):** primary source is OpenCode's local SQLite database (locate with `opencode debug paths`; inspect the schema with `sqlite3 <db> .schema`; extract per-message usage). Fallback if usage is not stored: use `logs/pag.log` request and response byte counts divided by 3.5 as approximate tokens, flagged `approx=true`.
 
-**Tests:** E1 (the harness runs one task end to end and records all columns), E2 (baseline run: tier 3, `deepseek-v4-flash`, `glm-5.2`, three runs each), E3 (ablation per 9.7 and model selection).
+**Tests:** E1 (the harness runs one task end to end and records all columns), E2 (baseline run: tier 3, `0g/deepseek-v4.1-flash` and `0g/glm-5.3-flash`, three runs each), E3 (ablation per 9.7 and model selection).
 
 **Model-selection rule:** choose the cheapest model whose mean pass rate across the 20 tasks is at least 85% of the best model's. Use the best model for `plan` and as Escalation 1. Update `base.json`, Section 6, and `versions.lock`. Re-run the suite after every OpenCode, plugin, or profile change.
 
@@ -836,8 +827,8 @@ Each task directory: `repo/` (snapshot), `prompt.txt`, `check.sh` (exit 0 = pass
 | Tarball binary name/layout | `tar -tzf` after download | Adjust the Dockerfile `tar`/path; record |
 | `--standalone` as entrypoint | Container starts and shows the TUI | Use `bash -lc 'cd /work && exec opencode --standalone'` |
 | Native read-only FS breakage | Startup error naming a path | Add that path as tmpfs/volume only; never drop `read_only` |
-| `aisdk:` provider fails | Smoke test A2b errors | Try the native package form `"package": "@opencode/ai/providers/openai-compatible"`; else try an OpenRouter route for that model |
-| Model id mismatch on Go | HTTP 400/404 on a model | Re-read `opencode.ai/v2/docs/console/go`; fix `base.json` and Section 6 |
+| `aisdk:` provider fails | Smoke test A2b errors | Try the native package form `"package": "@opencode/ai/providers/openai-compatible"` and verify the configured 0G router URL |
+| 0G model id mismatch | HTTP 400/404 on a model | Verify the model ID against the 0G Router catalogue and update the 0G-only model configuration |
 | `experimental.policies` syntax rejected | Startup warning | Keep denies in rules files only; record |
 | Plugin event field names (`status`, `tool`, `sessionID`) | Log `Object.keys(event)` on first run | Adapt the plugin; if `sessionID` is absent, skip auto-compact only |
 | `context` hook message shape | Fixture from a real run | Adapters `toNorm`/`applyReplacements` |
@@ -882,6 +873,6 @@ If a resolution fails twice, stop and report to the owner with the exact error a
 
 ## 17. References
 
-OpenCode 2.x docs (opencode.ai/v2/docs): install, CLI, config, permissions, providers, MCP, instructions, snapshots, network, plugins (build and overview), compaction, Go.
+OpenCode 2.x docs (opencode.ai/v2/docs): install, CLI, config, permissions, OpenAI-compatible providers, MCP, instructions, snapshots, network, plugins (build and overview), compaction.
 Context research: JetBrains/TUM "The Complexity Trap" (arXiv:2508.21433); terminal-agent harness report (arXiv:2603.05344); "Context as a Tool" (ACL Findings 2026, arXiv:2512.22087); AutoCompact (arXiv:2610.02163); Self-Compacting Language Model Agents (arXiv:2606.23525); proprioceptive-dashboard context managers (arXiv:2606.30005); TokenPilot (arXiv:2606.17016); Chroma "Context Rot" and arXiv:2510.05381; Anthropic, "Effective context engineering for AI agents" (2025).
 Antigravity: Google Cloud docs on agent permissions and sandbox settings; Antigravity CLI repository; community permission write-ups and forum threads.

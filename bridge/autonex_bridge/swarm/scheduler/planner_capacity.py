@@ -15,7 +15,7 @@ class CapacityBucket:
     model: str
     quota_group: str
     tier: str = "B"           # S, A, B, C
-    family: str = "generic"   # gpt-oss, qwen, llama, mistral, deepseek, gemini, etc.
+    family: str = "generic"   # GLM, Qwen, Kimi, DeepSeek
     rpm: float = 30.0
     tpm: float = 6000.0
     rpd_remaining: int = 14400

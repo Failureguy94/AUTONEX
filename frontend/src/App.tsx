@@ -4,6 +4,7 @@ import { Landing } from '@/ui/Landing';
 import { Workspace } from '@/ui/Workspace';
 import { ArkivHistoryModal } from '@/ui/ArkivHistoryModal';
 import { ErrorCheckpointModal } from '@/ui/ErrorCheckpointModal';
+import { IAICreditOptimizationDemo } from '@/ui/IAICreditOptimizationDemo';
 import { MODELS } from '@/mock/data';
 import { USE_MOCK } from '@/api/client';
 import { setAccent, resetAccentBlend } from '@/three/materials';
@@ -61,6 +62,7 @@ export default function App() {
         onClose={() => useStore.setState({ arkivHistoryOpen: false })}
       />
       <ErrorCheckpointModal />
+      <IAICreditOptimizationDemo />
     </div>
   );
 }

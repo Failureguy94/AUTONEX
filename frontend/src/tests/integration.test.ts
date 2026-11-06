@@ -96,7 +96,7 @@ describe('integration: tape -> reducer -> director', () => {
   });
 
   it('heavy hybrid run: 4 departments in 4 distinct wings, breaks/chats/meetings/permission all collision-free', () => {
-    const r = runGoal('Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one', { approvePermissions: true });
+    const r = runGoal('Research 0G Private Computer models and build a small routing verifier', { approvePermissions: true });
     expect(r.problems).toEqual([]);
     const st = useStore.getState();
     const bays = Object.values(st.departments).map((d) => d.bay);
@@ -112,7 +112,7 @@ describe('integration: tape -> reducer -> director', () => {
   });
 
   it('unapproved permission keeps the agent waiting in the cabin (no silent auto-approve)', () => {
-    const r = runGoal('Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one', { approvePermissions: false });
+    const r = runGoal('Research 0G Private Computer models and build a small routing verifier', { approvePermissions: false });
     expect(r.problems).toEqual([]);
     expect(useStore.getState().pendingPermissions.length).toBe(1);
   });

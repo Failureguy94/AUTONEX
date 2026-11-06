@@ -9,6 +9,7 @@ import time
 from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
+import yaml
 from .controller import SwarmController
 from .rounds.estimator import RunEstimator
 from .scheduler.admission import AdmissionController
@@ -68,41 +69,32 @@ def get_swarm_estimate(
 
 @api_router.get("/api/models")
 def get_models():
-    """Return catalog of available models loaded dynamically from config/models.yaml."""
-    models_path = Path(__file__).resolve().parents[3] / "config" / "models.yaml"
+    """Return only the configured 0G Private Computer models."""
+    models_path = Path(__file__).resolve().parents[2] / "config" / "models.yaml"
+    if not models_path.is_file():
+        raise HTTPException(status_code=500, detail="0G model catalogue is missing")
+
+    try:
+        with open(models_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise HTTPException(status_code=500, detail="Unable to load 0G model catalogue") from exc
+
     catalog: List[Dict[str, Any]] = []
-    if models_path.is_file():
-        try:
-            import yaml
-            with open(models_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-            for m in data.get("models", []):
-                mid = m.get("id", "")
-                prov = m.get("provider", "openrouter")
-                ctx = m.get("context", 32768)
-                catalog.append({
-                    "id": mid,
-                    "label": f"{prov.capitalize()} · {mid.split('/')[-1]}",
-                    "provider": prov,
-                    "context_tokens": ctx,
-                })
-        except Exception:
-            pass
+    for model in data.get("models", []):
+        model_id = model.get("id", "")
+        provider = model.get("provider", "")
+        if provider != "zg_compute" or not model_id.startswith("0g/"):
+            raise HTTPException(status_code=500, detail="Model catalogue contains a non-0G model")
+        catalog.append({
+            "id": model_id,
+            "label": f"0G Private Computer · {model_id.split('/')[-1]}",
+            "provider": "0g",
+            "context_tokens": model["context"],
+        })
+
     if not catalog:
-        catalog = [
-            {"id": "openrouter/google/gemma-4-31b-it:free", "label": "OpenRouter · Gemma 4 31B (manager default)", "provider": "openrouter", "context_tokens": 128000},
-            {"id": "openrouter/qwen/qwen3.8-27b:free", "label": "OpenRouter · Qwen 3.8 27B (coder)", "provider": "openrouter", "context_tokens": 128000},
-            {"id": "openrouter/cohere/north-mini-code:free", "label": "OpenRouter · Cohere North Mini Code", "provider": "openrouter", "context_tokens": 32000},
-            {"id": "openrouter/nvidia/nemotron-3.5-lightning:free", "label": "OpenRouter · Nemotron 3.5 Lightning", "provider": "openrouter", "context_tokens": 128000},
-            {"id": "groq/openai/gpt-oss-120b", "label": "Groq · GPT-OSS 120B", "provider": "groq", "context_tokens": 8000},
-            {"id": "groq/qwen/qwen3.8-27b", "label": "Groq · Qwen 3.8 27B", "provider": "groq", "context_tokens": 8000},
-            {"id": "groq/openai/gpt-oss-20b", "label": "Groq · GPT-OSS 20B (fast)", "provider": "groq", "context_tokens": 8000},
-            {"id": "nvidia/llama-3.1-nemotron-70b-instruct", "label": "NVIDIA NIM · Nemotron 70B", "provider": "nvidia", "context_tokens": 128000},
-            {"id": "nvidia/mistralai/codestral-22b-instruct-v0.1", "label": "NVIDIA NIM · Codestral 22B", "provider": "nvidia", "context_tokens": 32000},
-            {"id": "nvidia/deepseek-ai/deepseek-v4.1-flash", "label": "NVIDIA NIM · DeepSeek V4.1 Flash", "provider": "nvidia", "context_tokens": 128000},
-            {"id": "go/deepseek-v4-flash", "label": "OpenCode Go · DeepSeek V4 Flash", "provider": "go", "context_tokens": 128000},
-            {"id": "go/glm-5.3-flash", "label": "OpenCode Go · GLM 5.3 Flash", "provider": "go", "context_tokens": 128000},
-        ]
+        raise HTTPException(status_code=500, detail="0G model catalogue is empty")
     return catalog
 
 
@@ -110,6 +102,11 @@ def get_models():
 @api_router.post("/runs")
 @api_router.post("/api/runs")
 async def create_task(req: SwarmRunRequest):
+    if req.model is not None:
+        allowed_models = {model["id"] for model in get_models()}
+        if req.model not in allowed_models:
+            raise HTTPException(status_code=422, detail="Requested model is not in the configured 0G catalogue")
+
     run_id = f"run_{int(time.time() * 1000)}"
     swarm_opts = req.swarm or (req.options.get("swarm", {}) if req.options else {})
     size = req.swarm_size or (req.options.get("swarm_size") if req.options else None) or int(swarm_opts.get("size", 10))
@@ -296,4 +293,3 @@ def get_run_events(run_id: str, since_seq: int = 0, limit: int = 100):
     filtered = [e for e in events if e.get("seq", 0) > since_seq][:limit]
     next_seq = filtered[-1]["seq"] if filtered else since_seq
     return {"events": filtered, "next_seq": next_seq}
-

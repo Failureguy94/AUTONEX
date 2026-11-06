@@ -10,7 +10,7 @@ from typing import Optional
 class KeyringResolver:
     @staticmethod
     def resolve_key(key_ref: str, env_var: Optional[str] = None) -> Optional[str]:
-        """Resolves a key reference e.g. 'keyring:groq-1' or from an environment variable."""
+        """Resolves a key reference e.g. 'keyring:zg-compute-1' or an environment variable."""
         # Try OS keyring if available
         if key_ref.startswith("keyring:"):
             username = key_ref.split(":", 1)[1]

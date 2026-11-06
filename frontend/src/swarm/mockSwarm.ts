@@ -70,7 +70,7 @@ export function buildSwarmScript(goal: string, n: number): RawEv[] {
 
   // FRAME
   ev(joinDone, 'swarm.phase', undefined, { phase: 'frame', round: 1, note: FRAME(goal) });
-  ev(joinDone + 0.5, 'llm.call_started', 'M0', { call_id: 'fc0', agent_id: 'M0', model: 'groq/openai/gpt-oss-20b', role: 'moderator' });
+  ev(joinDone + 0.5, 'llm.call_started', 'M0', { call_id: 'fc0', agent_id: 'M0', model: '0g/glm-5.3-flash', role: 'moderator' });
   ev(joinDone + 2, 'llm.call_finished', 'M0', { call_id: 'fc0', tokens_in: 420, tokens_out: 180, latency_ms: 1500 });
 
   // DIVERGE in waves of 4, with a rate-limit episode
@@ -83,7 +83,7 @@ export function buildSwarmScript(goal: string, n: number): RawEv[] {
   let cid = 0;
   for (let w = 0; w < waves; w++) {
     const wave = agents.slice(w * 4, w * 4 + 4);
-    for (const a of wave) ev(t + 0.3, 'llm.call_started', a.id, { call_id: `c${cid}`, agent_id: a.id, model: 'openrouter/qwen/qwen3.8-27b:free', role: a.role });
+    for (const a of wave) ev(t + 0.3, 'llm.call_started', a.id, { call_id: `c${cid}`, agent_id: a.id, model: '0g/qwen3.7-flash', role: a.role });
     for (let k = 0; k < wave.length; k++) {
       const a = wave[k], iid = `I${w * 4 + k}`;
       const text = PROPOSE[(w * 4 + k) % PROPOSE.length](W());
@@ -130,7 +130,7 @@ export function buildSwarmScript(goal: string, n: number): RawEv[] {
   const critics = agents.filter((_, i) => i % 5 < 3); // 60%
   for (let b = 0; b < critics.length; b += 3) {
     const batch = critics.slice(b, b + 3);
-    for (const a of batch) ev(t + 0.2, 'llm.call_started', a.id, { call_id: `cc${b}-${a.id}`, agent_id: a.id, model: 'openrouter/qwen/qwen3.8-27b:free', role: a.role });
+    for (const a of batch) ev(t + 0.2, 'llm.call_started', a.id, { call_id: `cc${b}-${a.id}`, agent_id: a.id, model: '0g/qwen3-coder-flash', role: a.role });
     for (let k = 0; k < batch.length; k++) {
       const a = batch[k];
       const target = ideaIds[Math.floor(rnd() * ideaIds.length)];
@@ -171,7 +171,7 @@ export function buildSwarmScript(goal: string, n: number): RawEv[] {
 
   // SYNTHESIZE
   ev(t, 'swarm.phase', undefined, { phase: 'synthesize', round: 1 });
-  ev(t + 0.5, 'llm.call_started', 'M0', { call_id: 'sc0', agent_id: 'M0', model: 'openrouter/google/gemma-4-31b-it:free', role: 'moderator' });
+  ev(t + 0.5, 'llm.call_started', 'M0', { call_id: 'sc0', agent_id: 'M0', model: '0g/glm-5.3-flash', role: 'moderator' });
   const ranked = [...scoresAgg.entries()].sort((x, y) => y[1].sum - x[1].sum).map(([id]) => id);
   const topIdeas = ideaIds.filter((x) => ranked.slice(0, 3).includes(x.id));
   ev(t + 4, 'swarm.synthesis', 'M0', {

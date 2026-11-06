@@ -221,7 +221,7 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
     setExtending(true);
     setStatusMsg(null);
     try {
-      const client = await ensureRabdiWalletClient(walletClient);
+      const client = await ensureRabdiWalletClient(walletClient, address);
       const res = await extendArkivEntity(client, selectedRun.key, 90);
       setStatusMsg({
         type: 'success',
@@ -241,7 +241,7 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
     setDeleting(true);
     setStatusMsg(null);
     try {
-      const client = await ensureRabdiWalletClient(walletClient);
+      const client = await ensureRabdiWalletClient(walletClient, address);
       const res = await deleteArkivEntity(client, selectedRun.key);
       setStatusMsg({
         type: 'success',
@@ -323,7 +323,7 @@ export function ArkivHistoryModal({ open, onClose }: ArkivHistoryModalProps) {
     setUploadingContext(true);
     setStatusMsg(null);
     try {
-      const client = await ensureRabdiWalletClient(walletClient);
+      const client = await ensureRabdiWalletClient(walletClient, address);
       const res = await uploadContextWorkflow(client, newPayloadText, {
         projectId: newProjectId,
         userId: address || client.account?.address || 'user-1',

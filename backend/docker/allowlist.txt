@@ -8,8 +8,4 @@ raw.githubusercontent.com
 docs.python.org
 developer.mozilla.org
 nodejs.org
-opencode.ai
-api.groq.com
-integrate.api.nvidia.com
-openrouter.ai
 router-api.0g.ai

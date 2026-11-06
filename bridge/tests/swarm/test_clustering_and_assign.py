@@ -13,7 +13,7 @@ def test_clustering_and_outlier_tray():
         {"proposal_id": "p4", "title": "Regex Quick Scan 2", "approach": "regex pattern matcher on lines", "assumptions": ["regex"]},
         {"proposal_id": "p5", "title": "Quantum Hybrid", "approach": "unusual quantum state simulation", "assumptions": ["unique_unshared"]},
     ]
-    seat_families = {"seat_1": "qwen", "seat_2": "llama", "seat_3": "qwen", "seat_4": "gpt-oss", "seat_5": "mistral"}
+    seat_families = {"seat_1": "qwen", "seat_2": "glm", "seat_3": "qwen", "seat_4": "kimi", "seat_5": "deepseek"}
     for idx, p in enumerate(proposals):
         p["seat_id"] = f"seat_{idx+1}"
 
