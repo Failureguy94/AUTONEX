@@ -550,10 +550,10 @@ export function ReportView() {
             <div className="space-y-5 max-w-2xl py-2">
               <div className="space-y-1">
                 <h3 className="font-heading font-bold text-base text-ink">
-                  Decentralized Context & Deliverable Storage
+                  Decentralized Context & Checkpoint Storage
                 </h3>
                 <p className="text-xs font-body text-ink/70 leading-relaxed">
-                  Store large report context and synthesized source bundles on <strong>Ethereum Swarm</strong> content-addressed storage while anchoring ownership, timestamps, and cryptographic SHA-256 integrity hashes on the <strong>Arkiv Rabdi DB-Chain</strong>.
+                  Store the structured AI checkpoint summary and execution context on <strong>Ethereum Swarm</strong> content-addressed storage while anchoring ownership, timestamps, and cryptographic SHA-256 integrity hashes on the <strong>Arkiv Rabdi DB-Chain</strong>. Codebase files remain on local disk; only the AI synthesis and file inventory manifest are stored on-chain / on Swarm.
                 </p>
               </div>
 
@@ -647,8 +647,16 @@ export function ReportView() {
                       <span className="font-semibold">{projectName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-ink/40">Files in Bundle:</span>
-                      <span className="font-semibold">{fileKeys.length} files</span>
+                      <span className="text-ink/40">Payload Content:</span>
+                      <span className="font-semibold text-emerald-700">AI Checkpoint & Context Summary (JSON + MD)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Milestones Recorded:</span>
+                      <span className="font-semibold">{activeSummary?.projectOverview.tasksDone ?? 0}/{activeSummary?.projectOverview.tasksTotal ?? 0} tasks completed</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ink/40">Codebase Files:</span>
+                      <span className="font-semibold text-ink/60">Local Only ({fileKeys.length} files cataloged, zero code uploaded)</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-ink/40">Target Network:</span>
@@ -762,7 +770,7 @@ export function ReportView() {
                     ) : (
                       <>
                         <Icon d={I.database} size={14} />
-                        <span>Store Deliverable on Swarm & Anchor to Arkiv</span>
+                        <span>Store Context Summary on Swarm & Anchor to Arkiv</span>
                       </>
                     )}
                   </button>
