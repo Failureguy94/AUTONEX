@@ -1,5 +1,5 @@
 import { Envelope, parseEvent } from '@/api/types';
-import { USE_MOCK, HttpStream, EventStream, HttpClient, ApiClient } from '@/api/client';
+import { apiUrl, USE_MOCK, HttpStream, EventStream, HttpClient, ApiClient } from '@/api/client';
 import { MockSimulator } from '@/mock/simulator';
 import { applyEvent } from './events';
 import { useStore } from './store';
@@ -235,7 +235,7 @@ export async function haltEntireSystem() {
   }
 
   try {
-    await fetch('http://localhost:8000/api/tasks/cancel_all', { method: 'POST' });
+    await fetch(apiUrl('/api/tasks/cancel_all'), { method: 'POST' });
   } catch {}
 
   try {

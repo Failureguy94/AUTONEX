@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-const BRIDGE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from '@/api/client';
 
 export function isWalletProviderAvailable(): boolean {
   return typeof window !== 'undefined' && Boolean(window.ethereum);
@@ -91,7 +91,7 @@ export async function switchOrAddZeroGNetwork(): Promise<void> {
  */
 export async function fetchAuthNonce(address: string): Promise<{ nonce: string; issuedAt: string }> {
   try {
-    const res = await fetch(`${BRIDGE_API_URL}/api/auth/nonce?address=${encodeURIComponent(address)}`);
+    const res = await fetch(apiUrl(`/api/auth/nonce?address=${encodeURIComponent(address)}`));
     if (!res.ok) {
       throw new Error(`Failed to retrieve nonce: HTTP ${res.status}`);
     }
@@ -150,7 +150,7 @@ export async function verifySignatureWithBackend(
   nonce: string
 ): Promise<{ verified: boolean; token: string; message: string }> {
   try {
-    const res = await fetch(`${BRIDGE_API_URL}/api/auth/verify`, {
+    const res = await fetch(apiUrl('/api/auth/verify'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address, message, signature, nonce })

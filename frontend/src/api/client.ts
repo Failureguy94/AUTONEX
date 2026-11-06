@@ -36,13 +36,14 @@ export interface EventStream {
 // FIX F19: also read process.env when present (vitest / node tooling); in the browser `process` is undefined -> unchanged.
 const env = (k: string): string | undefined =>
   (import.meta as any).env?.[k] ?? (typeof process !== 'undefined' ? process.env?.[k] : undefined);
-const API_URL = env('VITE_API_URL') ?? 'http://localhost:8000';
+export const API_URL = env('VITE_API_URL') ?? '';
+export const apiUrl = (path: string) => `${API_URL}${path}`;
 export const USE_MOCK = env('VITE_USE_MOCK') === 'true';
 
 export class HttpClient implements ApiClient {
   private base = API_URL;
   private async req(path: string, init?: RequestInit) {
-    const r = await fetch(this.base + path, { headers: { 'Content-Type': 'application/json' }, ...init });
+    const r = await fetch(apiUrl(path), { headers: { 'Content-Type': 'application/json' }, ...init });
     if (!r.ok) {
       let errJson: any = null;
       try { errJson = await r.json(); } catch {}
@@ -70,7 +71,7 @@ export class HttpClient implements ApiClient {
   getEvents(runId: string, sinceSeq: number, limit: number) {
     return this.req(`/api/runs/${runId}/events?since_seq=${sinceSeq}&limit=${limit}`);
   }
-  async health() { try { const r = await fetch(this.base + '/api/health'); return r.ok; } catch { return false; } }
+  async health() { try { const r = await fetch(apiUrl('/api/health')); return r.ok; } catch { return false; } }
   get0GStatus() {
     return this.req('/api/config/0g/status');
   }
@@ -108,7 +109,9 @@ export class HttpStream implements EventStream {
     this.connect(runId, sinceSeq);
   }
   private connect(runId: string, sinceSeq: number) {
-    const url = API_URL.replace(/^http/, 'ws') + `/ws/events?run_id=${runId}&since_seq=${sinceSeq}`;
+    const url = API_URL
+      ? API_URL.replace(/^http/, 'ws') + `/ws/events?run_id=${runId}&since_seq=${sinceSeq}`
+      : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/events?run_id=${runId}&since_seq=${sinceSeq}`;
     this.ws = new WebSocket(url);
     this.ws.onopen = () => { this.retry = 0; this.send({ type: 'subscribe', run_id: runId }); };
     this.ws.onmessage = (m) => {

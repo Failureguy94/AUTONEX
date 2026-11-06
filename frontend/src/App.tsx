@@ -5,7 +5,7 @@ import { Workspace } from '@/ui/Workspace';
 import { ArkivHistoryModal } from '@/ui/ArkivHistoryModal';
 import { ErrorCheckpointModal } from '@/ui/ErrorCheckpointModal';
 import { MODELS } from '@/mock/data';
-import { USE_MOCK } from '@/api/client';
+import { apiUrl, USE_MOCK } from '@/api/client';
 import { setAccent, resetAccentBlend } from '@/three/materials';
 import { engine, GOLDEN_GOAL } from '@/state/engine';
 import { validateLayout } from '@/nav/validate';
@@ -46,7 +46,7 @@ export default function App() {
     setAccent(hex); resetAccentBlend();
     if (USE_MOCK) useStore.setState({ models: MODELS });
     else {
-      fetch(((import.meta as any).env?.VITE_API_URL ?? 'http://localhost:8000') + '/api/models')
+      fetch(apiUrl('/api/models'))
         .then((r) => r.json())
         .then((models) => useStore.setState({ models, demoMode: false, offline: false }))
         .catch(() => useStore.setState({ models: MODELS, demoMode: false }));

@@ -1,5 +1,6 @@
 import { useStore } from '@/state/store';
 import { director } from '@/sim/director';
+import { apiUrl } from '@/api/client';
 
 export interface ChatMessage {
   role: 'user' | 'manager';
@@ -56,7 +57,7 @@ Team members under your direction:
 Deliverables destination: ${localDir}
 Answer the user's inquiry with technical depth, crisp operational clarity, and professional leadership. Keep your response concise (2-4 sentences max).`;
 
-        const resp = await fetch('http://localhost:8000/api/llm/chat', {
+        const resp = await fetch(apiUrl('/api/llm/chat'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

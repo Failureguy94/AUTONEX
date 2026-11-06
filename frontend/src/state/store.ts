@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Agent, BlackboardNote, DepartmentDef, Envelope, FinalResult, Metrics, ModelInfo, PermissionRequest, Task, TriageResult, SwarmIdea, SwarmCluster, SwarmCritique } from '@/api/types';
 import { DEFAULT_ACCENT } from '@/config/office';
 import { generateCheckpointSummary, type CheckpointSummary } from '@/services/checkpointSummary';
+import { apiUrl } from '@/api/client';
 
 export interface AgentUI extends Agent {
   pending: number; done: number; failed: number;
@@ -294,7 +295,7 @@ export const useStore = create<Store>((set, get) => ({
 
     // 2. Check local bridge server (non-blocking with short timeout)
     try {
-      const res = await fetch('http://localhost:8000/api/config/0g/status', {
+      const res = await fetch(apiUrl('/api/config/0g/status'), {
         signal: AbortSignal.timeout(1500)
       }).then((r) => r.json());
 
@@ -377,7 +378,7 @@ export const useStore = create<Store>((set, get) => ({
         });
 
         // Background sync to bridge server if online
-        fetch('http://localhost:8000/api/config/0g/verify', {
+        fetch(apiUrl('/api/config/0g/verify'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ apiKey: trimmed })
@@ -440,7 +441,7 @@ export const useStore = create<Store>((set, get) => ({
       }
     } catch {}
     try {
-      await fetch('http://localhost:8000/api/config/0g', { method: 'DELETE' });
+      await fetch(apiUrl('/api/config/0g'), { method: 'DELETE' });
     } catch {}
     set({
       zgConnection: {
@@ -491,7 +492,7 @@ export const useStore = create<Store>((set, get) => ({
     if (!address) return { verified: false, message: 'No wallet connected' };
 
     try {
-      const res = await fetch('http://localhost:8000/api/auth/verify', {
+      const res = await fetch(apiUrl('/api/auth/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, signature, message, nonce })
@@ -537,7 +538,7 @@ export const useStore = create<Store>((set, get) => ({
     if (!address) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/iai/status?address=${encodeURIComponent(address)}`);
+      const res = await fetch(apiUrl(`/api/iai/status?address=${encodeURIComponent(address)}`));
       if (res.ok) {
         const data = await res.json();
         set((st) => ({
@@ -577,7 +578,7 @@ export const useStore = create<Store>((set, get) => ({
   },
   refreshIAIUsage: async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/iai/usage');
+      const res = await fetch(apiUrl('/api/iai/usage'));
       if (res.ok) {
         const usage = await res.json();
         set((st) => ({
@@ -594,7 +595,7 @@ export const useStore = create<Store>((set, get) => ({
   },
   runTestInference: async (prompt = 'Say hello in 3 words') => {
     try {
-      const res = await fetch('http://localhost:8000/api/zg/test-inference', {
+      const res = await fetch(apiUrl('/api/zg/test-inference'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, model: 'glm-5.3-flash' })
