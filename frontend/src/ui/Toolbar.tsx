@@ -63,7 +63,7 @@ export function Toolbar() {
           <span className="opacity-40">·</span>
           <span className="font-semibold uppercase">
             {s.iai?.stakingStatus === 'verified'
-              ? `${s.iai.indicativeDailyCredits.toFixed(1)} cr/d`
+              ? `${(s.iai?.indicativeDailyCredits ?? 0).toFixed(1)} cr/d`
               : s.zgConnection?.isVerified
               ? (s.zgConnection.maskedKey ? s.zgConnection.maskedKey : 'Verified')
               : 'Config'}

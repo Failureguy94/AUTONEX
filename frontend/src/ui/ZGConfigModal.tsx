@@ -315,10 +315,10 @@ export function ZGConfigModal() {
                     </span>
                     <div className="flex justify-between items-baseline">
                       <span className="text-xl font-mono font-bold text-ink">
-                        {iai.eligibleStakedAmount.toFixed(4)} <span className="text-xs text-ink/50 font-normal">iAI</span>
+                        {(iai.eligibleStakedAmount ?? 0).toFixed(4)} <span className="text-xs text-ink/50 font-normal">iAI</span>
                       </span>
                       <span className="text-xs font-mono text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded font-bold">
-                        {iai.indicativeDailyCredits.toFixed(4)} credits/day
+                        {(iai.indicativeDailyCredits ?? 0).toFixed(4)} credits/day
                       </span>
                     </div>
                     <p className="text-[11px] text-ink/60 font-body">
@@ -487,19 +487,19 @@ export function ZGConfigModal() {
                   <div className="grid grid-cols-2 gap-3 text-xs font-mono">
                     <div className="p-2.5 rounded-lg bg-ink/5 space-y-0.5">
                       <span className="text-[10px] text-ink/40 uppercase block">iAI Held in Wallet</span>
-                      <span className="font-bold text-ink">{parseFloat(iai.heldIAI).toFixed(6)} iAI</span>
+                      <span className="font-bold text-ink">{(parseFloat(iai.heldIAI || '0') || 0).toFixed(6)} iAI</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-ink/5 space-y-0.5">
                       <span className="text-[10px] text-ink/40 uppercase block">iAI Actually Staked</span>
-                      <span className="font-bold text-emerald-700">{parseFloat(iai.stakedIAI).toFixed(6)} iAI</span>
+                      <span className="font-bold text-emerald-700">{(parseFloat(iai.stakedIAI || '0') || 0).toFixed(6)} iAI</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-ink/5 space-y-0.5">
                       <span className="text-[10px] text-ink/40 uppercase block">Locked Collateral (a0G)</span>
-                      <span className="font-bold text-ink">{parseFloat(iai.stakedCollateralA0G).toFixed(4)} a0G</span>
+                      <span className="font-bold text-ink">{(parseFloat(iai.stakedCollateralA0G || '0') || 0).toFixed(4)} a0G</span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-0.5">
                       <span className="text-[10px] text-emerald-800 uppercase block font-semibold">Daily Indicative Allowance</span>
-                      <span className="font-bold text-emerald-900">{iai.indicativeDailyCredits.toFixed(4)} credits/day</span>
+                      <span className="font-bold text-emerald-900">{(iai.indicativeDailyCredits ?? 0).toFixed(4)} credits/day</span>
                     </div>
                   </div>
 

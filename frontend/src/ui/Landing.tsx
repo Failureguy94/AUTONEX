@@ -156,7 +156,7 @@ export function Landing() {
             <span className="opacity-40">·</span>
             <span className="text-[10px] font-semibold uppercase">
               {iai?.stakingStatus === 'verified'
-                ? `iAI Verified (${iai.indicativeDailyCredits.toFixed(2)} cr/d)`
+                ? `iAI Verified (${(iai?.indicativeDailyCredits ?? 0).toFixed(2)} cr/d)`
                 : zgConn.isVerified
                 ? (zgConn.maskedKey ? `Active (${zgConn.maskedKey})` : 'Active')
                 : 'Configure & Verify'}

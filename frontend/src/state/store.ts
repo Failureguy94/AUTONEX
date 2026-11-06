@@ -526,12 +526,12 @@ export const useStore = create<Store>((set, get) => ({
         set((st) => ({
           iai: {
             ...st.iai,
-            heldIAI: data.heldInWallet,
-            stakedIAI: data.actuallyStaked,
-            stakedCollateralA0G: data.stakedCollateralA0G,
-            eligibleStakedAmount: data.eligibleStakedAmount,
+            heldIAI: data.heldInWallet ?? data.walletBalance ?? '0.000000',
+            stakedIAI: data.actuallyStaked ?? data.stakedAmount ?? '0.000000',
+            stakedCollateralA0G: data.stakedCollateralA0G ?? data.lockedCollateral ?? '0.0000',
+            eligibleStakedAmount: Number(data.eligibleStakedAmount ?? 0) || 0,
             stakingStatus: data.isStakingVerified ? 'verified' : 'not_detected',
-            indicativeDailyCredits: data.indicativeDailyCredits,
+            indicativeDailyCredits: Number(data.indicativeDailyCredits ?? 0) || 0,
             lastCreditRefresh: data.lastCreditRefresh || 'Daily at 00:00 UTC'
           }
         }));
@@ -545,13 +545,13 @@ export const useStore = create<Store>((set, get) => ({
       set((st) => ({
         iai: {
           ...st.iai,
-          heldIAI: data.heldInWallet,
-          stakedIAI: data.actuallyStaked,
-          stakedCollateralA0G: data.stakedCollateralA0G,
-          eligibleStakedAmount: data.eligibleStakedAmount,
+          heldIAI: data.heldInWallet ?? '0.000000',
+          stakedIAI: data.actuallyStaked ?? '0.000000',
+          stakedCollateralA0G: data.stakedCollateralA0G ?? '0.0000',
+          eligibleStakedAmount: Number(data.eligibleStakedAmount ?? 0) || 0,
           stakingStatus: data.isStakingVerified ? 'verified' : 'not_detected',
-          indicativeDailyCredits: data.indicativeDailyCredits,
-          lastCreditRefresh: data.lastCreditRefresh
+          indicativeDailyCredits: Number(data.indicativeDailyCredits ?? 0) || 0,
+          lastCreditRefresh: data.lastCreditRefresh || 'Daily at 00:00 UTC'
         }
       }));
     } catch (err) {

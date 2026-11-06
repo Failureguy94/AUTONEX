@@ -177,12 +177,19 @@ def disconnect_0g():
 @app.get("/api/iai/status")
 def get_iai_status(address: str = ""):
     return {
-        "address": address,
-        "stakedAmount": "0.000000",
-        "walletBalance": "0.000000",
-        "lockedCollateral": "0.0000",
-        "dailyAllowance": "0.0000",
-        "isEligible": True
+        "walletAddress": address,
+        "heldInWallet": "0.000000",
+        "actuallyStaked": "0.000000",
+        "stakedCollateralA0G": "0.0000",
+        "eligibleStakedAmount": 0.0,
+        "isStakingVerified": False,
+        "indicativeDailyCredits": 0.0,
+        "lastCreditRefresh": "Daily at 00:00 UTC",
+        "rawBalances": {
+            "tokenBalanceWei": "0",
+            "stakedPositionWei": "0",
+            "collateralWei": "0"
+        }
     }
 
 
