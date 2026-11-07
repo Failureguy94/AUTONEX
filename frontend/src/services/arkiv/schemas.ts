@@ -140,5 +140,5 @@ export const CheckpointV2Schema = defineSchema('autonex.checkpoint_v2', {
   schema_version: str(),
   description: str().optional(),
   manifest_json: bytes().optional(),
+  is_active: bool().indexed(),
 });
-

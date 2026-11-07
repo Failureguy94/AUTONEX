@@ -13,6 +13,18 @@
 import path from 'node:path';
 import fs from 'node:fs';
 
+export function persistBrowserActiveCheckpoint(projectId: string, checkpointId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      `autonex:checkpoint-active:${projectId}`,
+      JSON.stringify({ checkpointId, updatedAt: Date.now() })
+    );
+  } catch (error) {
+    console.warn('Unable to persist the active checkpoint in browser storage.', error);
+  }
+}
+
 export type CheckpointLifecycleStatus = 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED';
 export type CheckpointExecutionStatus = 'In Progress' | 'Interrupted' | 'Completed' | 'Failed';
 export type RestoreStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
@@ -111,6 +123,10 @@ export class CheckpointDatabase {
     }
   }
 
+  private browserActiveKey(projectId: string): string {
+    return `autonex:checkpoint-active:${projectId}`;
+  }
+
   private initSchema(): void {
     if (!this.db) return;
 
@@ -181,6 +197,7 @@ export class CheckpointDatabase {
       return;
     }
     this.activeCheckpoints.set(projectId, { checkpointId, updatedAt });
+    persistBrowserActiveCheckpoint(projectId, checkpointId);
   }
 
   public getActiveCheckpoint(projectId: string): string | null {
@@ -190,7 +207,26 @@ export class CheckpointDatabase {
       ).get(projectId) as { checkpoint_id?: string } | undefined;
       return row?.checkpoint_id || null;
     }
-    return this.activeCheckpoints.get(projectId)?.checkpointId || null;
+    const memoryValue = this.activeCheckpoints.get(projectId)?.checkpointId;
+    if (memoryValue) return memoryValue;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(this.browserActiveKey(projectId));
+        if (raw) {
+          const parsed = JSON.parse(raw) as { checkpointId?: string; updatedAt?: number };
+          if (parsed.checkpointId) {
+            this.activeCheckpoints.set(projectId, {
+              checkpointId: parsed.checkpointId,
+              updatedAt: parsed.updatedAt || Date.now(),
+            });
+            return parsed.checkpointId;
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to read the persisted active checkpoint from browser storage.', error);
+      }
+    }
+    return null;
   }
 
   /**

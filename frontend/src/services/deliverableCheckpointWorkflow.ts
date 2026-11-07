@@ -2,13 +2,13 @@ import JSZip from 'jszip';
 import type { WalletClient } from 'viem';
 import { getActiveStorageProvider } from './swarm/operations';
 import { calculateSHA256 } from './checkpoint/crypto';
+import { persistBrowserActiveCheckpoint } from './checkpoint/checkpointDb';
 import {
   getArkivProjectsByUser,
   getArkivUserByWallet,
   registerArkivUser,
   createArkivProject,
-  saveArkivContextRef,
-  saveArkivCheckpoint,
+  saveArkivCheckpointBundle,
 } from './arkiv/operations';
 
 export interface DeliverableCheckpointInput {
@@ -127,7 +127,7 @@ export async function saveDeliverableCheckpoint(
     metadata: { contextFormat: 'plain-json' },
   });
 
-  const archiveContextRef = await saveArkivContextRef(input.walletClient, {
+  const archiveContextInput = {
     reportId: `${checkpointId}:code`,
     projectId: input.projectId,
     userId: input.userId,
@@ -138,8 +138,8 @@ export async function saveDeliverableCheckpoint(
     contentType: 'application/zip',
     fileSize: archiveBytes.byteLength,
     summary: `Binary source deliverable for checkpoint ${checkpointId}`,
-  });
-  const contextRef = await saveArkivContextRef(input.walletClient, {
+  };
+  const contextInput = {
     reportId: `${checkpointId}:context`,
     projectId: input.projectId,
     userId: input.userId,
@@ -150,9 +150,8 @@ export async function saveDeliverableCheckpoint(
     contentType: 'application/json',
     fileSize: contextBytes.byteLength,
     summary: `AI context snapshot for checkpoint ${checkpointId}`,
-  });
-
-  const arkivCheckpoint = await saveArkivCheckpoint(input.walletClient, {
+  };
+  const arkivCheckpoint = await saveArkivCheckpointBundle(input.walletClient, [archiveContextInput, contextInput], {
     checkpointId,
     projectId: input.projectId,
     parentCheckpointId: input.parentCheckpointId,
@@ -171,7 +170,11 @@ export async function saveDeliverableCheckpoint(
     schemaVersion: '1.0.0',
     description: `Generated deliverable checkpoint for ${input.projectName}`,
     manifestJson,
+    isActive: true,
   });
+  // A newly created child checkpoint becomes the active branch head. Arkiv
+  // history remains immutable; this pointer controls the local working branch.
+  persistBrowserActiveCheckpoint(input.projectId, checkpointId);
 
   return {
     checkpointId,
@@ -182,9 +185,9 @@ export async function saveDeliverableCheckpoint(
     archiveBytes: archiveBytes.byteLength,
     contextBytes: contextBytes.byteLength,
     ...identity,
-    checkpointEntityKey: arkivCheckpoint.entityKey,
+    checkpointEntityKey: arkivCheckpoint.checkpointEntityKey,
     checkpointTxHash: arkivCheckpoint.txHash,
     contextReportId: `${checkpointId}:context`,
-    contextEntityKey: contextRef.entityKey,
+    contextEntityKey: arkivCheckpoint.contextEntityKey,
   };
 }

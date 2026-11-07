@@ -9,7 +9,8 @@ import {
   type CheckpointDetails,
   type CheckpointVerificationResult,
 } from '@/services/checkpoint';
-import { getAllArkivCheckpoints, saveArkivCheckpoint } from '@/services/arkiv/operations';
+import { getAllArkivCheckpoints, saveArkivCheckpoint, setArkivCheckpointActive } from '@/services/arkiv/operations';
+import type { ArkivCheckpointRecord } from '@/services/arkiv/operations';
 import { saveDeliverableCheckpoint } from '@/services/deliverableCheckpointWorkflow';
 import { CodeEditor } from './CodeEditor';
 
@@ -47,7 +48,7 @@ const RESTORATION_STAGES = [
 
 export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: CheckpointModalProps) {
   const storeOpen = useStore((s) => s.checkpointModalOpen);
-  const activeCheckpointId = useStore((s) => s.selectedCheckpointId);
+  const selectedCheckpointId = useStore((s) => s.selectedCheckpointId);
   const setStoreOpen = useStore((s) => s.setCheckpointModalOpen);
   const goal = useStore((s) => s.goal) || 'AUTONEX Project';
   const report = useStore((s) => s.report);
@@ -89,14 +90,18 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
   // Checkpoint list & filtering
   const [checkpoints, setCheckpoints] = useState<CheckpointRecord[]>([]);
+  const [arkivCheckpoints, setArkivCheckpoints] = useState<ArkivCheckpointRecord[]>([]);
   const [loadingList, setLoadingList] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [branchFilter, setBranchFilter] = useState<'all' | 'active' | 'suppressed'>('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [groupByProject, setGroupByProject] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   // Selected Checkpoint
-  const [selectedId, setSelectedId] = useState<string | null>(activeCheckpointId);
+  const [selectedId, setSelectedId] = useState<string | null>(selectedCheckpointId);
   const [details, setDetails] = useState<CheckpointDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<ModalTab>('details');
@@ -136,17 +141,18 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
   // Sync selectedId with activeCheckpointId from store
   useEffect(() => {
-    if (activeCheckpointId) {
-      setSelectedId(activeCheckpointId);
+    if (selectedCheckpointId) {
+      setSelectedId(selectedCheckpointId);
       setActiveTab('details');
     }
-  }, [activeCheckpointId]);
+  }, [selectedCheckpointId]);
 
   // Load checkpoint list
   const loadCheckpoints = async () => {
     setLoadingList(true);
     try {
       const arkivRecords = await getAllArkivCheckpoints(100);
+      setArkivCheckpoints(arkivRecords);
       service.importArkivCheckpoints(arkivRecords);
       // Arkiv is the authoritative shared history. Do not hide checkpoints
       // merely because they were created under another project label.
@@ -377,6 +383,29 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
       setRestoreStage(9); // Refreshing editor
 
+      if (!walletClient) {
+        throw new Error('Checkpoint restored locally, but Arkiv active status could not be updated because no wallet is connected.');
+      }
+      const selectedArkiv = arkivCheckpoints.find(
+        (record) => record.checkpointId === details.checkpoint.checkpointId
+      );
+      if (!selectedArkiv?.key) {
+        throw new Error('Checkpoint restored locally, but its Arkiv entity key was not found for active-status update.');
+      }
+      const projectRecords = arkivCheckpoints.filter(
+        (record) => record.projectId === details.checkpoint.projectId
+      );
+      const superseded = projectRecords.filter(
+        (record) =>
+          record.checkpointId !== details.checkpoint.checkpointId &&
+          record.createdAt > details.checkpoint.createdAt &&
+          record.isActive !== false
+      );
+      await Promise.all([
+        setArkivCheckpointActive(walletClient, selectedArkiv.key, true),
+        ...superseded.map((record) => setArkivCheckpointActive(walletClient, record.key, false)),
+      ]);
+
       setRestoreSuccess(res);
       useStore.setState({
         toast: `✓ Checkpoint ${details.checkpoint.checkpointId} restored successfully!`,
@@ -499,29 +528,54 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
   // Filtered checkpoints
   const filteredCheckpoints = useMemo(() => {
+    const statusById = new Map(arkivCheckpoints.map((record) => [record.checkpointId, record.isActive]));
     return checkpoints.filter((c) => {
-      const matchSearch =
-        !searchQuery ||
-        c.checkpointId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.agentTaskId && c.agentTaskId.toLowerCase().includes(searchQuery.toLowerCase()));
-
       const matchStatus =
         statusFilter === 'all' ||
         c.executionStatus.toLowerCase() === statusFilter.toLowerCase() ||
         c.lifecycleStatus.toLowerCase() === statusFilter.toLowerCase();
+      const matchProject = projectFilter === 'all' || c.projectId === projectFilter;
+      const isSuppressed = statusById.get(c.checkpointId) === false;
+      const matchBranch =
+        branchFilter === 'all' ||
+        (branchFilter === 'active' && !isSuppressed) ||
+        (branchFilter === 'suppressed' && isSuppressed);
 
-      return matchSearch && matchStatus;
-    });
-  }, [checkpoints, searchQuery, statusFilter]);
+      return matchStatus && matchProject && matchBranch;
+    }).sort((a, b) => sortOrder === 'newest' ? b.createdAt - a.createdAt : a.createdAt - b.createdAt);
+  }, [checkpoints, arkivCheckpoints, statusFilter, projectFilter, branchFilter, sortOrder]);
+
+  const projectOptions = useMemo(() => {
+    return Array.from(new Set(checkpoints.map((checkpoint) => checkpoint.projectId).filter(Boolean))).sort();
+  }, [checkpoints]);
+
+  const groupedCheckpoints = useMemo(() => {
+    if (!groupByProject) return [['All projects', filteredCheckpoints] as const];
+    const groups = new Map<string, CheckpointRecord[]>();
+    for (const checkpoint of filteredCheckpoints) {
+      const group = groups.get(checkpoint.projectId) || [];
+      group.push(checkpoint);
+      groups.set(checkpoint.projectId, group);
+    }
+    return Array.from(groups.entries());
+  }, [filteredCheckpoints, groupByProject]);
 
   if (!isOpen) return null;
 
   const selectedChk = details?.checkpoint;
-  const latestCheckpointId = service.getActiveCheckpoint(selectedChk?.projectId || projectId)
+  const activeCheckpointId =
+    (selectedChk && service.getActiveCheckpoint(selectedChk.projectId)) ||
+    checkpoints
+      .map((checkpoint) => service.getActiveCheckpoint(checkpoint.projectId))
+      .find((checkpointId): checkpointId is string => Boolean(checkpointId)) ||
+    service.getActiveCheckpoint(projectId);
+  const latestCheckpointId = activeCheckpointId
     || service.listAllCheckpoints({ page: 1, limit: 100 }).checkpoints[0]?.checkpointId
     || null;
   const canRestoreSelected = Boolean(selectedChk && selectedChk.checkpointId !== latestCheckpointId);
+  const arkivStatusById = new Map(
+    arkivCheckpoints.map((record) => [record.checkpointId, record.isActive])
+  );
 
   return (
     <motion.div
@@ -592,14 +646,59 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
           <div className="w-80 sm:w-96 border-r border-ink/10 bg-[#FAF7F2]/80 flex flex-col min-h-0">
             {/* Search & Filter Bar */}
             <div className="p-3 border-b border-ink/10 space-y-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search checkpoints or tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-xs bg-white rounded-lg border border-ink/15 px-3 py-1.5 text-ink outline-none focus:border-ink/40"
-                />
+              <div className="grid grid-cols-2 gap-1.5">
+                <select
+                  value={projectFilter}
+                  onChange={(event) => setProjectFilter(event.target.value)}
+                  className="min-w-0 rounded-lg border border-ink/15 bg-white px-2 py-1.5 text-[10px] text-ink outline-none"
+                  aria-label="Filter by project"
+                >
+                  <option value="all">All projects</option>
+                  {projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}
+                </select>
+                <select
+                  value={branchFilter}
+                  onChange={(event) => setBranchFilter(event.target.value as typeof branchFilter)}
+                  className="min-w-0 rounded-lg border border-ink/15 bg-white px-2 py-1.5 text-[10px] text-ink outline-none"
+                  aria-label="Filter by branch status"
+                >
+                  <option value="all">All branch states</option>
+                  <option value="active">Active only</option>
+                  <option value="suppressed">Suppressed only</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={sortOrder}
+                  onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}
+                  className="flex-1 rounded-lg border border-ink/15 bg-white px-2 py-1.5 text-[10px] text-ink outline-none"
+                  aria-label="Sort checkpoints"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+                <button
+                  onClick={() => setGroupByProject((value) => !value)}
+                  className={`rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors ${
+                    groupByProject ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]' : 'border-ink/15 bg-white text-ink/60'
+                  }`}
+                  title="Group checkpoints by project ID"
+                >
+                  {groupByProject ? 'Grouped' : 'Flat'}
+                </button>
+                {(projectFilter !== 'all' || branchFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'newest') && (
+                  <button
+                    onClick={() => {
+                      setProjectFilter('all');
+                      setBranchFilter('all');
+                      setStatusFilter('all');
+                      setSortOrder('newest');
+                    }}
+                    className="rounded-lg px-2 py-1.5 text-[10px] font-semibold text-ink/55 hover:bg-ink/5 hover:text-ink"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
               <div className="flex gap-1 text-[11px] font-heading">
                 {['all', 'completed', 'failed', 'interrupted'].map((st) => (
@@ -616,6 +715,10 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                   </button>
                 ))}
               </div>
+              <div className="flex items-center justify-between pt-1 text-[10px] font-mono text-ink/45">
+                <span>{filteredCheckpoints.length} matching checkpoint{filteredCheckpoints.length === 1 ? '' : 's'}</span>
+                <span>{projectOptions.length} project{projectOptions.length === 1 ? '' : 's'} indexed</span>
+              </div>
             </div>
 
             {/* Timeline List */}
@@ -630,29 +733,45 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                   <p className="text-[11px]">Checkpoints are automatically created around agent execution.</p>
                 </div>
               ) : (
-                filteredCheckpoints.map((chk) => {
+                groupedCheckpoints.map(([groupName, group]) => (
+                  <div key={groupName} className="space-y-2">
+                    {groupByProject && (
+                      <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg bg-[#FAF7F2] px-2 py-1 text-[10px] font-mono text-ink/55">
+                        <span className="truncate font-semibold">{groupName}</span>
+                        <span>{group.length}</span>
+                      </div>
+                    )}
+                    {group.map((chk) => {
                   const isSelected = chk.checkpointId === selectedId;
                   const isVerified = Boolean(chk.archiveSwarmRef && chk.lifecycleStatus === 'COMPLETED');
+                  const isActive = chk.checkpointId === latestCheckpointId;
+                  const isSuperseded = arkivStatusById.get(chk.checkpointId) === false;
                   const dateStr = new Date(chk.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                   return (
                     <div
                       key={chk.checkpointId}
-                      onClick={() => setSelectedId(chk.checkpointId)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                      onClick={() => !isSuperseded && setSelectedId(chk.checkpointId)}
+                      aria-disabled={isSuperseded}
+                      title={isSuperseded ? 'Superseded by the restored checkpoint; preserved in Arkiv history.' : undefined}
+                      className={`p-3 rounded-xl border transition-all space-y-2 ${
+                        isSuperseded
+                          ? 'bg-ink/10 border-ink/10 text-ink/40 cursor-not-allowed grayscale opacity-60'
+                          : 'cursor-pointer'
+                      } ${
                         isSelected
                           ? 'bg-white border-[var(--accent)] shadow-sm'
-                          : 'bg-white/60 border-ink/10 hover:border-ink/25 hover:bg-white'
+                          : !isSuperseded && 'bg-white/60 border-ink/10 hover:border-ink/25 hover:bg-white'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[11px] font-bold text-ink">
+                        <span className={`font-mono text-[11px] font-bold ${isSuperseded ? 'text-ink/45' : 'text-ink'}`}>
                           {chk.checkpointId.slice(0, 16)}...
                         </span>
                         <span className="text-[10px] font-mono text-ink/40">{dateStr}</span>
                       </div>
 
-                      <p className="text-xs font-body text-ink/80 line-clamp-2 leading-relaxed">
+                      <p className={`text-xs font-body line-clamp-2 leading-relaxed ${isSuperseded ? 'text-ink/45' : 'text-ink/80'}`}>
                         {chk.description || 'Automated project checkpoint'}
                       </p>
 
@@ -672,6 +791,16 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                           }`}>
                             {chk.executionStatus}
                           </span>
+                          {isActive && (
+                            <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/15 text-[var(--accent)] font-semibold">
+                              Active
+                            </span>
+                          )}
+                          {isSuperseded && (
+                            <span className="px-1.5 py-0.5 rounded bg-ink/10 text-ink/50 font-semibold">
+                              Superseded
+                            </span>
+                          )}
                         </div>
 
                         <span className={`flex items-center gap-1 ${
@@ -682,7 +811,9 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                       </div>
                     </div>
                   );
-                })
+                })}
+                  </div>
+                ))
               )}
             </div>
           </div>

@@ -138,6 +138,7 @@ export function ReportView() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [aiChanges, setAiChanges] = useState<Record<string, string | null> | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const runTestInference = useStore((s) => s.runTestInference);
 
@@ -309,13 +310,17 @@ export function ReportView() {
     setAiBusy(true);
     setAiError(null);
     setAiResponse(null);
+    setAiChanges(null);
     const result = await runTestInference(
-      `You are a coding agent. Modify only ${selectedFile} according to the request below.
-Return the complete replacement file inside a single markdown code fence and nothing else.
+      `You are a coding agent editing a project.
+Return ONLY valid JSON with this exact shape:
+{"writes":{"path/to/file.md":"complete file contents"},"deletes":["path/to/remove.txt"]}
+Use "writes" to create new files or replace existing files. Use "deletes" only when explicitly requested.
+Do not modify any file not required by the request. Preserve existing file contents unless a change is requested.
 Request: ${aiPrompt}
 
-Current file:
-${files[selectedFile] || ''}`,
+Current project files:
+${Object.entries(files).map(([path, content]) => `--- ${path}\n${content}`).join('\n')}`,
       { maxTokens: 12000 }
     );
     setAiBusy(false);
@@ -328,17 +333,48 @@ ${files[selectedFile] || ''}`,
       setAiError('0G returned no editable code. Try a more specific request.');
       return;
     }
-    const fenced = content.match(/```(?:[\w+-]+)?\s*([\s\S]*?)```/);
-    const proposed = (fenced?.[1] || content).trim();
-    setAiResponse(proposed);
+    let changes: Record<string, string | null> | null = null;
+    try {
+      const jsonText = content.match(/\{[\s\S]*\}/)?.[0];
+      if (jsonText) {
+        const parsed = JSON.parse(jsonText) as { writes?: Record<string, string>; deletes?: string[] };
+        changes = {};
+        for (const [path, value] of Object.entries(parsed.writes || {})) {
+          if (path.trim() && typeof value === 'string') changes[path.replace(/\\/g, '/').replace(/^\/+/, '')] = value;
+        }
+        for (const path of parsed.deletes || []) {
+          if (typeof path === 'string' && path.trim()) changes[path.replace(/\\/g, '/').replace(/^\/+/, '')] = null;
+        }
+      }
+    } catch {
+      changes = null;
+    }
+    if (!changes || !Object.keys(changes).length) {
+      const fileBlocks = [...content.matchAll(/###\s*FILE:\s*([^\n]+)\n```[\w+-]*\n([\s\S]*?)```/gi)];
+      if (fileBlocks.length) {
+        changes = Object.fromEntries(fileBlocks.map((match) => [match[1].trim(), match[2]]));
+      }
+    }
+    if (!changes || !Object.keys(changes).length) {
+      changes = { [selectedFile]: (content.match(/```(?:[\w+-]+)?\s*([\s\S]*?)```/)?.[1] || content).trim() };
+    }
+    setAiChanges(changes);
+    setAiResponse(Object.entries(changes).map(([path, value]) => `${value === null ? 'DELETE' : 'WRITE'} ${path}`).join('\n'));
   };
 
   const applyAiEdit = () => {
-    if (!aiResponse || !selectedFile) return;
-    const nextFiles = { ...files, [selectedFile]: aiResponse };
+    if (!aiChanges) return;
+    const nextFiles = { ...files };
+    const createdFiles = Object.keys(aiChanges).filter((path) => aiChanges[path] !== null && !files[path]);
+    for (const [path, value] of Object.entries(aiChanges)) {
+      if (value === null) delete nextFiles[path];
+      else nextFiles[path] = value;
+    }
     setWorkingFiles(nextFiles);
+    setSelectedFile(createdFiles[0] || (nextFiles[selectedFile] ? selectedFile : Object.keys(nextFiles)[0] || ''));
     saveWorkingSnapshot(projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'), nextFiles, workingCheckpointId);
     setAiResponse(null);
+    setAiChanges(null);
     setAiPrompt('');
   };
 
@@ -1062,43 +1098,6 @@ ${files[selectedFile] || ''}`,
                       Save
                     </button>
                   </div>
-                  <div className="col-span-2 border border-ink/10 rounded-xl bg-white/70 flex flex-col overflow-hidden">
-                    <div className="px-3 py-2 border-b border-ink/10 font-heading text-xs font-bold flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      0G Code Agent
-                    </div>
-                    <div className="p-3 space-y-3 flex-1 overflow-y-auto">
-                      <p className="text-[11px] leading-relaxed text-ink/60">
-                        Ask the connected 0G model to change the selected file. Review the proposal before applying it.
-                      </p>
-                      <textarea
-                        value={aiPrompt}
-                        onChange={(event) => setAiPrompt(event.target.value)}
-                        placeholder="e.g. Add loading and error states"
-                        className="w-full min-h-24 resize-y rounded-lg border border-ink/15 bg-paper p-2 text-xs outline-none focus:border-[var(--accent)]"
-                        disabled={aiBusy}
-                      />
-                      <button
-                        onClick={handleAiEdit}
-                        disabled={aiBusy || !aiPrompt.trim() || !selectedFile}
-                        className="w-full rounded-lg px-3 py-2 text-xs font-heading font-bold text-white disabled:opacity-50"
-                        style={{ background: 'var(--accent)' }}
-                      >
-                        {aiBusy ? 'Thinking…' : 'Suggest Code Change'}
-                      </button>
-                      {aiError && <p className="rounded-lg bg-rose-50 p-2 text-[11px] text-rose-700">{aiError}</p>}
-                      {aiResponse && (
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-mono uppercase text-emerald-700">Proposal ready</p>
-                          <pre className="max-h-48 overflow-auto rounded-lg bg-ink/5 p-2 text-[10px] leading-relaxed">{aiResponse}</pre>
-                          <div className="flex gap-2">
-                            <button onClick={applyAiEdit} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[11px] font-bold text-white">Apply</button>
-                            <button onClick={() => setAiResponse(null)} className="rounded-lg border border-ink/15 px-2 py-1.5 text-[11px]">Discard</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
                 <CodeEditor
                   value={files[selectedFile] || ''}
@@ -1115,6 +1114,43 @@ ${files[selectedFile] || ''}`,
                   className="flex-1"
                   onSave={handleCreateCheckpointFromChanges}
                 />
+              </div>
+              <div className="col-span-2 border border-ink/10 rounded-xl bg-white/70 flex flex-col overflow-hidden">
+                <div className="px-3 py-2 border-b border-ink/10 font-heading text-xs font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  0G Code Agent
+                </div>
+                <div className="p-3 space-y-3 flex-1 overflow-y-auto">
+                  <p className="text-[11px] leading-relaxed text-ink/60">
+                    Ask the connected 0G model to create, edit, or delete files. Review the file operations before applying them.
+                  </p>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(event) => setAiPrompt(event.target.value)}
+                    placeholder="e.g. Create test2.md with our project name"
+                    className="w-full min-h-24 resize-y rounded-lg border border-ink/15 bg-paper p-2 text-xs outline-none focus:border-[var(--accent)]"
+                    disabled={aiBusy}
+                  />
+                  <button
+                    onClick={handleAiEdit}
+                    disabled={aiBusy || !aiPrompt.trim() || !selectedFile}
+                    className="w-full rounded-lg px-3 py-2 text-xs font-heading font-bold text-white disabled:opacity-50"
+                    style={{ background: 'var(--accent)' }}
+                  >
+                    {aiBusy ? 'Thinking…' : 'Suggest File Changes'}
+                  </button>
+                  {aiError && <p className="rounded-lg bg-rose-50 p-2 text-[11px] text-rose-700">{aiError}</p>}
+                  {aiResponse && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-mono uppercase text-emerald-700">Proposal ready</p>
+                      <pre className="max-h-48 overflow-auto rounded-lg bg-ink/5 p-2 text-[10px] leading-relaxed">{aiResponse}</pre>
+                      <div className="flex gap-2">
+                        <button onClick={applyAiEdit} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[11px] font-bold text-white">Apply</button>
+                        <button onClick={() => { setAiResponse(null); setAiChanges(null); }} className="rounded-lg border border-ink/15 px-2 py-1.5 text-[11px]">Discard</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

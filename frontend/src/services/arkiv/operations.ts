@@ -104,11 +104,13 @@ export interface SaveCheckpointInput {
   schemaVersion?: string;
   description?: string;
   manifestJson?: string;
+  isActive?: boolean;
 }
 
 export interface ArkivCheckpointRecord extends SaveCheckpointInput {
   key: Hex;
   owner: string;
+  isActive: boolean;
 }
 
 /**
@@ -931,6 +933,9 @@ function mapArkivCheckpoint(e: any): ArkivCheckpointRecord {
       schemaVersion: String(value('schema_version', '2.0.0')),
       description: value('description') ? String(value('description')) : undefined,
       manifestJson: decodeArkivBytes(rawManifest),
+      // Older entities predate this field and are treated as active until a
+      // restore explicitly marks them suppressed.
+      isActive: value('is_active', true) !== false && String(value('is_active', true)) !== 'false',
     };
   }
 
@@ -994,12 +999,104 @@ export async function saveArkivCheckpoint(
     if (input.contextAuthTag) values.context_auth_tag = input.contextAuthTag.slice(0, 64);
     if (input.description) values.description = input.description.slice(0, 120);
     if (input.manifestJson) values.manifest_json = encoder.encode(input.manifestJson.slice(0, 120000));
+    values.is_active = input.isActive ?? true;
 
     const result = await getArkivWalletClient(walletClient).createEntity(CheckpointV2Schema, values, {
       expiration: ExpirationTime.fromDays(90),
     });
     return { entityKey: result.entityKey as Hex, txHash: result.txHash as Hex };
   }
+
+/**
+ * Atomically anchors the two Swarm references and their checkpoint metadata.
+ * Arkiv supports mixed-schema batches, so this produces one wallet prompt and
+ * one transaction for the core checkpoint write.
+ */
+export async function saveArkivCheckpointBundle(
+  walletClient: WalletClient,
+  contextInputs: [SaveContextRefInput, SaveContextRefInput],
+  checkpoint: SaveCheckpointInput
+) {
+  if (!walletClient.account) throw new Error('Wallet not connected.');
+  const userAddress = getAddress(walletClient.account.address);
+  if (!walletClient.chain || walletClient.chain.id !== 7794095) {
+    throw new Error(`Chain ID mismatch: Wallet must be connected to Rabdi DB-Chain (7794095), got ${walletClient.chain?.id ?? 'unknown'}.`);
+  }
+  await assertSufficientTglm(userAddress);
+  const arkivWallet = getArkivWalletClient(walletClient);
+  const now = u64(BigInt(Math.floor(Date.now() / 1000)));
+  const contextValues = contextInputs.map((input) => ({
+    report_id: input.reportId.slice(0, 64),
+    project_id: input.projectId.slice(0, 64),
+    user_id: input.userId.slice(0, 64),
+    owner: addr(userAddress),
+    storage_provider: (input.storageProvider || 'swarm').slice(0, 32),
+    swarm_ref: input.swarmRef.slice(0, 128),
+    content_hash: input.contentHash.slice(0, 128),
+    file_name: input.fileName.slice(0, 100),
+    content_type: input.contentType.slice(0, 64),
+    file_size: u64(BigInt(input.fileSize)),
+    created_at: now,
+    ...(input.summary ? { summary: input.summary.slice(0, 120) } : {}),
+  }));
+  const checkpointValues: any = {
+    checkpoint_id: checkpoint.checkpointId.slice(0, 64),
+    project_id: checkpoint.projectId.slice(0, 64),
+    owner: addr(userAddress),
+    run_id: (checkpoint.runId || checkpoint.projectId).slice(0, 64),
+    status: checkpoint.status.slice(0, 32),
+    lifecycle_status: checkpoint.lifecycleStatus.slice(0, 32),
+    created_at: u64(BigInt(Math.floor(checkpoint.createdAt / 1000))),
+    swarm_archive_ref: checkpoint.archiveSwarmRef.slice(0, 128),
+    archive_sha256: checkpoint.archiveSha256.slice(0, 128),
+    archive_bytes_size: u64(BigInt(checkpoint.archiveBytesSize)),
+    swarm_context_ref: checkpoint.contextSwarmRef.slice(0, 128),
+    context_sha256: checkpoint.contextSha256.slice(0, 128),
+    context_bytes_size: u64(BigInt(checkpoint.contextBytesSize)),
+    file_count: u64(BigInt(checkpoint.fileCount)),
+    storage_provider: (checkpoint.storageProvider || 'swarm').slice(0, 32),
+    schema_version: (checkpoint.schemaVersion || '2.0.0').slice(0, 32),
+    is_active: checkpoint.isActive ?? true,
+    ...(checkpoint.parentCheckpointId ? { parent_checkpoint_id: checkpoint.parentCheckpointId.slice(0, 64) } : {}),
+    ...(checkpoint.agentTaskId ? { agent_task_id: checkpoint.agentTaskId.slice(0, 64) } : {}),
+    ...(checkpoint.encryptionIv ? { encryption_iv: checkpoint.encryptionIv.slice(0, 64) } : {}),
+    ...(checkpoint.cipherAuthTag ? { cipher_auth_tag: checkpoint.cipherAuthTag.slice(0, 64) } : {}),
+    ...(checkpoint.contextEncryptionIv ? { context_encryption_iv: checkpoint.contextEncryptionIv.slice(0, 64) } : {}),
+    ...(checkpoint.contextAuthTag ? { context_auth_tag: checkpoint.contextAuthTag.slice(0, 64) } : {}),
+    ...(checkpoint.description ? { description: checkpoint.description.slice(0, 120) } : {}),
+    ...(checkpoint.manifestJson ? { manifest_json: encoder.encode(checkpoint.manifestJson.slice(0, 120000)) } : {}),
+  };
+  const result = await arkivWallet.executeBatch({
+    creates: [
+      { schema: ContextRefSchema, values: contextValues[0], expiration: ExpirationTime.fromDays(90) },
+      { schema: ContextRefSchema, values: contextValues[1], expiration: ExpirationTime.fromDays(90) },
+      { schema: CheckpointV2Schema, values: checkpointValues, expiration: ExpirationTime.fromDays(90) },
+    ],
+  });
+  return {
+    txHash: result.txHash as Hex,
+    contextEntityKey: result.createdEntities[1] as Hex,
+    archiveContextEntityKey: result.createdEntities[0] as Hex,
+    checkpointEntityKey: result.createdEntities[2] as Hex,
+  };
+}
+
+/** Updates the durable Arkiv branch status without deleting checkpoint history. */
+export async function setArkivCheckpointActive(
+  walletClient: WalletClient,
+  entityKey: Hex,
+  isActive: boolean
+) {
+  if (!walletClient.account) throw new Error('Wallet not connected.');
+  if (!walletClient.chain || walletClient.chain.id !== 7794095) {
+    throw new Error(`Chain ID mismatch: Wallet must be connected to Rabdi DB-Chain (7794095), got ${walletClient.chain?.id ?? 'unknown'}.`);
+  }
+  await assertSufficientTglm(getAddress(walletClient.account.address));
+  const result = await getArkivWalletClient(walletClient).patchEntity(CheckpointV2Schema, entityKey, {
+    set: { is_active: isActive },
+  });
+  return { txHash: result.txHash as Hex };
+}
 
 /** Reads every currently indexed checkpoint record from Arkiv Testnet. */
 export async function getAllArkivCheckpoints(limit = 100): Promise<ArkivCheckpointRecord[]> {

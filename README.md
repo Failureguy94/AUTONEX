@@ -125,6 +125,25 @@ If Arkiv or Swarm configuration is missing, existing local checkpoint metadata
 is preserved and the UI reports the failed operation instead of overwriting the
 active workspace.
 
+Restoring a checkpoint changes the active branch head without deleting immutable
+Arkiv records or Swarm objects. In the browser, that active head is persisted in
+`localStorage`, so a refresh keeps the restored checkpoint active. This browser
+pointer is profile-local; shared or cross-device branch state should use the
+Node/SQLite checkpoint database or a separate Arkiv branch-head entity.
+
+Checkpoint entities also include an Arkiv `is_active` flag. A restore patches
+the selected entity to `true` and newer entities on the abandoned branch to
+`false`; the binary Swarm objects remain untouched. Existing entities created
+before this field was introduced are treated as active until a restore updates
+their status. Arkiv writes require the connected Rabdi wallet and tGLM.
+
+Checkpoint uploads use Arkiv's atomic mixed-schema batch transaction: the two
+Swarm pointer entities and the checkpoint metadata entity are committed
+together with one wallet confirmation. The first upload for a wallet/project
+may still ask separately for the one-time user and project identity entities;
+later checkpoints reuse those entities and require only the single checkpoint
+batch confirmation.
+
 ### Why Arkiv + Swarm?
 Traditional databases (Postgres, MongoDB) rely on centralized trust: a server operator can tamper with simulation outputs or alter multi-agent votes. Conversely, storing large multi-file codebase bundles and context files directly on blockchain smart contracts is cost-prohibitive. 
 
