@@ -23,14 +23,11 @@ export function Toolbar() {
       {/* Left section: Branding & View Modes */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => cameraCtl.fit()}>
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shadow-xs transition-transform hover:scale-105"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent) 0%, #2B2B2E 100%)',
-            }}
-          >
-            <span className="font-heading font-black text-white text-xs tracking-wider">A</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="AUTONEX Logo"
+            className="w-7 h-7 object-contain drop-shadow-sm transition-transform hover:scale-105"
+          />
           <div className="flex items-baseline gap-1.5">
             <span className="font-heading font-bold text-sm tracking-tight text-ink">AUTONEX</span>
             <span className="text-[9px] font-mono text-ink/40 uppercase tracking-widest hidden sm:inline">3D</span>

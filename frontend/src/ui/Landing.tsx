@@ -127,12 +127,11 @@ export function Landing() {
       {/* 1. Dedicated Fixed Top Header Navbar */}
       <header className="fixed top-0 left-0 right-0 z-30 h-14 border-b border-ink/10 bg-[#FAF7F2]/90 backdrop-blur-md px-6 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs cursor-pointer transition-transform hover:scale-105"
-            style={{ background: 'var(--accent)' }}
-          >
-            <span className="font-heading font-black text-white text-sm">A</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="AUTONEX Logo"
+            className="w-8 h-8 object-contain drop-shadow-sm cursor-pointer transition-transform hover:scale-105"
+          />
           <div className="flex items-baseline gap-2">
             <span className="font-heading font-bold text-lg tracking-tight text-ink">AUTONEX</span>
             <span className="text-[10px] font-mono text-ink/40 uppercase tracking-widest hidden sm:inline">Autonomous Floor</span>
