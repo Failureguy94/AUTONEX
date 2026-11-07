@@ -10,6 +10,13 @@ export default {
         accent: 'var(--accent)',
         'accent-soft': 'var(--accent-soft)',
       },
+      zIndex: {
+        '60': '60',
+        '70': '70',
+        '80': '80',
+        '90': '90',
+        '100': '100',
+      },
       fontFamily: {
         heading: ['"Space Grotesk"', 'sans-serif'],
         body: ['Inter', 'sans-serif'],

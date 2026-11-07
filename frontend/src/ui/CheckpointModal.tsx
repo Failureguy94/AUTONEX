@@ -589,7 +589,7 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
         initial={{ y: 24, scale: 0.98, opacity: 0 }}
         animate={{ y: 0, scale: 1, opacity: 1 }}
         exit={{ y: 16, opacity: 0 }}
-        className="w-[1100px] max-w-full h-[88vh] bg-paper rounded-2xl shadow-2xl border border-ink/10 flex flex-col overflow-hidden"
+        className="w-[1100px] max-w-full h-[88vh] bg-paper rounded-2xl shadow-2xl border border-ink/10 flex flex-col overflow-hidden isolate relative z-0"
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-ink/10 bg-white/70">
@@ -643,7 +643,7 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
         {/* Modal Body: Left Sidebar (Timeline) + Right Main (Inspector/Diff/Preview) */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Left Panel: Checkpoint Timeline */}
-          <div className="w-80 sm:w-96 border-r border-ink/10 bg-[#FAF7F2]/80 flex flex-col min-h-0">
+          <div className="w-80 sm:w-96 shrink-0 border-r border-ink/10 bg-[#FAF7F2]/80 flex flex-col min-h-0 relative">
             {/* Search & Filter Bar */}
             <div className="p-3 border-b border-ink/10 space-y-2">
               <div className="grid grid-cols-2 gap-1.5">
@@ -722,7 +722,7 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
             </div>
 
             {/* Timeline List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
               {loadingList && checkpoints.length === 0 ? (
                 <div className="py-12 text-center text-xs text-ink/50 font-body">
                   Loading verified checkpoints...
@@ -736,9 +736,9 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                 groupedCheckpoints.map(([groupName, group]) => (
                   <div key={groupName} className="space-y-2">
                     {groupByProject && (
-                      <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg bg-[#FAF7F2] px-2 py-1 text-[10px] font-mono text-ink/55">
+                      <div className="sticky top-0 z-10 flex items-center justify-between rounded-lg bg-[#FAF7F2] px-2.5 py-1 text-[10px] font-mono text-ink/70 border border-ink/10 shadow-xs backdrop-blur-sm">
                         <span className="truncate font-semibold">{groupName}</span>
-                        <span>{group.length}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-ink/5 text-ink/60 font-bold">{group.length}</span>
                       </div>
                     )}
                     {group.map((chk) => {
@@ -1172,12 +1172,14 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-60 bg-ink/70 backdrop-blur-xs flex items-center justify-center p-4"
+            style={{ zIndex: 60 }}
+            onClick={(e) => e.stopPropagation()}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-paper rounded-2xl shadow-2xl border border-ink/15 p-6 space-y-4"
+              className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-paper rounded-2xl shadow-2xl border border-ink/15 p-6 space-y-4"
             >
               <div className="flex items-center gap-3 text-amber-700">
                 <Icon d={I.alert} size={24} />
@@ -1315,12 +1317,14 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-70 bg-ink/80 backdrop-blur-md flex items-center justify-center p-4"
+            style={{ zIndex: 70 }}
+            onClick={(e) => e.stopPropagation()}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-md bg-paper rounded-2xl shadow-2xl border border-ink/15 p-6 space-y-5"
+              className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-paper rounded-2xl shadow-2xl border border-ink/15 p-6 space-y-5"
             >
               {restoring ? (
                 <>
