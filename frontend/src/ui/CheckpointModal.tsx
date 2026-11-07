@@ -92,6 +92,7 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
   const [checkpoints, setCheckpoints] = useState<CheckpointRecord[]>([]);
   const [arkivCheckpoints, setArkivCheckpoints] = useState<ArkivCheckpointRecord[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [branchFilter, setBranchFilter] = useState<'all' | 'active' | 'suppressed'>('all');
@@ -99,6 +100,12 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
   const [groupByProject, setGroupByProject] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    if (!address && ownerFilter === 'mine') {
+      setOwnerFilter('all');
+    }
+  }, [address, ownerFilter]);
 
   // Selected Checkpoint
   const [selectedId, setSelectedId] = useState<string | null>(selectedCheckpointId);
@@ -528,22 +535,27 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
 
   // Filtered checkpoints
   const filteredCheckpoints = useMemo(() => {
-    const statusById = new Map(arkivCheckpoints.map((record) => [record.checkpointId, record.isActive]));
+    const arkivById = new Map(arkivCheckpoints.map((record) => [record.checkpointId, record]));
+    const connectedOwner = address?.trim().toLowerCase();
     return checkpoints.filter((c) => {
+      const arkivRecord = arkivById.get(c.checkpointId);
+      const matchOwner =
+        ownerFilter === 'all' ||
+        Boolean(connectedOwner && arkivRecord?.owner?.trim().toLowerCase() === connectedOwner);
       const matchStatus =
         statusFilter === 'all' ||
         c.executionStatus.toLowerCase() === statusFilter.toLowerCase() ||
         c.lifecycleStatus.toLowerCase() === statusFilter.toLowerCase();
       const matchProject = projectFilter === 'all' || c.projectId === projectFilter;
-      const isSuppressed = statusById.get(c.checkpointId) === false;
+      const isSuppressed = arkivRecord?.isActive === false;
       const matchBranch =
         branchFilter === 'all' ||
         (branchFilter === 'active' && !isSuppressed) ||
         (branchFilter === 'suppressed' && isSuppressed);
 
-      return matchStatus && matchProject && matchBranch;
+      return matchOwner && matchStatus && matchProject && matchBranch;
     }).sort((a, b) => sortOrder === 'newest' ? b.createdAt - a.createdAt : a.createdAt - b.createdAt);
-  }, [checkpoints, arkivCheckpoints, statusFilter, projectFilter, branchFilter, sortOrder]);
+  }, [address, checkpoints, arkivCheckpoints, ownerFilter, statusFilter, projectFilter, branchFilter, sortOrder]);
 
   const projectOptions = useMemo(() => {
     return Array.from(new Set(checkpoints.map((checkpoint) => checkpoint.projectId).filter(Boolean))).sort();
@@ -648,6 +660,15 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
             <div className="p-3 border-b border-ink/10 space-y-2">
               <div className="grid grid-cols-2 gap-1.5">
                 <select
+                  value={ownerFilter}
+                  onChange={(event) => setOwnerFilter(event.target.value as typeof ownerFilter)}
+                  className="min-w-0 rounded-lg border border-ink/15 bg-white px-2 py-1.5 text-[10px] text-ink outline-none"
+                  aria-label="Filter by checkpoint owner"
+                >
+                  <option value="all">All checkpoints</option>
+                  <option value="mine" disabled={!address}>My checkpoints{address ? '' : ' (connect wallet)'}</option>
+                </select>
+                <select
                   value={projectFilter}
                   onChange={(event) => setProjectFilter(event.target.value)}
                   className="min-w-0 rounded-lg border border-ink/15 bg-white px-2 py-1.5 text-[10px] text-ink outline-none"
@@ -686,9 +707,10 @@ export function CheckpointModal({ open: propsOpen, onClose: propsOnClose }: Chec
                 >
                   {groupByProject ? 'Grouped' : 'Flat'}
                 </button>
-                {(projectFilter !== 'all' || branchFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'newest') && (
+                {(ownerFilter !== 'all' || projectFilter !== 'all' || branchFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'newest') && (
                   <button
                     onClick={() => {
+                      setOwnerFilter('all');
                       setProjectFilter('all');
                       setBranchFilter('all');
                       setStatusFilter('all');
