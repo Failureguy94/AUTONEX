@@ -156,7 +156,7 @@ export function Landing() {
             <span className="opacity-40">·</span>
             <span className="text-[10px] font-semibold uppercase">
               {iai?.stakingStatus === 'verified'
-                ? `iAI Verified (${iai.indicativeDailyCredits.toFixed(2)} cr/d)`
+                ? `iAI Verified (${(iai?.indicativeDailyCredits ?? 0).toFixed(2)} cr/d)`
                 : zgConn.isVerified
                 ? (zgConn.maskedKey ? `Active (${zgConn.maskedKey})` : 'Active')
                 : 'Configure & Verify'}
@@ -164,7 +164,7 @@ export function Landing() {
           </button>
           {USE_MOCK && (
             <span className="text-[10px] font-mono uppercase tracking-wider rounded-full border border-ink/20 px-2 py-0.5 text-ink/60">
-              Demo mode
+              3D Mesh Active
             </span>
           )}
         </div>

@@ -99,89 +99,87 @@ function extractErrorMessage(error: unknown): string {
  * User-friendly parser for Web3 and Arkiv RPC transaction errors
  */
 export function formatArkivError(error: unknown): string {
-  const msg = extractErrorMessage(error);
-  const code =
-    (error as any)?.code ??
-    (error as any)?.cause?.code ??
-    (error as any)?.data?.code ??
-    (error as any)?.data?.originalError?.code;
+  if (!error) return 'An unexpected error occurred.';
+
+  let msg = '';
+  if (typeof error === 'string') {
+    msg = error;
+  } else if (typeof error === 'object') {
+    const err = error as any;
+    msg =
+      err.shortMessage ||
+      err.details ||
+      err.reason ||
+      err.message ||
+      err.data?.message ||
+      err.error?.message ||
+      err.cause?.shortMessage ||
+      err.cause?.message ||
+      '';
+
+    if (!msg || msg === '[object Object]') {
+      if (typeof err.toString === 'function') {
+        const s = err.toString();
+        if (s && s !== '[object Object]') {
+          msg = s;
+        }
+      }
+    }
+
+    if (!msg || msg === '[object Object]') {
+      try {
+        msg = JSON.stringify(error);
+      } catch {
+        msg = 'An error occurred during wallet operation';
+      }
+    }
+  } else {
+    msg = String(error);
+  }
+
+  const lower = msg.toLowerCase();
 
   if (
-    code === 4001 ||
-    msg.includes('User rejected') ||
-    msg.includes('ACTION_REJECTED') ||
-    msg.includes('denied transaction') ||
-    msg.includes('user rejected action') ||
-    msg.includes('User denied account authorization') ||
-    /user rejected/i.test(msg) ||
-    /user cancelled/i.test(msg) ||
-    /user denied/i.test(msg)
+    lower.includes('user rejected') ||
+    lower.includes('action_rejected') ||
+    lower.includes('denied transaction') ||
+    lower.includes('rejected the request') ||
+    lower.includes('cancelled') ||
+    lower.includes('canceled') ||
+    (typeof error === 'object' && (error as any)?.code === 4001)
   ) {
     return 'Transaction cancelled by user in wallet.';
   }
-
-  if (
-    code === 4100 ||
-    msg.includes('4100') ||
-    msg.includes('unauthorized') ||
-    msg.includes('not been authorized')
-  ) {
-    return 'MetaMask account unauthorized. Please approve wallet account access via eth_requestAccounts.';
-  }
-
-  if (msg.includes('authorization mismatch') || msg.includes('Wallet authorization mismatch')) {
-    return msg;
-  }
-
-  if (
-    msg.includes('without revert data') ||
-    msg.includes('execution reverted') ||
-    msg.includes('contractfunctionexecutionerror')
-  ) {
-    return 'Arkiv Rabdi DB-Chain transaction reverted. Please verify your wallet is connected to Chain ID 7794095 with sufficient tGLM for storage and gas fees.';
-  }
-
-  if (
-    msg.includes('insufficient funds') ||
-    msg.includes('Insufficient tGLM') ||
-    msg.includes('gas required exceeds allowance')
-  ) {
+  if (lower.includes('insufficient funds') || lower.includes('insufficient tglm')) {
     return 'Insufficient tGLM balance for storage fee. Claim tokens from hub.arkiv.network.';
   }
 
   if (
-    code === 4902 ||
-    msg.includes('ChainMismatchError') ||
-    msg.includes('wrong chain') ||
-    msg.includes('Wrong network') ||
-    msg.includes('unrecognized chain') ||
-    msg.includes('Unknown chain') ||
-    msg.includes('does not match') ||
-    msg.includes('not been added') ||
-    /switch to the rabdi/i.test(msg) ||
-    /wallet switch required/i.test(msg) ||
-    /unrecognized chain/i.test(msg) ||
-    // Only treat "chain id" references as a mismatch when they explicitly indicate a wrong/different chain
-    /chain id mismatch/i.test(msg) ||
-    /connected to chain id/i.test(msg) ||
-    /wrong chain id/i.test(msg) ||
-    /incorrect chain/i.test(msg)
+    lower.includes('chainmismatcherror') ||
+    lower.includes('wrong chain') ||
+    lower.includes('wrong network') ||
+    lower.includes('switch to the rabdi') ||
+    lower.includes('wallet switch required') ||
+    lower.includes('unrecognized chain') ||
+    lower.includes('chain not found') ||
+    lower.includes('0x76edaf') ||
+    lower.includes('0x76ee8f') ||
+    lower.includes('7794095')
   ) {
     return 'Please switch your wallet to the Rabdi DB-Chain Testnet (Chain ID 7794095).';
   }
-
-  if (msg.includes('MissingAccessKeyError') || msg.includes('rate limit') || msg.includes('429')) {
+  if (lower.includes('missingaccesskeyerror') || lower.includes('rate limit')) {
     return 'Arkiv RPC rate limit reached. Configure VITE_ARKIV_ACCESS_KEY in .env.local.';
   }
-
-  if (msg.includes('EntityTooLargeError') || msg.includes('MAX_ENTITY_BYTES')) {
+  if (lower.includes('entitytoolargeerror') || lower.includes('max_entity_bytes')) {
     return 'Payload exceeds Arkiv limit of 128 KiB per entity.';
   }
 
-  if (!msg || msg === '[object Object]') {
-    return 'Wallet operation failed. Please verify your connection to Rabdi DB-Chain (Chain ID 7794095).';
+  if (msg.includes('[object Object]')) {
+    return 'Wallet operation failed. Please check your wallet connection and try again.';
   }
 
-  return msg.slice(0, 160);
+  return msg.slice(0, 180);
 }
+
 

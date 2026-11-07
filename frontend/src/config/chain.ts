@@ -105,8 +105,7 @@ export async function switchOrAddRabdiNetwork(providerOrClient?: any): Promise<v
     throw new Error('No EVM wallet detected in browser. Please install MetaMask or another browser wallet.');
   }
 
-  // 7794095 in hex is 0x76edaf
-  const chainIdHex = `0x${rabdiChain.id.toString(16)}`;
+  const chainIdHex = `0x${rabdiChain.id.toString(16)}`; // '0x76edaf' (7794095)
 
   // Check current chain ID first! If already on Rabdi, return immediately without throwing switch prompt
   try {
@@ -129,34 +128,22 @@ export async function switchOrAddRabdiNetwork(providerOrClient?: any): Promise<v
       params: [{ chainId: chainIdHex }],
     });
   } catch (switchError: any) {
-    const msg = (switchError?.message || switchError?.shortMessage || switchError?.data?.message || '').toLowerCase();
-    const code =
-      switchError?.code ??
-      switchError?.data?.code ??
-      switchError?.data?.originalError?.code ??
-      switchError?.cause?.code ??
-      switchError?.error?.code;
-
+    const msg = (switchError?.message || '').toLowerCase();
     if (msg.includes('already') || msg.includes('current')) {
       return;
     }
-    // Respect user cancellation / rejection
-    if (code === 4001 || msg.includes('user rejected') || msg.includes('denied')) {
+    // If user explicitly rejected the switch prompt in their wallet, re-throw
+    if (
+      switchError?.code === 4001 ||
+      msg.includes('user rejected') ||
+      msg.includes('action_rejected') ||
+      msg.includes('rejected the request')
+    ) {
       throw switchError;
     }
 
-    if (
-      code === 4902 ||
-      code === -32603 ||
-      msg.includes('unrecognized') ||
-      msg.includes('unknown chain') ||
-      msg.includes('not added') ||
-      msg.includes('does not exist') ||
-      msg.includes('chain not found') ||
-      msg.includes('could not find chain') ||
-      msg.includes('try adding') ||
-      msg.includes('wallet_addethereumchain')
-    ) {
+    // For any other error (chain not added, 4902, -32603, unrecognized in Rabby, etc.), prompt to add Rabdi DB-Chain
+    try {
       await eth.request({
         method: 'wallet_addEthereumChain',
         params: [
@@ -169,16 +156,8 @@ export async function switchOrAddRabdiNetwork(providerOrClient?: any): Promise<v
           },
         ],
       });
-      try {
-        await eth.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: chainIdHex }],
-        });
-      } catch {
-        // Ignored if already switched upon adding
-      }
-    } else {
-      throw switchError;
+    } catch (addError: any) {
+      throw addError;
     }
   }
 }
