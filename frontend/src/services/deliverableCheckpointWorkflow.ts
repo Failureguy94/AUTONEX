@@ -6,8 +6,6 @@ import { persistBrowserActiveCheckpoint } from './checkpoint/checkpointDb';
 import {
   getArkivProjectsByUser,
   getArkivUserByWallet,
-  registerArkivUser,
-  createArkivProject,
   saveArkivCheckpointBundle,
 } from './arkiv/operations';
 
@@ -42,26 +40,28 @@ export interface DeliverableCheckpointResult {
 async function ensureArkivIdentity(input: DeliverableCheckpointInput) {
   let userEntityCreated = false;
   let projectEntityCreated = false;
+  let userInput: { userId: string; displayName: string } | undefined;
+  let projectInput: { projectId: string; userId: string; name: string; description?: string } | undefined;
   const existingUser = await getArkivUserByWallet(input.userId);
   if (!existingUser) {
-    await registerArkivUser(input.walletClient, {
+    userInput = {
       userId: input.userId,
       displayName: input.userId,
-    });
+    };
     userEntityCreated = true;
   }
 
   const projects = await getArkivProjectsByUser(input.userId);
   if (!projects.some((project) => project.projectId === input.projectId)) {
-    await createArkivProject(input.walletClient, {
+    projectInput = {
       projectId: input.projectId,
       userId: input.userId,
       name: input.projectName,
       description: input.goal.slice(0, 120),
-    });
+    };
     projectEntityCreated = true;
   }
-  return { userEntityCreated, projectEntityCreated };
+  return { userEntityCreated, projectEntityCreated, userInput, projectInput };
 }
 
 /**
@@ -151,27 +151,35 @@ export async function saveDeliverableCheckpoint(
     fileSize: contextBytes.byteLength,
     summary: `AI context snapshot for checkpoint ${checkpointId}`,
   };
-  const arkivCheckpoint = await saveArkivCheckpointBundle(input.walletClient, [archiveContextInput, contextInput], {
-    checkpointId,
-    projectId: input.projectId,
-    parentCheckpointId: input.parentCheckpointId,
-    runId: input.projectId,
-    status: 'Completed',
-    lifecycleStatus: 'COMPLETED',
-    createdAt: Date.now(),
-    archiveSwarmRef: archive.reference,
-    archiveSha256: archiveHash,
-    archiveBytesSize: archiveBytes.byteLength,
-    contextSwarmRef: context.reference,
-    contextSha256: contextHash,
-    contextBytesSize: contextBytes.byteLength,
-    fileCount: Object.keys(input.files).length,
-    storageProvider: 'swarm',
-    schemaVersion: '1.0.0',
-    description: `Generated deliverable checkpoint for ${input.projectName}`,
-    manifestJson,
-    isActive: true,
-  });
+  const arkivCheckpoint = await saveArkivCheckpointBundle(
+    input.walletClient,
+    [archiveContextInput, contextInput],
+    {
+      checkpointId,
+      projectId: input.projectId,
+      parentCheckpointId: input.parentCheckpointId,
+      runId: input.projectId,
+      status: 'Completed',
+      lifecycleStatus: 'COMPLETED',
+      createdAt: Date.now(),
+      archiveSwarmRef: archive.reference,
+      archiveSha256: archiveHash,
+      archiveBytesSize: archiveBytes.byteLength,
+      contextSwarmRef: context.reference,
+      contextSha256: contextHash,
+      contextBytesSize: contextBytes.byteLength,
+      fileCount: Object.keys(input.files).length,
+      storageProvider: 'swarm',
+      schemaVersion: '1.0.0',
+      description: `Generated deliverable checkpoint for ${input.projectName}`,
+      manifestJson,
+      isActive: true,
+    },
+    {
+      user: identity.userInput,
+      project: identity.projectInput,
+    }
+  );
   // A newly created child checkpoint becomes the active branch head. Arkiv
   // history remains immutable; this pointer controls the local working branch.
   persistBrowserActiveCheckpoint(input.projectId, checkpointId);

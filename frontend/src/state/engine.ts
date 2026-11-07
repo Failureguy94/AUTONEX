@@ -26,6 +26,15 @@ function pushLogSafe(text: string) {
   });
 }
 
+function warnInvalidEvent(raw: unknown) {
+  const event = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
+  console.warn('[EventStream] dropped invalid event', {
+    type: event?.type ?? typeof raw,
+    seq: event?.seq,
+    reason: 'event failed the client event schema',
+  });
+}
+
 class MockEngine implements RunEngine {
   private sim: MockSimulator | null = null;
   private raf = 0;
@@ -71,7 +80,7 @@ class MockEngine implements RunEngine {
   pause(p: boolean) { this.paused = p; useStore.setState({ paused: p }); }
   private handle(e: Envelope) {
     const ev = parseEvent(e);
-    if (!ev) { console.warn('dropped invalid event', e); return; }
+    if (!ev) { warnInvalidEvent(e); return; }
     this.replayTape.push(ev);
     useStore.setState({ runEvents: [...useStore.getState().runEvents, ev] });
     applyEvent(ev, false);
@@ -141,7 +150,7 @@ class LiveEngine implements RunEngine {
       this.stream = new HttpStream();
       this.stream.start(run_id, 0, (e) => {
         const ev = parseEvent(e);
-        if (!ev) { console.warn('dropped invalid event', e); return; }
+        if (!ev) { warnInvalidEvent(e); return; }
         this.replayTape.push(ev);
         useStore.setState({ runEvents: [...useStore.getState().runEvents, ev] });
 
