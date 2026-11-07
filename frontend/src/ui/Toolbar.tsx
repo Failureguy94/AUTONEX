@@ -18,18 +18,30 @@ export function Toolbar() {
     resetAccentBlend();
   };
 
+  const handleGoHome = () => {
+    engine.stop();
+    useStore.setState({ phase: 'landing' });
+  };
+
   return (
     <header className="h-12 shrink-0 flex items-center justify-between px-3 border-b border-ink/10 bg-[#FAF7F2]/95 backdrop-blur-md relative z-20 overflow-x-auto no-scrollbar shadow-xs">
       {/* Left section: Branding & View Modes */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => cameraCtl.fit()}>
+        <div
+          role="button"
+          tabIndex={0}
+          title="Return to Home"
+          onClick={handleGoHome}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleGoHome()}
+          className="flex items-center gap-2 cursor-pointer select-none group transition-opacity hover:opacity-85"
+        >
           <img
             src="/logo.png"
             alt="AUTONEX Logo"
-            className="w-7 h-7 object-contain drop-shadow-sm transition-transform hover:scale-105"
+            className="w-7 h-7 object-contain drop-shadow-sm transition-transform group-hover:scale-105"
           />
           <div className="flex items-baseline gap-1.5">
-            <span className="font-heading font-bold text-sm tracking-tight text-ink">AUTONEX</span>
+            <span className="font-heading font-bold text-sm tracking-tight text-ink group-hover:text-[var(--accent)] transition-colors">AUTONEX</span>
             <span className="text-[9px] font-mono text-ink/40 uppercase tracking-widest hidden sm:inline">3D</span>
           </div>
         </div>
