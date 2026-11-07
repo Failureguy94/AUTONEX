@@ -88,6 +88,62 @@ AUTONEX integrates **0G Private Compute** and the **iAI token staking ecosystem*
 
 AUTONEX integrates **Arkiv Network** as its native decentralized database layer and **Ethereum Swarm** as its content-addressed file storage layer. Simulation runs, multi-agent consensus proofs, and context references are anchored directly onto the **Rabdi DB-Chain Testnet**.
 
+### Checkpoint storage and restore setup
+
+Checkpoint history uses Arkiv for metadata and Ethereum Swarm for encrypted/binary
+archives and AI context. Before using **Save / Upload** or restoring an older
+checkpoint, copy `frontend/.env.example` to `frontend/.env` and set:
+
+```env
+VITE_AUTONEX_WORKSPACE_DIR=/absolute/path/to/the/active/project
+```
+
+The workspace path must be the actual project directory whose files AUTONEX
+should capture or replace. Restart the Vite dev server after changing `.env`.
+The browser cannot infer or access an arbitrary local directory, so leaving this
+setting empty intentionally prevents destructive restore operations.
+
+Arkiv setup:
+
+1. Install/connect a wallet such as MetaMask.
+2. Switch it to **Rabdi DB-Chain Testnet**, chain ID `7794095`.
+3. Keep sufficient `tGLM` for Arkiv entity writes.
+4. `VITE_ARKIV_ACCESS_KEY` is optional for reads, but recommended to avoid
+   public endpoint rate limits.
+
+Swarm setup:
+
+1. `VITE_SWARM_GATEWAY_URL` defaults to the public Ethereum Swarm gateway.
+2. For reliable uploads, configure a Bee gateway and a funded,
+   usable `VITE_SWARM_POSTAGE_BATCH_ID`.
+3. The postage batch ID is not required for read-only history retrieval when
+   the configured gateway allows public reads.
+4. `VITE_SWARM_TIMEOUT_MS` controls upload/download failure detection and
+   defaults to `15000`.
+
+If Arkiv or Swarm configuration is missing, existing local checkpoint metadata
+is preserved and the UI reports the failed operation instead of overwriting the
+active workspace.
+
+Restoring a checkpoint changes the active branch head without deleting immutable
+Arkiv records or Swarm objects. In the browser, that active head is persisted in
+`localStorage`, so a refresh keeps the restored checkpoint active. This browser
+pointer is profile-local; shared or cross-device branch state should use the
+Node/SQLite checkpoint database or a separate Arkiv branch-head entity.
+
+Checkpoint entities also include an Arkiv `is_active` flag. A restore patches
+the selected entity to `true` and newer entities on the abandoned branch to
+`false`; the binary Swarm objects remain untouched. Existing entities created
+before this field was introduced are treated as active until a restore updates
+their status. Arkiv writes require the connected Rabdi wallet and tGLM.
+
+Checkpoint uploads use Arkiv's atomic mixed-schema batch transaction: the two
+Swarm pointer entities and the checkpoint metadata entity are committed
+together with one wallet confirmation. The first upload for a wallet/project
+may still ask separately for the one-time user and project identity entities;
+later checkpoints reuse those entities and require only the single checkpoint
+batch confirmation.
+
 ### Why Arkiv + Swarm?
 Traditional databases (Postgres, MongoDB) rely on centralized trust: a server operator can tamper with simulation outputs or alter multi-agent votes. Conversely, storing large multi-file codebase bundles and context files directly on blockchain smart contracts is cost-prohibitive. 
 

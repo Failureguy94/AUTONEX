@@ -6,10 +6,13 @@ import { Icon, I } from './Icons';
 import { fmtEffort } from '@/state/events';
 import { jsPDF } from 'jspdf';
 import { generateProjectFiles, downloadProjectZip, downloadMarkdownReport, downloadSingleFile } from '@/services/projectBundle';
-import { uploadContextWorkflow, retrieveContextWorkflow } from '@/services/storageWorkflow';
+import { retrieveContextWorkflow } from '@/services/storageWorkflow';
+import { saveDeliverableCheckpoint } from '@/services/deliverableCheckpointWorkflow';
+import { hasWorkingChanges, loadWorkingSnapshot, saveWorkingSnapshot } from '@/services/workingSnapshot';
 import { RABDI_EXPLORER_URL, RABDI_FAUCET_URL, fetchTglmBalance, formatArkivError } from '@/services/arkiv/balance';
 import { rabdiChain, switchOrAddRabdiNetwork, ensureRabdiWalletClient } from '@/config/chain';
 import { CheckpointSummaryView } from './CheckpointSummaryView';
+import { CodeEditor } from './CodeEditor';
 import { generateCheckpointSummary, formatCheckpointSummaryMarkdown, type CheckpointSummary } from '@/services/checkpointSummary';
 import { apiUrl } from '@/api/client';
 
@@ -86,6 +89,9 @@ export function ReportView() {
   const modelId = useStore((s) => s.modelId);
   const triage = useStore((s) => s.triage);
   const paused = useStore((s) => s.paused);
+  const restoredWorkspaceFiles = useStore((s) => s.restoredWorkspaceFiles);
+  const restoredCheckpointId = useStore((s) => s.restoredCheckpointId);
+  const editorOpenRequested = useStore((s) => s.editorOpenRequested);
 
   const [activeTab, setActiveTab] = useState<'report' | 'files' | 'checkpoint' | 'storage'>('report');
   const [selectedFile, setSelectedFile] = useState<string>('src/App.tsx');
@@ -125,23 +131,57 @@ export function ReportView() {
   const projectName = localOutputDir.split(/[\\/]/).filter(Boolean).pop() || 'ProjectOutput';
 
   const [realFiles, setRealFiles] = useState<Record<string, string> | null>(null);
+  const [workingFiles, setWorkingFiles] = useState<Record<string, string> | null>(null);
+  const [baselineFiles, setBaselineFiles] = useState<Record<string, string> | null>(null);
+  const [workingCheckpointId, setWorkingCheckpointId] = useState<string | null>(null);
+  const [checkpointingChanges, setCheckpointingChanges] = useState(false);
+  const [editorMaximized, setEditorMaximized] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [aiChanges, setAiChanges] = useState<Record<string, string | null> | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const runTestInference = useStore((s) => s.runTestInference);
+
+  useEffect(() => {
+    if (!restoredWorkspaceFiles || !restoredCheckpointId) return;
+    const restored = { ...restoredWorkspaceFiles };
+    setRealFiles(restored);
+    setWorkingFiles(restored);
+    setBaselineFiles(restored);
+    setWorkingCheckpointId(restoredCheckpointId);
+    setSelectedFile(Object.keys(restored)[0] || '');
+  }, [restoredWorkspaceFiles, restoredCheckpointId]);
+
+  useEffect(() => {
+    if (!editorOpenRequested) return;
+    setActiveTab('files');
+    useStore.setState({ editorOpenRequested: false });
+  }, [editorOpenRequested]);
 
   useEffect(() => {
     if (!open || !localOutputDir) return;
     fetch(apiUrl(`/api/deliverables?dir=${encodeURIComponent(localOutputDir)}`))
       .then(r => r.json())
       .then(d => {
-        if (d.files && Object.keys(d.files).length > 0) {
-          setRealFiles(d.files);
-          setSelectedFile(Object.keys(d.files)[0]);
+        const persisted = loadWorkingSnapshot(projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+        const diskFiles = d.files && Object.keys(d.files).length > 0 ? d.files : null;
+        const loadedFiles = persisted?.files || diskFiles;
+        if (loadedFiles && Object.keys(loadedFiles).length > 0) {
+          setRealFiles(loadedFiles);
+          setWorkingFiles(loadedFiles);
+          setBaselineFiles(loadedFiles);
+          setWorkingCheckpointId(persisted?.baseCheckpointId || null);
+          setSelectedFile(Object.keys(loadedFiles)[0]);
         }
       })
       .catch(() => {});
   }, [open, localOutputDir]);
 
   const fallbackFiles = useMemo(() => generateProjectFiles(goal), [goal]);
-  const files = realFiles || fallbackFiles;
+  const files = workingFiles || realFiles || fallbackFiles;
   const fileKeys = useMemo(() => Object.keys(files), [files]);
+  const hasUnsavedChanges = hasWorkingChanges(files, baselineFiles);
 
   // Derived real-time Checkpoint Summary
   const activeSummary = useMemo<CheckpointSummary | null>(() => {
@@ -266,6 +306,79 @@ export function ReportView() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleAiEdit = async () => {
+    if (!selectedFile || !aiPrompt.trim() || aiBusy) return;
+    setAiBusy(true);
+    setAiError(null);
+    setAiResponse(null);
+    setAiChanges(null);
+    const result = await runTestInference(
+      `You are a coding agent editing a project.
+Return ONLY valid JSON with this exact shape:
+{"writes":{"path/to/file.md":"complete file contents"},"deletes":["path/to/remove.txt"]}
+Use "writes" to create new files or replace existing files. Use "deletes" only when explicitly requested.
+Do not modify any file not required by the request. Preserve existing file contents unless a change is requested.
+Request: ${aiPrompt}
+
+Current project files:
+${Object.entries(files).map(([path, content]) => `--- ${path}\n${content}`).join('\n')}`,
+      { maxTokens: 12000 }
+    );
+    setAiBusy(false);
+    if (!result.ok) {
+      setAiError(result.error || '0G model request failed');
+      return;
+    }
+    const content = result.result?.content || result.result?.text || result.result?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      setAiError('0G returned no editable code. Try a more specific request.');
+      return;
+    }
+    let changes: Record<string, string | null> | null = null;
+    try {
+      const jsonText = content.match(/\{[\s\S]*\}/)?.[0];
+      if (jsonText) {
+        const parsed = JSON.parse(jsonText) as { writes?: Record<string, string>; deletes?: string[] };
+        changes = {};
+        for (const [path, value] of Object.entries(parsed.writes || {})) {
+          if (path.trim() && typeof value === 'string') changes[path.replace(/\\/g, '/').replace(/^\/+/, '')] = value;
+        }
+        for (const path of parsed.deletes || []) {
+          if (typeof path === 'string' && path.trim()) changes[path.replace(/\\/g, '/').replace(/^\/+/, '')] = null;
+        }
+      }
+    } catch {
+      changes = null;
+    }
+    if (!changes || !Object.keys(changes).length) {
+      const fileBlocks = [...content.matchAll(/###\s*FILE:\s*([^\n]+)\n```[\w+-]*\n([\s\S]*?)```/gi)];
+      if (fileBlocks.length) {
+        changes = Object.fromEntries(fileBlocks.map((match) => [match[1].trim(), match[2]]));
+      }
+    }
+    if (!changes || !Object.keys(changes).length) {
+      changes = { [selectedFile]: (content.match(/```(?:[\w+-]+)?\s*([\s\S]*?)```/)?.[1] || content).trim() };
+    }
+    setAiChanges(changes);
+    setAiResponse(Object.entries(changes).map(([path, value]) => `${value === null ? 'DELETE' : 'WRITE'} ${path}`).join('\n'));
+  };
+
+  const applyAiEdit = () => {
+    if (!aiChanges) return;
+    const nextFiles = { ...files };
+    const createdFiles = Object.keys(aiChanges).filter((path) => aiChanges[path] !== null && !files[path]);
+    for (const [path, value] of Object.entries(aiChanges)) {
+      if (value === null) delete nextFiles[path];
+      else nextFiles[path] = value;
+    }
+    setWorkingFiles(nextFiles);
+    setSelectedFile(createdFiles[0] || (nextFiles[selectedFile] ? selectedFile : Object.keys(nextFiles)[0] || ''));
+    saveWorkingSnapshot(projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'), nextFiles, workingCheckpointId);
+    setAiResponse(null);
+    setAiChanges(null);
+    setAiPrompt('');
+  };
+
   const handleStoreOnSwarmAndArkiv = async () => {
     setUploadingStorage(true);
     setStorageError(null);
@@ -290,39 +403,56 @@ export function ReportView() {
         throw new Error('Please connect your Web3 wallet first.');
       }
 
-      // Package strictly the AI-generated summary/checkpoint context (no raw codebase file dumps)
+      // Capture the complete generated source tree and AI state. Source bytes
+      // are stored in Swarm; Arkiv stores only immutable metadata and pointers.
       const summary = activeSummary || generateCheckpointSummary(useStore.getState(), files, localOutputDir);
       const summaryMarkdown = summary ? formatCheckpointSummaryMarkdown(summary) : (report?.report_markdown || 'Autonomous Run Summary');
-
-      const payload = JSON.stringify(
-        {
-          type: 'autonex_summary_checkpoint_context',
-          version: '1.0.0',
-          goal,
-          timestamp: new Date().toISOString(),
-          checkpointSummary: summary,
-          summaryMarkdown,
-          fileInventory: fileKeys, // Only list of file paths/names, no code contents
-          metadata: {
-            projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-            projectName,
-            signer,
-            modelId: useStore.getState().modelId,
-          },
-        },
-        null,
-        2
-      );
-
-      const res = await uploadContextWorkflow(client, payload, {
-        projectId: projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      const projectId = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const res = await saveDeliverableCheckpoint({
+        walletClient: client,
         userId: signer,
-        fileName: `${projectName.toLowerCase()}-summary-context.json`,
-        contentType: 'application/json',
-        summary: `AI Summary & Context Checkpoint for ${goal.slice(0, 50)}...`,
+        projectId,
+        projectName,
+        goal,
+        files,
+        reportMarkdown: summaryMarkdown,
+        aiContext: {
+          checkpointSummary: summary,
+          tasks,
+          agents,
+          edges,
+          notes,
+          runEvents,
+          metrics,
+          executionState,
+          executionError,
+          contextStages,
+          fileEdits,
+          checkpoint,
+          simClock,
+          realElapsed,
+          effortLogical,
+          modelId,
+          triage,
+          paused,
+        },
       });
 
-      setStorageResult(res);
+      setStorageResult({
+        reportId: res.checkpointId,
+        swarmReference: res.archiveReference,
+        contentHash: res.archiveHash,
+        entityKey: res.checkpointEntityKey,
+        txHash: res.checkpointTxHash,
+        contextReference: res.contextReference,
+        contextHash: res.contextHash,
+        contextReportId: res.contextReportId,
+        contextEntityKey: res.contextEntityKey,
+        fileSize: res.archiveBytes,
+      });
+      setBaselineFiles(files);
+      setWorkingCheckpointId(res.checkpointId);
+      saveWorkingSnapshot(projectId, files, res.checkpointId);
       fetchTglmBalance(signer as any).then((b) => setTglmBalance(b.formatted)).catch(() => {});
     } catch (err: any) {
       setStorageError(formatArkivError(err));
@@ -331,12 +461,76 @@ export function ReportView() {
     }
   };
 
+  const handleCreateCheckpointFromChanges = async () => {
+    if (!walletClient || !hasUnsavedChanges) return;
+    setCheckpointingChanges(true);
+    setStorageError(null);
+    try {
+      const client = await ensureRabdiWalletClient(walletClient, activeAddress);
+      const signer = client.account?.address || activeAddress;
+      if (!signer) throw new Error('Connect a wallet before creating a checkpoint.');
+      const summary = activeSummary || generateCheckpointSummary(useStore.getState(), files, localOutputDir);
+      const projectId = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const result = await saveDeliverableCheckpoint({
+        walletClient: client,
+        userId: signer,
+        projectId,
+        projectName,
+        goal,
+        files,
+        parentCheckpointId: workingCheckpointId,
+        reportMarkdown: summary ? formatCheckpointSummaryMarkdown(summary) : report?.report_markdown,
+        aiContext: {
+          checkpointSummary: summary,
+          tasks,
+          agents,
+          edges,
+          notes,
+          runEvents,
+          metrics,
+          executionState,
+          executionError,
+          contextStages,
+          fileEdits,
+          checkpoint,
+          simClock,
+          realElapsed,
+          effortLogical,
+          modelId,
+          triage,
+          paused,
+        },
+      });
+      setBaselineFiles({ ...files });
+      setWorkingCheckpointId(result.checkpointId);
+      saveWorkingSnapshot(projectId, files, result.checkpointId);
+      setStorageResult({
+        reportId: result.checkpointId,
+        swarmReference: result.archiveReference,
+        contentHash: result.archiveHash,
+        entityKey: result.checkpointEntityKey,
+        txHash: result.checkpointTxHash,
+        contextReference: result.contextReference,
+        contextHash: result.contextHash,
+        fileSize: result.archiveBytes,
+      });
+      useStore.setState({ toast: `New checkpoint ${result.checkpointId} created from your changes.` });
+    } catch (error: any) {
+      setStorageError(error?.message || 'Could not create a checkpoint from the edited files.');
+    } finally {
+      setCheckpointingChanges(false);
+    }
+  };
+
   const handleVerifySwarmIntegrity = async () => {
     if (!storageResult?.reportId) return;
     setVerifyingSwarm(true);
     setVerifyStatus(null);
     try {
-      const check = await retrieveContextWorkflow(storageResult.reportId, storageResult.entityKey);
+      const check = await retrieveContextWorkflow(
+        storageResult.contextReportId || storageResult.reportId,
+        storageResult.contextEntityKey || storageResult.entityKey
+      );
       if (check.verified) {
         setVerifyStatus('✓ Cryptographic SHA-256 Verified! Swarm content matches on-chain Arkiv record bit-for-bit.');
       } else {
@@ -434,7 +628,7 @@ export function ReportView() {
       className="absolute inset-0 z-40 bg-ink/50 backdrop-blur-sm flex items-center justify-center p-6"
       onClick={(e) => e.target === e.currentTarget && useStore.setState({ reportOpen: false })}>
       <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-        className="w-[880px] max-h-[88vh] rounded-2xl bg-paper shadow-2xl border border-ink/10 overflow-hidden flex flex-col">
+        className={`${editorMaximized ? 'w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]' : 'w-[880px] max-h-[88vh]'} rounded-2xl bg-paper shadow-2xl border border-ink/10 overflow-hidden flex flex-col transition-all`}>
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-ink/10 blueprint-grid">
@@ -459,6 +653,13 @@ export function ReportView() {
 
           {/* Action Download Buttons */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setEditorMaximized(!editorMaximized); setActiveTab('files'); }}
+              className="rounded-xl px-3 py-1.5 text-xs font-heading bg-ink/5 hover:bg-ink/10"
+              title="Open the project in the full-screen editor"
+            >
+              {editorMaximized ? 'Windowed' : 'Open Editor'}
+            </button>
             <button
               onClick={handleDownloadZip}
               disabled={zipping}
@@ -557,7 +758,7 @@ export function ReportView() {
         </div>
 
         {/* Tab Content Body */}
-        <div className="flex-1 overflow-y-auto px-8 py-5">
+        <div className={`flex-1 overflow-y-auto px-8 py-5 ${editorMaximized && activeTab === 'files' ? 'min-h-0' : ''}`}>
           {activeTab === 'checkpoint' ? (
             <CheckpointSummaryView
               summary={activeSummary}
@@ -574,7 +775,7 @@ export function ReportView() {
                   Decentralized Context & Checkpoint Storage
                 </h3>
                 <p className="text-xs font-body text-ink/70 leading-relaxed">
-                  Store the structured AI checkpoint summary and execution context on <strong>Ethereum Swarm</strong> content-addressed storage while anchoring ownership, timestamps, and cryptographic SHA-256 integrity hashes on the <strong>Arkiv Rabdi DB-Chain</strong>. Codebase files remain on local disk; only the AI synthesis and file inventory manifest are stored on-chain / on Swarm.
+                  Store the complete editable source tree and AI checkpoint context on <strong>Ethereum Swarm</strong> as immutable binary objects while anchoring ownership, timestamps, references, and cryptographic SHA-256 integrity hashes on the <strong>Arkiv Rabdi DB-Chain</strong>.
                 </p>
               </div>
 
@@ -677,7 +878,7 @@ export function ReportView() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-ink/40">Codebase Files:</span>
-                      <span className="font-semibold text-ink/60">Local Only ({fileKeys.length} files cataloged, zero code uploaded)</span>
+                      <span className="font-semibold text-ink/60">{hasUnsavedChanges ? 'Edited locally · checkpoint required' : `${fileKeys.length} editable files`}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-ink/40">Target Network:</span>
@@ -850,9 +1051,9 @@ export function ReportView() {
             )
           ) : (
             /* Deliverables / Source Code Tab */
-            <div className="grid grid-cols-12 gap-4 h-[440px]">
+            <div className="grid grid-cols-12 gap-4 h-[calc(100vh-20rem)] min-h-[440px]">
               {/* File list sidebar */}
-              <div className="col-span-4 border border-ink/10 rounded-xl bg-ink/2 p-2 overflow-y-auto space-y-1">
+              <div className="col-span-3 border border-ink/10 rounded-xl bg-ink/2 p-2 overflow-y-auto space-y-1">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-ink/40 px-2 py-1">Generated Files</div>
                 {fileKeys.map((fk) => (
                   <button
@@ -869,10 +1070,19 @@ export function ReportView() {
               </div>
 
               {/* Code viewer pane */}
-              <div className="col-span-8 border border-ink/10 rounded-xl bg-ink/5 flex flex-col overflow-hidden">
+              <div className="col-span-7 border border-ink/10 rounded-xl bg-ink/5 flex flex-col overflow-hidden">
                 <div className="px-3 py-2 border-b border-ink/10 flex items-center justify-between bg-ink/3">
                   <span className="font-mono text-xs text-ink/70 font-semibold">{selectedFile}</span>
                   <div className="flex items-center gap-2">
+                    {hasUnsavedChanges && (
+                      <button
+                        onClick={handleCreateCheckpointFromChanges}
+                        disabled={checkpointingChanges}
+                        className="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--accent)] text-white font-semibold disabled:opacity-50"
+                      >
+                        {checkpointingChanges ? 'Saving…' : 'Create New Checkpoint'}
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(files[selectedFile] || '');
@@ -892,9 +1102,58 @@ export function ReportView() {
                     </button>
                   </div>
                 </div>
-                <pre className="flex-1 p-4 overflow-auto font-mono text-xs leading-relaxed text-ink/90 bg-[#FAF7F2] select-text">
-                  <code>{files[selectedFile] || '// Select a file to view code'}</code>
-                </pre>
+                <CodeEditor
+                  value={files[selectedFile] || ''}
+                  filePath={selectedFile}
+                  onChange={(content) => {
+                    const nextFiles = { ...files, [selectedFile]: content };
+                    setWorkingFiles(nextFiles);
+                    saveWorkingSnapshot(
+                      projectName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                      nextFiles,
+                      workingCheckpointId
+                    );
+                  }}
+                  className="flex-1"
+                  onSave={handleCreateCheckpointFromChanges}
+                />
+              </div>
+              <div className="col-span-2 border border-ink/10 rounded-xl bg-white/70 flex flex-col overflow-hidden">
+                <div className="px-3 py-2 border-b border-ink/10 font-heading text-xs font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  0G Code Agent
+                </div>
+                <div className="p-3 space-y-3 flex-1 overflow-y-auto">
+                  <p className="text-[11px] leading-relaxed text-ink/60">
+                    Ask the connected 0G model to create, edit, or delete files. Review the file operations before applying them.
+                  </p>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(event) => setAiPrompt(event.target.value)}
+                    placeholder="e.g. Create test2.md with our project name"
+                    className="w-full min-h-24 resize-y rounded-lg border border-ink/15 bg-paper p-2 text-xs outline-none focus:border-[var(--accent)]"
+                    disabled={aiBusy}
+                  />
+                  <button
+                    onClick={handleAiEdit}
+                    disabled={aiBusy || !aiPrompt.trim() || !selectedFile}
+                    className="w-full rounded-lg px-3 py-2 text-xs font-heading font-bold text-white disabled:opacity-50"
+                    style={{ background: 'var(--accent)' }}
+                  >
+                    {aiBusy ? 'Thinking…' : 'Suggest File Changes'}
+                  </button>
+                  {aiError && <p className="rounded-lg bg-rose-50 p-2 text-[11px] text-rose-700">{aiError}</p>}
+                  {aiResponse && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-mono uppercase text-emerald-700">Proposal ready</p>
+                      <pre className="max-h-48 overflow-auto rounded-lg bg-ink/5 p-2 text-[10px] leading-relaxed">{aiResponse}</pre>
+                      <div className="flex gap-2">
+                        <button onClick={applyAiEdit} className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[11px] font-bold text-white">Apply</button>
+                        <button onClick={() => { setAiResponse(null); setAiChanges(null); }} className="rounded-lg border border-ink/15 px-2 py-1.5 text-[11px]">Discard</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

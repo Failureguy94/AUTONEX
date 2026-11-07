@@ -10,6 +10,7 @@ import { ReportView } from './ReportView';
 import { SettingsModal } from './SettingsModal';
 import { ZGConfigModal } from './ZGConfigModal';
 import { ErrorCheckpointModal } from './ErrorCheckpointModal';
+import { CheckpointModal } from './CheckpointModal';
 import { Minimap } from './Minimap';
 import { TriageBanner } from './TriageBanner';
 import { PermissionPanel } from './PermissionPanel';
@@ -66,6 +67,7 @@ export function Workspace() {
           <SettingsModal />
           <ZGConfigModal />
           <ErrorCheckpointModal />
+          <CheckpointModal />
           {!goal && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 rounded-xl bg-white/95 border border-ink/15 text-ink text-xs font-heading px-4 py-2 shadow-md flex items-center gap-3 backdrop-blur-md">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

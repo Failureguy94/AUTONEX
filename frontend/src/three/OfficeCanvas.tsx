@@ -164,8 +164,9 @@ export function OfficeCanvas({ ambient = false }: { ambient?: boolean }) {
   const post = useStore((s) => s.settings.post);
   const dpr = useStore((s) => (s.settings.shadows === 'high' ? [1, 2] : [1, 1.5]));
   useEffect(() => {
+    if (!ambient) director.spawnDesktopCrew();
     return () => { director.reset(); };
-  }, []);
+  }, [ambient]);
   return (
     <Canvas
       shadows

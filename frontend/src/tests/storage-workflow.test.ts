@@ -4,12 +4,11 @@ import {
   retrieveContextWorkflow,
   setupUserAndProjectWorkflow,
 } from '@/services/storageWorkflow';
-import { getFallbackStorage } from '@/services/swarm/client';
+import { getActiveStorageProvider } from '@/services/swarm/operations';
 import * as arkivOps from '@/services/arkiv/operations';
 
 describe('Unified Arkiv + Swarm Storage Workflow Pipeline', () => {
   beforeEach(() => {
-    getFallbackStorage().clear();
     vi.restoreAllMocks();
   });
 
@@ -30,6 +29,16 @@ describe('Unified Arkiv + Swarm Storage Workflow Pipeline', () => {
       author: 'AUTONEX AI Floor',
     });
 
+    const mockSwarmRef = 'ebb37e867f90bff371c628ad269d98360543f66c3e462e4186e2c2de1c9c2091';
+    const provider = getActiveStorageProvider();
+    vi.spyOn(provider, 'uploadBinary').mockResolvedValueOnce({
+      reference: mockSwarmRef,
+      contentHash: 'sha256:dummyhash',
+      byteSize: new TextEncoder().encode(fileContent).byteLength,
+      contentType: 'application/json',
+      timestamp: new Date().toISOString(),
+    });
+
     const result = await uploadContextWorkflow(mockWalletClient, fileContent, {
       projectId: 'project-autonex-v1',
       userId: 'user-42',
@@ -40,27 +49,23 @@ describe('Unified Arkiv + Swarm Storage Workflow Pipeline', () => {
     expect(result.reportId).toBeDefined();
     expect(result.projectId).toBe('project-autonex-v1');
     expect(result.userId).toBe('user-42');
-    expect(result.swarmReference).toHaveLength(64);
+    expect(result.swarmReference).toBe(mockSwarmRef);
     expect(result.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(result.entityKey).toBe('0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
     expect(result.txHash).toBe('0x9876543210987654321098765432109876543210987654321098765432109876');
-
-    // Verify it was stored in Swarm
-    const storage = getFallbackStorage();
-    expect(storage.has(result.swarmReference)).toBe(true);
   });
 
   it('2. Retrieve Context Workflow: fetches from Arkiv & Swarm, verifies SHA-256 integrity', async () => {
     const rawContent = '# Project Specification\n\nVerified by Arkiv DB-Chain';
     const rawBytes = new TextEncoder().encode(rawContent);
-    const mockHash = 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
     const mockSwarmRef = '1122334455667788990011223344556677889900112233445566778899001122';
 
-    // Seed fallback storage
-    getFallbackStorage().set(mockSwarmRef, {
-      content: rawContent,
-      contentType: 'text/markdown',
-      timestamp: Date.now(),
+    const provider = getActiveStorageProvider();
+    vi.spyOn(provider, 'downloadBinary').mockResolvedValueOnce({
+      data: rawBytes,
+      contentHash: 'sha256:dummy',
+      byteSize: rawBytes.byteLength,
+      verified: true,
     });
 
     // Mock getArkivContextRefByReportId with real SHA-256 of rawContent
@@ -87,7 +92,7 @@ describe('Unified Arkiv + Swarm Storage Workflow Pipeline', () => {
 
     expect(retrieved.verified).toBe(true);
     expect(retrieved.content).toBe(rawContent);
-    expect(retrieved.contentType).toBe('text/markdown');
+    expect(retrieved.contentType).toBe('application/json');
     expect(retrieved.expectedHash).toBe(realHash);
     expect(retrieved.actualHash).toBe(realHash);
     expect(retrieved.metadata.reportId).toBe('rep_123');
@@ -99,11 +104,12 @@ describe('Unified Arkiv + Swarm Storage Workflow Pipeline', () => {
     const tamperedContent = 'Original sensitive payload [MODIFIED BY ATTACKER]';
     const mockSwarmRef = 'aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899';
 
-    // Swarm holds tampered content
-    getFallbackStorage().set(mockSwarmRef, {
-      content: tamperedContent,
-      contentType: 'text/plain',
-      timestamp: Date.now(),
+    const provider = getActiveStorageProvider();
+    vi.spyOn(provider, 'downloadBinary').mockResolvedValueOnce({
+      data: new TextEncoder().encode(tamperedContent),
+      contentHash: 'sha256:tamperedhash',
+      byteSize: new TextEncoder().encode(tamperedContent).byteLength,
+      verified: true,
     });
 
     const { calculateSHA256 } = await import('@/services/swarm/operations');

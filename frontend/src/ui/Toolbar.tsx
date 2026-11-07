@@ -206,6 +206,12 @@ export function Toolbar() {
         />
 
         <ToolbarBtn
+          onClick={() => useStore.getState().setCheckpointModalOpen(true)}
+          icon={I.layers}
+          label="Checkpoints"
+        />
+
+        <ToolbarBtn
           onClick={() => useStore.setState({ arkivHistoryOpen: true })}
           icon={I.database}
           label="Arkiv"

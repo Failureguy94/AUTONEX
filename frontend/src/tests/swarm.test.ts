@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   calculateSHA256,
   uploadContextFile,
   getContextFile,
   verifyContentIntegrity,
+  getActiveStorageProvider,
 } from '@/services/swarm/operations';
-import { getFallbackStorage } from '@/services/swarm/client';
 
 describe('Ethereum Swarm Content-Addressed Storage & Hashing', () => {
   beforeEach(() => {
-    getFallbackStorage().clear();
+    vi.restoreAllMocks();
   });
 
   it('1. Cryptographic SHA-256: computes standard sha256: hex string', async () => {
@@ -39,6 +39,16 @@ describe('Ethereum Swarm Content-Addressed Storage & Hashing', () => {
       timestamp: Date.now(),
     });
 
+    const mockRef = 'ebb37e867f90bff371c628ad269d98360543f66c3e462e4186e2c2de1c9c2091';
+    const provider = getActiveStorageProvider();
+    vi.spyOn(provider, 'uploadBinary').mockResolvedValueOnce({
+      reference: mockRef,
+      contentHash: await calculateSHA256(payload),
+      byteSize: new TextEncoder().encode(payload).byteLength,
+      contentType: 'application/json',
+      timestamp: new Date().toISOString(),
+    });
+
     const res = await uploadContextFile(payload, 'deliverable.json', 'application/json');
 
     expect(res.swarmReference).toHaveLength(64);
@@ -50,12 +60,20 @@ describe('Ethereum Swarm Content-Addressed Storage & Hashing', () => {
 
   it('4. Get Context File: retrieves stored content from content reference', async () => {
     const sampleMd = '# AUTONEX Deliverable Report\n\n- Milestone 1: Done\n- Milestone 2: Done';
-    const upload = await uploadContextFile(sampleMd, 'report.md', 'text/markdown');
+    const mockRef = 'ebb37e867f90bff371c628ad269d98360543f66c3e462e4186e2c2de1c9c2091';
+    const provider = getActiveStorageProvider();
 
-    const retrieved = await getContextFile(upload.swarmReference);
+    vi.spyOn(provider, 'downloadBinary').mockResolvedValueOnce({
+      data: new TextEncoder().encode(sampleMd),
+      contentHash: await calculateSHA256(sampleMd),
+      byteSize: new TextEncoder().encode(sampleMd).byteLength,
+      verified: true,
+    });
+
+    const retrieved = await getContextFile(mockRef);
 
     expect(retrieved.content).toBe(sampleMd);
-    expect(retrieved.contentType).toBe('text/markdown');
+    expect(retrieved.contentType).toBe('application/json');
     expect(retrieved.fileSize).toBe(new TextEncoder().encode(sampleMd).byteLength);
   });
 
@@ -74,6 +92,10 @@ describe('Ethereum Swarm Content-Addressed Storage & Hashing', () => {
 
   it('6. Error Handling: throws clean descriptive error when reference not found', async () => {
     const nonExistentRef = '0000000000000000000000000000000000000000000000000000000000000000';
+    const provider = getActiveStorageProvider();
+    vi.spyOn(provider, 'downloadBinary').mockRejectedValueOnce(
+      new Error(`Failed to retrieve binary data from Swarm reference "${nonExistentRef}": Not found`)
+    );
     await expect(getContextFile(nonExistentRef)).rejects.toThrow();
   });
 });

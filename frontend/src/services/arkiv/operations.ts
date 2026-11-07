@@ -11,6 +11,7 @@ import {
   UserSchema,
   ProjectSchema,
   ContextRefSchema,
+  CheckpointV2Schema,
 } from './schemas';
 
 const encoder = new TextEncoder();
@@ -77,6 +78,39 @@ export interface SaveContextRefInput {
   contentType: string;
   fileSize: number;
   summary?: string;
+}
+
+export interface SaveCheckpointInput {
+  checkpointId: string;
+  projectId: string;
+  parentCheckpointId?: string | null;
+  agentTaskId?: string | null;
+  runId?: string;
+  status: string;
+  lifecycleStatus: string;
+  createdAt: number;
+  archiveSwarmRef: string;
+  archiveSha256: string;
+  archiveBytesSize: number;
+  contextSwarmRef: string;
+  contextSha256: string;
+  contextBytesSize: number;
+  encryptionIv?: string;
+  cipherAuthTag?: string;
+  contextEncryptionIv?: string;
+  contextAuthTag?: string;
+  fileCount: number;
+  storageProvider?: string;
+  schemaVersion?: string;
+  description?: string;
+  manifestJson?: string;
+  isActive?: boolean;
+}
+
+export interface ArkivCheckpointRecord extends SaveCheckpointInput {
+  key: Hex;
+  owner: string;
+  isActive: boolean;
 }
 
 /**
@@ -869,3 +903,213 @@ export async function getAllArkivContextRefs(limit = 30) {
   }
 }
 
+function mapArkivCheckpoint(e: any): ArkivCheckpointRecord {
+    const value = (name: string, fallback: any = '') => getAttr(e, name) ?? e[name] ?? fallback;
+    const createdAt = Number(value('created_at', 0));
+    const rawManifest = value('manifest_json', '');
+    return {
+      key: (e.$key || e.key) as Hex,
+      owner: String(value('owner', e.$owner || '')),
+      checkpointId: String(value('checkpoint_id')),
+      projectId: String(value('project_id')),
+      parentCheckpointId: value('parent_checkpoint_id') ? String(value('parent_checkpoint_id')) : null,
+      agentTaskId: value('agent_task_id') ? String(value('agent_task_id')) : null,
+      runId: String(value('run_id', '')),
+      status: String(value('status', 'Completed')),
+      lifecycleStatus: String(value('lifecycle_status', 'COMPLETED')),
+      createdAt: createdAt > 10_000_000_000 ? createdAt : createdAt * 1000,
+      archiveSwarmRef: String(value('swarm_archive_ref')),
+      archiveSha256: String(value('archive_sha256')),
+      archiveBytesSize: Number(value('archive_bytes_size', 0)),
+      contextSwarmRef: String(value('swarm_context_ref')),
+      contextSha256: String(value('context_sha256')),
+      contextBytesSize: Number(value('context_bytes_size', 0)),
+      encryptionIv: value('encryption_iv') ? String(value('encryption_iv')) : undefined,
+      cipherAuthTag: value('cipher_auth_tag') ? String(value('cipher_auth_tag')) : undefined,
+      contextEncryptionIv: value('context_encryption_iv') ? String(value('context_encryption_iv')) : undefined,
+      contextAuthTag: value('context_auth_tag') ? String(value('context_auth_tag')) : undefined,
+      fileCount: Number(value('file_count', 0)),
+      storageProvider: String(value('storage_provider', 'swarm')),
+      schemaVersion: String(value('schema_version', '2.0.0')),
+      description: value('description') ? String(value('description')) : undefined,
+      manifestJson: decodeArkivBytes(rawManifest),
+      // Older entities predate this field and are treated as active until a
+      // restore explicitly marks them suppressed.
+      isActive: value('is_active', true) !== false && String(value('is_active', true)) !== 'false',
+    };
+  }
+
+function decodeArkivBytes(value: any): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'string') {
+    if (value.startsWith('0x') && /^[0-9a-f]+$/i.test(value.slice(2))) {
+      try {
+        return decoder.decode(Uint8Array.from(value.slice(2).match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))));
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  }
+  if (value instanceof Uint8Array || Array.isArray(value)) {
+    return decoder.decode(value instanceof Uint8Array ? value : Uint8Array.from(value));
+  }
+  if (typeof value === 'object') {
+    if (typeof value.value === 'string') return decodeArkivBytes(value.value);
+    if (Array.isArray(value.value)) return decodeArkivBytes(value.value);
+    if (value.data) return decodeArkivBytes(value.data);
+  }
+  return undefined;
+}
+
+/** Publishes immutable checkpoint metadata while binary data remains in Swarm. */
+export async function saveArkivCheckpoint(
+    walletClient: WalletClient,
+    input: SaveCheckpointInput
+  ) {
+    if (!walletClient.account) throw new Error('Wallet not connected.');
+    const userAddress = getAddress(walletClient.account.address);
+    if (!walletClient.chain || walletClient.chain.id !== 7794095) {
+      throw new Error(`Chain ID mismatch: Wallet must be connected to Rabdi DB-Chain (7794095), got ${walletClient.chain?.id ?? 'unknown'}.`);
+    }
+    await assertSufficientTglm(userAddress);
+    const values: any = {
+      checkpoint_id: input.checkpointId.slice(0, 64),
+      project_id: input.projectId.slice(0, 64),
+      owner: addr(userAddress),
+      run_id: (input.runId || input.projectId).slice(0, 64),
+      status: input.status.slice(0, 32),
+      lifecycle_status: input.lifecycleStatus.slice(0, 32),
+      created_at: u64(BigInt(Math.floor(input.createdAt / 1000))),
+      swarm_archive_ref: input.archiveSwarmRef.slice(0, 128),
+      archive_sha256: input.archiveSha256.slice(0, 128),
+      archive_bytes_size: u64(BigInt(input.archiveBytesSize)),
+      swarm_context_ref: input.contextSwarmRef.slice(0, 128),
+      context_sha256: input.contextSha256.slice(0, 128),
+      context_bytes_size: u64(BigInt(input.contextBytesSize)),
+      file_count: u64(BigInt(input.fileCount)),
+      storage_provider: (input.storageProvider || 'swarm').slice(0, 32),
+      schema_version: (input.schemaVersion || '2.0.0').slice(0, 32),
+    };
+    if (input.parentCheckpointId) values.parent_checkpoint_id = input.parentCheckpointId.slice(0, 64);
+    if (input.agentTaskId) values.agent_task_id = input.agentTaskId.slice(0, 64);
+    if (input.encryptionIv) values.encryption_iv = input.encryptionIv.slice(0, 64);
+    if (input.cipherAuthTag) values.cipher_auth_tag = input.cipherAuthTag.slice(0, 64);
+    if (input.contextEncryptionIv) values.context_encryption_iv = input.contextEncryptionIv.slice(0, 64);
+    if (input.contextAuthTag) values.context_auth_tag = input.contextAuthTag.slice(0, 64);
+    if (input.description) values.description = input.description.slice(0, 120);
+    if (input.manifestJson) values.manifest_json = encoder.encode(input.manifestJson.slice(0, 120000));
+    values.is_active = input.isActive ?? true;
+
+    const result = await getArkivWalletClient(walletClient).createEntity(CheckpointV2Schema, values, {
+      expiration: ExpirationTime.fromDays(90),
+    });
+    return { entityKey: result.entityKey as Hex, txHash: result.txHash as Hex };
+  }
+
+/**
+ * Atomically anchors the two Swarm references and their checkpoint metadata.
+ * Arkiv supports mixed-schema batches, so this produces one wallet prompt and
+ * one transaction for the core checkpoint write.
+ */
+export async function saveArkivCheckpointBundle(
+  walletClient: WalletClient,
+  contextInputs: [SaveContextRefInput, SaveContextRefInput],
+  checkpoint: SaveCheckpointInput
+) {
+  if (!walletClient.account) throw new Error('Wallet not connected.');
+  const userAddress = getAddress(walletClient.account.address);
+  if (!walletClient.chain || walletClient.chain.id !== 7794095) {
+    throw new Error(`Chain ID mismatch: Wallet must be connected to Rabdi DB-Chain (7794095), got ${walletClient.chain?.id ?? 'unknown'}.`);
+  }
+  await assertSufficientTglm(userAddress);
+  const arkivWallet = getArkivWalletClient(walletClient);
+  const now = u64(BigInt(Math.floor(Date.now() / 1000)));
+  const contextValues = contextInputs.map((input) => ({
+    report_id: input.reportId.slice(0, 64),
+    project_id: input.projectId.slice(0, 64),
+    user_id: input.userId.slice(0, 64),
+    owner: addr(userAddress),
+    storage_provider: (input.storageProvider || 'swarm').slice(0, 32),
+    swarm_ref: input.swarmRef.slice(0, 128),
+    content_hash: input.contentHash.slice(0, 128),
+    file_name: input.fileName.slice(0, 100),
+    content_type: input.contentType.slice(0, 64),
+    file_size: u64(BigInt(input.fileSize)),
+    created_at: now,
+    ...(input.summary ? { summary: input.summary.slice(0, 120) } : {}),
+  }));
+  const checkpointValues: any = {
+    checkpoint_id: checkpoint.checkpointId.slice(0, 64),
+    project_id: checkpoint.projectId.slice(0, 64),
+    owner: addr(userAddress),
+    run_id: (checkpoint.runId || checkpoint.projectId).slice(0, 64),
+    status: checkpoint.status.slice(0, 32),
+    lifecycle_status: checkpoint.lifecycleStatus.slice(0, 32),
+    created_at: u64(BigInt(Math.floor(checkpoint.createdAt / 1000))),
+    swarm_archive_ref: checkpoint.archiveSwarmRef.slice(0, 128),
+    archive_sha256: checkpoint.archiveSha256.slice(0, 128),
+    archive_bytes_size: u64(BigInt(checkpoint.archiveBytesSize)),
+    swarm_context_ref: checkpoint.contextSwarmRef.slice(0, 128),
+    context_sha256: checkpoint.contextSha256.slice(0, 128),
+    context_bytes_size: u64(BigInt(checkpoint.contextBytesSize)),
+    file_count: u64(BigInt(checkpoint.fileCount)),
+    storage_provider: (checkpoint.storageProvider || 'swarm').slice(0, 32),
+    schema_version: (checkpoint.schemaVersion || '2.0.0').slice(0, 32),
+    is_active: checkpoint.isActive ?? true,
+    ...(checkpoint.parentCheckpointId ? { parent_checkpoint_id: checkpoint.parentCheckpointId.slice(0, 64) } : {}),
+    ...(checkpoint.agentTaskId ? { agent_task_id: checkpoint.agentTaskId.slice(0, 64) } : {}),
+    ...(checkpoint.encryptionIv ? { encryption_iv: checkpoint.encryptionIv.slice(0, 64) } : {}),
+    ...(checkpoint.cipherAuthTag ? { cipher_auth_tag: checkpoint.cipherAuthTag.slice(0, 64) } : {}),
+    ...(checkpoint.contextEncryptionIv ? { context_encryption_iv: checkpoint.contextEncryptionIv.slice(0, 64) } : {}),
+    ...(checkpoint.contextAuthTag ? { context_auth_tag: checkpoint.contextAuthTag.slice(0, 64) } : {}),
+    ...(checkpoint.description ? { description: checkpoint.description.slice(0, 120) } : {}),
+    ...(checkpoint.manifestJson ? { manifest_json: encoder.encode(checkpoint.manifestJson.slice(0, 120000)) } : {}),
+  };
+  const result = await arkivWallet.executeBatch({
+    creates: [
+      { schema: ContextRefSchema, values: contextValues[0], expiration: ExpirationTime.fromDays(90) },
+      { schema: ContextRefSchema, values: contextValues[1], expiration: ExpirationTime.fromDays(90) },
+      { schema: CheckpointV2Schema, values: checkpointValues, expiration: ExpirationTime.fromDays(90) },
+    ],
+  });
+  return {
+    txHash: result.txHash as Hex,
+    contextEntityKey: result.createdEntities[1] as Hex,
+    archiveContextEntityKey: result.createdEntities[0] as Hex,
+    checkpointEntityKey: result.createdEntities[2] as Hex,
+  };
+}
+
+/** Updates the durable Arkiv branch status without deleting checkpoint history. */
+export async function setArkivCheckpointActive(
+  walletClient: WalletClient,
+  entityKey: Hex,
+  isActive: boolean
+) {
+  if (!walletClient.account) throw new Error('Wallet not connected.');
+  if (!walletClient.chain || walletClient.chain.id !== 7794095) {
+    throw new Error(`Chain ID mismatch: Wallet must be connected to Rabdi DB-Chain (7794095), got ${walletClient.chain?.id ?? 'unknown'}.`);
+  }
+  await assertSufficientTglm(getAddress(walletClient.account.address));
+  const result = await getArkivWalletClient(walletClient).patchEntity(CheckpointV2Schema, entityKey, {
+    set: { is_active: isActive },
+  });
+  return { txHash: result.txHash as Hex };
+}
+
+/** Reads every currently indexed checkpoint record from Arkiv Testnet. */
+export async function getAllArkivCheckpoints(limit = 100): Promise<ArkivCheckpointRecord[]> {
+    const filter = eq('arkiv.schema', 'autonex.checkpoint_v2');
+    const res = await arkivPublicClient.query(filter as any, { limit });
+    return (res.entities || []).map(mapArkivCheckpoint);
+  }
+
+export async function getArkivCheckpointsByProject(projectId: string, limit = 100) {
+    const filter = and(
+      eq('arkiv.schema', 'autonex.checkpoint_v2'),
+      eq('project_id', projectId)
+    );
+    const res = await arkivPublicClient.query(filter as any, { limit });
+    return (res.entities || []).map(mapArkivCheckpoint);
+}
