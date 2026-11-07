@@ -127,12 +127,11 @@ export function Landing() {
       {/* 1. Dedicated Fixed Top Header Navbar */}
       <header className="fixed top-0 left-0 right-0 z-30 h-14 border-b border-ink/10 bg-[#FAF7F2]/90 backdrop-blur-md px-6 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs cursor-pointer transition-transform hover:scale-105"
-            style={{ background: 'var(--accent)' }}
-          >
-            <span className="font-heading font-black text-white text-sm">A</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="AUTONEX Logo"
+            className="w-8 h-8 object-contain drop-shadow-sm cursor-pointer transition-transform hover:scale-105"
+          />
           <div className="flex items-baseline gap-2">
             <span className="font-heading font-bold text-lg tracking-tight text-ink">AUTONEX</span>
             <span className="text-[10px] font-mono text-ink/40 uppercase tracking-widest hidden sm:inline">Autonomous Floor</span>
@@ -260,7 +259,7 @@ export function Landing() {
 
       {/* 3. Hero Content Container with Safe Top Clearance & Scrollability */}
       <div className="relative h-full pt-16 flex flex-col justify-start overflow-y-auto no-scrollbar z-10">
-        <div className="max-w-xl px-8 lg:px-16 py-6 lg:py-8">
+        <div className="max-w-2xl lg:max-w-3xl px-6 sm:px-8 lg:px-12 py-6 lg:py-8">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <div className="inline-flex items-center gap-2 mb-3 px-2.5 py-1 rounded-full bg-white/70 border border-ink/10 text-xs font-heading text-ink/70 shadow-xs">
               <span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
@@ -374,23 +373,24 @@ export function Landing() {
               </motion.div>
             )}
 
-            <div className="flex gap-2 mb-1">
+            <div className="flex flex-col sm:flex-row gap-2 mb-1">
               <input
                 id="task-input"
                 value={goal}
+                title={goal}
                 onChange={(e) => {
                   setGoal(e.target.value);
                   if (validationError) setValidationError(null);
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && handleStartTask()}
                 placeholder={appMode === 'swarm' ? 'Topic for the swarm to deliberate…' : 'Describe a task for the manager…'}
-                className="flex-1 rounded-xl border border-ink/15 bg-white/90 px-4 py-3 font-body text-sm outline-none focus:border-ink/40 shadow-sm"
+                className="flex-1 min-w-0 rounded-xl border border-ink/15 bg-white/90 px-4 py-3 font-body text-sm outline-none focus:border-ink/40 shadow-sm"
               />
               <button
                 type="button"
                 onClick={handleStartTask}
                 disabled={isExecuting}
-                className="flex items-center gap-2 rounded-xl px-5 py-3 font-heading font-semibold text-sm text-white shadow-md transition-all hover:scale-[1.02] disabled:opacity-60 disabled:pointer-events-none"
+                className="flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-heading font-semibold text-sm text-white shadow-md transition-all hover:scale-[1.02] disabled:opacity-60 disabled:pointer-events-none shrink-0"
                 style={{ background: 'var(--accent)' }}
               >
                 {isExecuting ? (
@@ -409,7 +409,7 @@ export function Landing() {
               <button
                 type="button"
                 onClick={() => useStore.setState({ arkivHistoryOpen: true, arkivActiveTab: 'swarm_context' })}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-xs font-mono transition-transform hover:scale-105"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-xs font-mono transition-transform hover:scale-105 shrink-0"
                 title="Browse decentralized simulation runs and context deliverables on Arkiv Rabdi DB-Chain & Swarm"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -426,7 +426,7 @@ export function Landing() {
                     requestId: '47fe2489886d5d85, 588da584-73b2-4dff-9c17-66609f61c2b5'
                   });
                 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs font-mono transition-transform hover:scale-105"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs font-mono transition-transform hover:scale-105 shrink-0"
                 title="Test 0G Private Computer Error Checkpoint & Save Context to Arkiv + Swarm"
               >
                 <Icon d={I.alert} size={11} />
@@ -436,7 +436,7 @@ export function Landing() {
 
             {/* live preview or swarm estimate */}
             {preview && (
-              <div className="h-7 mt-1 text-[11px] font-body text-ink/55 flex items-center gap-2 flex-wrap">
+              <div className="min-h-[28px] mt-1 text-[11px] font-body text-ink/55 flex items-center gap-2 flex-wrap">
                 <span className="font-mono">≈</span>
                 <span className="capitalize font-medium">{preview.task_class.replace(/_/g, ' ')} · {preview.intensity}</span>
                 {preview.intensity === 'light' && <span className="text-ink/40">· sprint, no coffee breaks</span>}
