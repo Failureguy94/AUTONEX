@@ -1,3 +1,20 @@
+<!-- Animated header with walking AI agents -->
+<p align="center">
+  <img src="assets/autonex_header.svg" alt="AUTONEX animated header with walking AI agents" width="100%">
+</p>
+
+<p align="center">
+  <img src="assets/autonex_banner.jpg" alt="AUTONEX 3D multi-agent engineering workspace" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/pritulsingh/AUTONEX"><img src="https://img.shields.io/badge/AUTONEX-3D_Multi--Agent_Engineering-7b2ff7?style=for-the-badge&logo=rocket&logoColor=white" alt="AUTONEX 3D multi-agent engineering"></a>
+  <img src="https://img.shields.io/badge/React-18.3-61dafb?style=flat-square&logo=react" alt="React 18.3">
+  <img src="https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.6">
+  <img src="https://img.shields.io/badge/Three.js-WebGL_3D_Floor-000000?style=flat-square&logo=threedotjs" alt="Three.js">
+  <img src="https://img.shields.io/badge/License-MIT-ff7518?style=flat-square" alt="MIT License">
+</p>
+
 # AUTONEX
 
 AUTONEX is a developer project that combines an interactive 3D multi-agent
