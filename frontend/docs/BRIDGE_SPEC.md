@@ -1,6 +1,14 @@
-# AUTONEX Bridge Server — specification
+# AUTONEX Bridge Server — target specification
 
-The Bridge is the **missing middle** between the AUTONEX office (frontend, done) and AUTONEX (single-agent coding runtime, done, untouched).
+> **Status:** This document describes a target integration design, not the
+> exact behavior or completion status of the current code. The repository has
+> a TypeScript live bridge in `frontend/tools/mock-bridge/` and a separate
+> Python FastAPI swarm service in `bridge/autonex_bridge/`. Their APIs and
+> execution paths are not interchangeable. Use the source and tests for
+> current behavior; use this document as a design reference.
+
+The intended Bridge is the **mediation layer** between the AUTONEX office and
+agent execution runtimes.
 AUTONEX is *one agent in one terminal with no API*; AUTONEX assumes *a company with a live event stream*. The Bridge **builds the company**
 on top of AUTONEX and translates everything that really happens into the event contract (`api-contract.md`).
 

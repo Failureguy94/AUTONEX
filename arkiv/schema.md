@@ -1,6 +1,6 @@
 # Arkiv Database Schemas & Storage Architecture
 
-This document defines the complete schema specification for **GravityDesk (`AUTONEX`)** on the **Arkiv Rabdi DB-Chain Testnet** (`Chain ID: 7794095`).
+This document defines the schema specification for **AUTONEX** on the **Arkiv Rabdi DB-Chain Testnet** (`Chain ID: 7794095`).
 
 All entities are created, queried, and verified using the official `@arkiv-network/sdk`.
 
@@ -8,7 +8,7 @@ All entities are created, queried, and verified using the official `@arkiv-netwo
 
 ## 1. Schema Overview
 
-GravityDesk uses four specialized schemas designed to balance verifiable decentralization, query performance, and storage costs:
+AUTONEX uses four specialized schemas designed to balance verifiable decentralization, query performance, and storage costs:
 
 | Schema Name | Primary Purpose | Retention (TTL) | Ownership | Max Size |
 |---|---|---|---|---|
@@ -187,4 +187,3 @@ export const AuditLogSchema = defineSchema({
   "bundle_bytes": "<Uint8Array 14,820 bytes of JSON-encoded files>"
 }
 ```
-

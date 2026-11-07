@@ -1,47 +1,82 @@
-# AUTONEX Bridge — Current Integration Guide
+# AUTONEX Integration Notes
 
-AUTONEX routes hosted model inference **only through 0G Private Computer**. The
-Bridge handles role routing, rate limits, retries, and same-provider fallbacks;
-it must never send a prompt to another model provider.
+This is a current orientation guide for the repository. AUTONEX has several
+separate components; the term "Bridge" is used for more than one of them.
 
-## Configuration
+## Which runtime should I use?
 
-Set `ZG_API_KEY` for the Bridge/PAG runtime. The 0G Router endpoint is
-`https://router-api.0g.ai/v1` and can be overridden with `ZG_BASE_URL`. Do not
-add alternative model-provider keys or endpoints.
+| What you want to run | Component | Entry point |
+|---|---|---|
+| Explore the 3D workspace without credentials | Frontend simulator | `npm run dev` from the repository root |
+| Submit Office/Swarm work through the frontend's live event API | TypeScript bridge | `npm run bridge` from `frontend/`, with `VITE_USE_MOCK=false` |
+| Run Python swarm endpoints and Python orchestration components | Python service | `uvicorn autonex_bridge.main:app` from `bridge/` |
+| Run an independent terminal coding agent | PAG | `backend/bin/pag.ps1` on Windows |
 
-The canonical provider and model configuration is:
+The TypeScript bridge is under `frontend/tools/mock-bridge/`; the `bridge` and
+`bridge:mock` npm scripts start the same server. The Python FastAPI service is
+under `bridge/autonex_bridge/` and is not a drop-in replacement for the
+frontend bridge. PAG is separate from both.
 
-- `bridge/config/providers.yaml` — 0G Router URL, API key environment variable,
-  and gateway limits.
-- `bridge/config/models.yaml` — supported 0G model IDs and role fallback chains.
-- `backend/profiles/base.json` — 0G catalogue for the PAG terminal agent.
+## Frontend setup
 
-Every model ID must use the `0g/` prefix and map to the `zg_compute` provider.
-Fallbacks may select another configured 0G model but never another provider.
+From the repository root:
 
-## Run and validate
-
-```bash
-npm run check
-npm run build
-cd bridge
-python -m pytest -q
+```powershell
+npm run install:frontend
+npm run dev
 ```
 
-For frontend development, use `npm run bridge:mock` and `npm run dev`. Configure
-the production Bridge with `ZG_API_KEY` before starting live inference.
+By default, the frontend runs its built-in simulator. To try the TypeScript
+live bridge, start it in another terminal and set the following in
+`frontend/.env.local`:
 
-## Privacy and rate limits
+```dotenv
+VITE_USE_MOCK=false
+VITE_API_URL=http://localhost:8000
+```
 
-- The agent requests pass through the local gateway; in Docker mode, only its
-  proxy receives `ZG_API_KEY`.
-- Unknown or non-0G providers are rejected by the egress trust policy.
-- Rate-limit values are conservative configuration, not service guarantees.
-  Honor 0G response headers and keep the gateway queue bounded.
-- Verify current 0G data-handling terms before sending sensitive project data.
+Set `ZG_API_KEY` in the bridge process environment or in `frontend/.env` for
+live model inference. A local simulator run does not demonstrate a live model
+call or file edit.
 
-See `ARCHITECTURE.md`, `BRIDGE_SPEC.md`, and
-`MODEL_ROUTING_AND_RATE_LIMITS.md` for implementation details. Files under
-`reference/` are historical background and do not define current provider
-support.
+## Python and PAG setup
+
+Python service:
+
+```powershell
+cd bridge
+python -m pip install -e ".[dev]"
+python -m uvicorn autonex_bridge.main:app --host 127.0.0.1 --port 8001
+```
+
+PAG on Windows:
+
+```powershell
+.\backend\bin\pag.ps1 D:\path\to\project assist
+```
+
+PAG uses Native mode by default. Its `--docker` mode requires WSL and Docker.
+See [`../../backend/README.md`](../../backend/README.md) for details.
+
+## Current documentation map
+
+- [`../README.md`](../README.md) — frontend commands and source layout.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — runtime boundaries and current
+  component responsibilities.
+- [`api-contract.md`](api-contract.md) — event/API contract reference.
+- [`BRIDGE_SPEC.md`](BRIDGE_SPEC.md) — target design for a broader integration;
+  not a description of every currently implemented behavior.
+- [`../../bridge/README.md`](../../bridge/README.md) — Python service and
+  gateway implementation notes.
+- [`../../backend/README.md`](../../backend/README.md) — PAG setup.
+
+## Configuration and safety
+
+Keep local API keys out of version control. Hosted inference sends the prompt
+and any included context to the configured provider. Review the provider's
+terms before using proprietary data.
+
+The Python service has demo wallet-authentication and iAI
+status/usage responses. They are not production authentication, staking
+verification, or billing services. Review source and tests before relying on
+any component as a security boundary.

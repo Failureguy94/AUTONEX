@@ -1,8 +1,9 @@
 # What was changed relative to GLM's delivery — and why
 
-GLM produced the frontend in two passes (original + "Triage Layer" change-set). Reading it against the code it modified, and then **running** it
-(it had never been run), found real defects. Principle followed: **keep GLM's design and code; change only what was broken**, each change minimal and listed here.
-Everything below is covered by the 25 frontend tests unless marked *visual*.
+This is a historical changelog for the initial frontend delivery. It is not a
+current inventory of all repository tests or a complete status report.
+The fixes below were validated by the tests available at the time; run the
+current `npm run check` and `npm run build` for the present checkout.
 
 ## A. The delivery would not have started
 | # | Defect | Fix |
@@ -45,5 +46,12 @@ Contract server `tools/mock-bridge` · tape recorder · layout exporter (`docs/l
 * The people are **procedural low-poly 3D figures** (capsules/spheres, walk/sit/type/drink/talk animations driven by math) — *not* 2D sprites and *not* motion-captured. They read as friendly stylised characters, not realistic humans.
 * Hierarchy is visible by clothing (manager suit + tie, lead lanyard + deeper shirt) and furniture (manager glass cabin; lead semi-enclosed glass desk; workers' open desks). **Leads do not have fully walled offices** — only the manager does. Meeting rooms exist for reviews.
 * Monitor screens are a static "switched-on" blue (no per-desk animated content).
-* The Bridge (everything between the UI and AUTONEX) is **not built**; only the Gateway core is. `ReplayEngine` for real past runs, Compute drawer v2, `triage.override` UI: see `00_START_HERE.md` backlog.
+* The repository now includes a TypeScript live bridge under
+  `frontend/tools/mock-bridge/` and a separate Python FastAPI swarm service
+  under `bridge/autonex_bridge/`, in addition to the Python gateway core.
+  These components are not one unified runtime. The broader design in
+  `BRIDGE_SPEC.md` is target-state documentation; check
+  `ARCHITECTURE.md` and the current source for implementation boundaries.
+  Some items from the original backlog (for example a persistent real-run
+  replay experience and a UI override for triage) may still be unimplemented.
 * Provider limit numbers in `bridge/config/providers.yaml` are **placeholders**; model ids must be verified on the day.

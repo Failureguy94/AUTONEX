@@ -1,78 +1,106 @@
-# Architecture — how the pieces fit
+# AUTONEX Architecture
 
-## 1. The idea in one picture
-```
- YOU type one task
-      │
-      ▼
-┌─────────────────────────────  AUTONEX OFFICE (frontend, DONE)  ─────────────────────────────┐
-│ React + three.js + zustand.  A PURE RENDERER of an event stream: nothing moves unless an event  │
-│ says so.  Landing (task, profile, model) → 3D office → Inspector, Permission Desk, DAG, report.  │
-└───────────────▲──────────────────────────────────────────────────────────┬───────────────────┘
-   events (WS)  │  contract v3 (docs/api-contract.md)                       │ REST + WS control messages
-┌───────────────┴──────────────────────  BRIDGE SERVER (to build)  ─────────▼───────────────────┐
-│ 1 TRIAGE   classify (code? text? research?) → size (complexity C) → intensity → break policy    │
-│ 2 ORG      departments (frontend / backend / research / data / qa / content) + leads + workers  │
-│ 3 PLAN     manager LLM → validated task DAG;  leads expand their branch                          │
-│ 4 SCHEDULE DAG resolver · assignment score · admission control · failure ladder                  │
-│ 5 WORKERS  search · llm · script · validate (no agent)        code → AUTONEX session         │
-│ 6 REVIEW   validators → lead review → manager synthesis → git merge → result.final              │
-│ + EventBus/Tape · Privacy gate · Permission relay · Break/energy derivation                      │
-└───────────────┬──────────────────────────────────────────────────────────┬───────────────────┘
-                │ every LLM call                                            │ headless sessions
-                ▼                                                           ▼
-┌──────────────────────────  PROVIDER GATEWAY (core DONE: bridge/)  ─────┐   ┌────────  AUTONEX (UNTOUCHED)  ────────┐
-│ OpenAI-compatible local proxy 127.0.0.1:8787/v1                          │◄──┤ opencode run, provider "bridge",          │
-│ router · limiter · priority queue · 429/5xx/ctx handling · fallback ·   │   │ plugins, permissions, context tiers,      │
-│ breaker · budget · accounting → llm.call_*, gate.state                   │   │ audit.jsonl, git branch, walkthrough.md   │
-└──────────────┬──────────────────────────────────────────────────────────┘   └───────────────────────────────────────────┘
-               ▼
-   0G Private Computer Router (ZG_API_KEY)   ← key lives only in the Bridge/PAG proxy
+This document describes the current repository boundaries. AUTONEX has
+multiple runtimes; the frontend, TypeScript bridge, Python service, and PAG
+terminal runner are not one server.
+
+## Component map
+
+```text
+Browser
+  React + Three.js + Zustand
+    ├── default: built-in event simulator
+    ├── live: frontend/tools/mock-bridge (Node/TypeScript, port 8000)
+    │            └── 0G Private Computer inference (ZG_API_KEY)
+    └── optional: Arkiv / Ethereum Swarm checkpoint services
+
+Python service (bridge/autonex_bridge, separate process)
+  FastAPI swarm API + Python swarm components + gateway primitives
+
+PAG terminal runner (backend/, separate process)
+  OpenCode profiles/plugins; Native Windows mode or optional WSL/Docker mode
 ```
 
-## 2. Who does what (and why)
-| Layer | Responsibility | Status |
+## Frontend execution modes
+
+The frontend selects its engine using `VITE_USE_MOCK`.
+
+| Mode | Behavior | Requirements |
 |---|---|---|
-| Office UI | render events; user controls (task, profile, permission answers, merge/discard, speed) | **done & tested** |
-| Mock bridge | executable spec of the contract; lets UI + Bridge be developed independently | **done & tested** |
-| Bridge | the *company*: triage, org, plan, schedule, aggregate, derive human moments from real signals | **specified** (`BRIDGE_SPEC.md`) |
-| Gateway | the *only* path to any model; keeps usage inside limits; emits compute events | **core done & tested (16 tests)**; HTTP/SSE layer to build |
-| AUTONEX | an excellent single-agent coding worker with safety, context discipline, rollback | **existing, untouched** |
+| Simulator (default) | Runs a local scripted Office or Swarm event sequence; no server or hosted model calls | Node/npm to develop |
+| TypeScript live bridge | Sends task requests to the Node server and receives sequenced events over WebSocket | Bridge running at `VITE_API_URL`; `ZG_API_KEY` for live inference |
 
-**Only code workers use AUTONEX.** Manager/leads are single-shot structured calls; research/data/QA/content are mostly deterministic code. That is why a 15-person office costs ~100 LLM calls, not ~1000.
+The live bridge source is under `frontend/tools/mock-bridge/`. Its npm scripts
+`bridge` and `bridge:mock` are aliases. The simulator remains a deliberate UI
+development path and should not be confused with real execution.
 
-## 3. Mapping of the owner's ideas to the design
-| Idea | Where it lives |
-|---|---|
-| A triage layer that checks what kind of task it is | `TRIAGE_AND_PLANNING §1-2` → `task.triaged` (shown as the "Manager's call" banner) |
-| Separate leads: frontend / backend / text-generation… each with their own workers | dynamic departments (`§3` of that doc); bays are slots, departments are tenants |
-| Simple fast work: no breaks, workers just finish; very heavy project: breaks, coffee, lunch | `intensity → break_policy` (`§2.1`); sprint tape contains **zero** break events — enforced by tests |
-| Manager works alone for tiny text tasks | `text_gen`+`light` → `departments:[]`, manager types at her own desk |
-| Different 0G models for different leads; manager = the selected 0G model | `MODEL_ROUTING §2` role→model table + same-provider fallback chains |
-| Coffee/lunch/chat must mean something | `BRIDGE_SPEC §7`: coffee = real context compaction, chat = real hand-off, energy = real context fraction |
-| Click an employee → live status (progress, energy, context, engine) | Inspector (done) fed by `agent.metrics`, `task.progress`, `file.edit` |
-| AUTONEX gets a GUI (permissions, diffs, rollback) | Permission Desk, Inspector Live tab, Merge/Discard (frontend done; Bridge relay specified) |
-| One API/account hits the per-minute limit | Gateway (`MODEL_ROUTING`): limiter, queue, backoff, same-provider model fallback, budget pre-check |
+## TypeScript bridge
 
-## 4. Ports & processes (local only)
-| Process | Port | Notes |
-|---|---|---|
-| Vite dev server (UI) | 5173 | `npm run dev` |
-| Bridge (REST + `/ws/events`) | 8000 | `VITE_API_URL` points here; `npm run bridge:mock` is the stand-in |
-| Gateway (`/v1/chat/completions`) | 8787 | mounted in the Bridge process or separate; bound to 127.0.0.1 |
-| AUTONEX sessions | – | child processes of the Bridge, one worktree each |
-| Search backend | – | SearXNG (AUTONEX docker) or the `ddgs` python lib as a keyless fallback |
+The Node server exposes the frontend-facing REST and `/ws/events` interfaces,
+manages run/event state, and dispatches Office or Swarm execution paths. The
+Office runner includes LLM calls, worker events, file/context handling, and
+permission requests. The Swarm runner produces proposal, critique, vote, and
+synthesis activity. The bridge's live behavior should be checked against its
+source and tests rather than assuming every event in `api-contract.md` is
+emitted by every path.
 
-## 5. Data flow of one heavy run (worked example, placeholder limits)
-Goal: *"Compare the top 3 open-weight coding models and build a tiny CLI that benchmarks one"*.
-1. Triage → `hybrid`, C≈56 → **heavy / workday**, departments research · data · backend · content (4 wings), 6 workers.
-2. Budget pre-check: calls ≈ triage 1 + manager 2 + leads 8 + llm workers ~8 + **2 code sessions × ~40 = 80** ≈ **~100 calls**.
-   With the *placeholder* limits (OpenRouter 15 rpm / 40 per day) an OpenRouter-only setup is **infeasible** (100 > 0.8·40) → the Bridge degrades the plan *before* starting (1 code session, merged nodes, cheaper roles) or asks the owner. With NVIDIA (≈27 rpm effective) carrying the code sessions and OpenRouter carrying manager/leads, it fits (~5-8 min of API time) — this is the concrete reason for getting several providers.
-3. Office: manager at her desk; 10 people walk in from reception over ~25 s; DAG on the whiteboard.
-4. Research workers: search + one summarising call each; data worker runs the benchmark script; backend lead expands "implement CLI" → 2 code workers, each in its own git worktree through the Gateway.
-5. Real events: file edits tail from `audit.jsonl`; a compaction in one session → that worker walks to the pantry (a real break); the research→backend hand-off → a real chat + blackboard note; strict profile → Permission Desk.
-6. Validators (pytest, citations) → lead reviews → manager synthesises → branches merged → `result.final` with measured effort.
-7. Everyone walks out; Merge/Discard decide the fate of branch `agent/<ts>`.
+Vite's development proxy forwards `/api` and `/ws` to `localhost:8000`.
+`VITE_API_URL` may be set explicitly when using a different host.
 
-## 6. Failure containment
-Provider 429/5xx/context errors never reach the UI as errors (Gateway). A dead session restarts once, then the task is reassigned. A broken plan is repaired once, then replaced by a template. Quota exhaustion is predicted before the run, not discovered during it. The UI shows only what really happened — if something fails, it shows `FAILED`, not a fake success.
+## Python service
+
+`bridge/autonex_bridge/main.py` starts the FastAPI application and mounts the
+router in `swarm/api.py`. The Python service includes:
+
+- Swarm run creation, estimates, steering, phase/board/idea queries, and
+  checkpoint routes.
+- WebSocket event delivery and a SQLite-backed repository.
+- Round planning, personas/seats, clustering, voting, admission, scheduling,
+  supervision/watchdogs, and verification components.
+- Privacy/egress classification, redaction, pseudonymization, and audit
+  components.
+- Gateway primitives in `gateway/` for 0G model validation/routing,
+  context-aware fallbacks, token estimation, rate/concurrency control,
+  retries, and circuit breaking.
+
+This FastAPI process is separate from the TypeScript server used by the
+frontend. The Python Gateway package is not currently exposed as an
+OpenAI-compatible proxy by the FastAPI app. The Python app also contains demo
+wallet-authentication and iAI status/usage responses; do not rely on these as
+production identity or billing services.
+
+## PAG terminal runner
+
+`backend/` contains PAG, an independent OpenCode-based terminal runner. It
+provides Native mode on Windows, an optional `--docker` path through WSL, JSON
+profiles, plugins, scripts, and evaluation fixtures. The frontend does not
+start PAG automatically.
+
+## Optional storage path
+
+Frontend service modules implement wallet connection/signing, Arkiv entity
+operations, and Ethereum Swarm upload/download workflows for checkpoint and
+report features. These services require their respective network, wallet,
+credentials, and workspace configuration. They are not prerequisites for
+running either the simulator or the TypeScript bridge.
+
+## Local ports and commands
+
+| Process | Default port | Start command |
+|---|---:|---|
+| Vite frontend | 5173 | `npm run dev` from root |
+| TypeScript bridge | 8000 | `npm run bridge` from `frontend/` |
+| Python FastAPI | user-selected | `python -m uvicorn autonex_bridge.main:app --port 8001` from `bridge/` |
+
+The Python service's port is independent of the Vite proxy target. When using
+it, configure clients explicitly; it is not a drop-in replacement for the
+TypeScript frontend bridge.
+
+## Related documentation
+
+- [`../README.md`](../README.md) — repository setup and component overview
+- [`api-contract.md`](api-contract.md) — frontend event/API contract reference
+- [`BRIDGE_SPEC.md`](BRIDGE_SPEC.md) — target bridge design
+- [`00_START_HERE.md`](00_START_HERE.md) — current integration orientation
+- [`../../bridge/README.md`](../../bridge/README.md) — Python service specifics
+- [`../../backend/README.md`](../../backend/README.md) — PAG specifics

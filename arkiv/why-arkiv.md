@@ -1,6 +1,6 @@
 # Why Arkiv? Architectural Justification
 
-This document evaluates the architectural rationale for choosing **Arkiv Network** as the decentralized persistence layer for **GravityDesk (`AUTONEX`)**, specifically answering the core ETHGlobal Arkiv judging evaluation:
+This document evaluates the architectural rationale for choosing **Arkiv Network** as the decentralized persistence layer for **AUTONEX**, specifically answering the core ETHGlobal Arkiv judging evaluation:
 
 > *"If you swapped out Arkiv for traditional databases like Postgres or standard backend storage, how would your architecture break or change?"*
 
@@ -8,7 +8,7 @@ This document evaluates the architectural rationale for choosing **Arkiv Network
 
 ## 1. What Breaks If We Swap Arkiv for Postgres or Centralized Cloud Storage?
 
-If GravityDesk were rebuilt using a traditional relational database (e.g. PostgreSQL, MongoDB, or AWS S3):
+If AUTONEX were rebuilt using a traditional relational database (e.g. PostgreSQL, MongoDB, or AWS S3):
 
 ```
 ┌──────────────────────────────────────────────┐       ┌──────────────────────────────────────────────┐
@@ -25,7 +25,7 @@ If GravityDesk were rebuilt using a traditional relational database (e.g. Postgr
 
 ### Specific Breakages:
 1. **Loss of Verifiable Autonomous Provenance:**
-   - In GravityDesk, autonomous agents deliberate in Swarm Hall, cast Borda ballots, and generate code without human intervention.
+   - In AUTONEX, autonomous agents deliberate in Swarm Hall, cast Borda ballots, and generate code without human intervention.
    - Storing these consensus proofs in Postgres would reduce trust to zero: a central server administrator could alter quorum numbers, modify test pass rates, or silently inject malicious code into generated files.
    - With Arkiv, every deliverable and swarm consensus proof is cryptographically sealed by the user's wallet on Rabdi DB-Chain.
 2. **Loss of Direct Client-to-Database Decentralization:**
@@ -55,9 +55,9 @@ Arkiv combines the best of both worlds:
 
 ---
 
-## 3. How GravityDesk Leverages Arkiv's Specific Capabilities
+## 3. How AUTONEX Leverages Arkiv's Specific Capabilities
 
-| Arkiv Capability | How GravityDesk Employs It |
+| Arkiv Capability | How AUTONEX Employs It |
 |---|---|
 | **SQL-Like Querying** | Filters public network runs, user runs, deliverable files, and swarm deliberation rounds by indexed attributes (`run_id`, `owner`, `round`, `l2_tests_pass`). |
 | **Typed Schemas (`defineSchema`)** | Defines strict contracts (`autonex.run`, `autonex.deliverable`, `autonex.swarm_round`, `autonex.audit_log`) ensuring verified integrity of all agent outputs. |
@@ -65,4 +65,3 @@ Arkiv combines the best of both worlds:
 | **Native Protocol Expiration** | Enforces a 90-day retention period for testnet simulation runs with an interactive **"+90d Preserve"** button calling `extendArkivEntity()`. |
 | **Connected Wallet Signing** | Reuses the user's browser wallet (MetaMask) on Rabdi Testnet (`7794095`) with `tGLM` native currency, guaranteeing zero private key exposure. |
 | **Zero-Gas Public Reads** | Powers the public **Arkiv Verifiable Project Explorer** where anyone can inspect code, review test scores, and load on-chain projects into their workspace with zero gas. |
-

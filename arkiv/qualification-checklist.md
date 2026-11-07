@@ -1,6 +1,6 @@
 # ETHGlobal Arkiv Track Qualification Checklist
 
-This checklist maps each **ETHGlobal Arkiv Track** requirement to its exact implementation files, documentation, verification methods, and verifiable evidence in **GravityDesk (`AUTONEX`)**.
+This checklist maps each **ETHGlobal Arkiv Track** requirement to its exact implementation files, documentation, verification methods, and verifiable evidence in **AUTONEX**.
 
 ---
 
@@ -18,4 +18,3 @@ This checklist maps each **ETHGlobal Arkiv Track** requirement to its exact impl
 | **8. Reach & Target Audience (25%)** | Dual-engine simulation (Office & Swarm) | `arkiv/reach.md` | End-to-end user journey walkthrough and live testing guide | DAOs, autonomous AI engineers, protocol architects, and post-hackathon roadmap |
 | **9. Test Suite & Code Quality** | `frontend/src/tests/arkiv.test.ts` (19 Arkiv tests) | `frontend/src/tests/` | Automated test runner: `npm run check` / `npx vitest run` | 59/59 Vitest unit tests passed (10/10 test files), 0 TypeScript errors |
 | **10. Open-Source License & AI Disclosure** | `LICENSE` (MIT) | `README.md` | Root MIT license file + AI usage disclosure in `README.md` | Permissive open-source license; transparent AI disclosure for simulation and coding assistance |
-

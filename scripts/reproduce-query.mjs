@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * GravityDesk - Reproducible Arkiv DB-Chain Query Script
+ * AUTONEX - Reproducible Arkiv DB-Chain Query Script
  * ETHGlobal Arkiv Track Verification
  *
  * Network: Rabdi DB-Chain Testnet
@@ -27,7 +27,7 @@ async function rpcCall(method, params = []) {
 
 async function main() {
   console.log('================================================================');
-  console.log('     GravityDesk - Arkiv Rabdi DB-Chain Query Reproducer        ');
+  console.log('       AUTONEX - Arkiv Rabdi DB-Chain Query Reproducer           ');
   console.log('================================================================');
   console.log(`[1] Connecting to Rabdi RPC: ${RPC_URL}`);
 

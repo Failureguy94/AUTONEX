@@ -176,6 +176,10 @@ export function OfficeCanvas({ ambient = false }: { ambient?: boolean }) {
       onCreated={({ gl }) => {
         gl.toneMapping = post ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
         gl.toneMappingExposure = 1.05;
+        gl.domElement.addEventListener('webglcontextlost', (event) => {
+          event.preventDefault();
+          console.warn('[WebGL] Rendering context lost; waiting for browser recovery.');
+        });
       }}
       style={{ background: 'transparent' }}
     >
