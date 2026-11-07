@@ -1,59 +1,82 @@
-# AUTONEX
+# AUTONEX Frontend
 
-> Hand one manager a task. Watch a whole team sit down, argue, grab coffee, and ship it.
+The frontend is a Vite/React application that presents Office and Swarm
+workflows in a 3D workspace. It uses Three.js through React Three Fiber,
+Zustand for application state, and an event-driven simulation/live-run engine.
 
-A gamified **3D virtual office** that visualises a hierarchical multi-agent AI system **in real time**. The office is a *pure renderer*: nothing moves
-unless a real event says so. It is designed to sit on top of **AUTONEX** (a free, open-weight autonomous coding runtime) through a **Bridge Server**,
-so every walk, break, hand-off and file edit you see really happened.
+## Run locally
 
+From the repository root:
+
+```powershell
+npm run install:frontend
+npm run dev
 ```
-user task ─► triage (what kind? how big?) ─► the right team is hired ─► work runs on AUTONEX + free open-weight models ─► report
-                                                  every step is a live event in the office
+
+Open `http://localhost:5173`. The built-in simulator is the default and does
+not require a bridge or API key.
+
+## Use the TypeScript live bridge
+
+Start the bridge from a second terminal:
+
+```powershell
+cd frontend
+npm run bridge
 ```
 
-## Run it (mock mode — works today, no keys)
-```bash
-npm install
-npm run dev            # http://localhost:5173  — pick a task chip and press "Open the office"
-npm run check          # tsc + 25 tests (layout, navigation, physics, triage, live contract)
-npm run build          # production build
+Set these Vite variables in `frontend/.env.local` and restart Vite:
+
+```dotenv
+VITE_USE_MOCK=false
+VITE_API_URL=http://localhost:8000
 ```
-Try the three behaviours from the Landing chips: *"Summarize this repo README…"* (manager works **alone**, no breaks) ·
-*"Add dark mode to the dashboard"* (small team, coffee on context compaction) · *"Compare the top 3 open-weight coding models and build a tiny CLI…"* (full team, **a whole workday**: coffee, lunch, review meetings, reassignment).
 
-### Against a (mock) backend over real HTTP/WebSocket
-```bash
-npm run bridge:mock                         # contract server on :8000 (the executable spec for the real Bridge)
-echo "VITE_USE_MOCK=false" > .env.local     # then:  npm run dev
+The bridge process also needs `ZG_API_KEY` in its environment or in
+`frontend/.env`. The `bridge:mock` script is a legacy alias for `bridge`; the
+same TypeScript server is used. It runs its live Office/Swarm paths outside the
+test environment. The Python FastAPI service under `bridge/` is separate and
+is not this frontend bridge.
+
+## Checks and helper scripts
+
+```powershell
+npm run check
+npm run build
+npm test
+npm run tape:record
+npm run layout:export
 ```
-`npm run tape:record` → `tapes/*.json` · `npm run layout:export` → `docs/layout-slots.json` · `cd bridge && python -m pytest -q` → 16 gateway tests.
 
-## What is in the office
-* **People:** procedural low-poly **3D** characters (not 2D sprites) with walk / sit / type / think / drink / eat / talk / celebrate animations, A\* pathfinding, door queues, wall sliding, collision-free (tested). Unique hair/skin; **dress by rank**: workers wear their department's color, **leads** a deeper shade + lanyard & ID badge, the **manager** a charcoal suit with a brand-colored tie.
-* **Work areas:** four department wings with **laptop** workstations (+ monitor, lamp, mug, nameplate); each lead sits in a **semi-enclosed glass office** at the head of the wing; the **manager has a glass-walled cabin** (executive desk, visitor chairs, plan whiteboard, meeting table). Plus reception, three meeting rooms, pantry/coffee area and cafeteria **far from the desks** (walking is real), lounge, server room that blinks with real LLM calls.
-* **Click anyone** → Inspector (status, task + progress, energy, context, engine, outputs, live terminal/diff, follow camera). Left panel: org chart · task DAG · blackboard. Bottom: event log + replay scrubber. Right: Compute & Cost. Permission Desk for approvals. Company-color picker re-tints everything live; day/night; Blueprint view; minimap; keyboard: `Space` pause · `F` follow · `G` flows · `B` blueprint · `D` dev overlay · `Esc` close.
-* Honest limits (no fully walled offices for leads, stylised not realistic motion, visuals not yet eyeballed): `docs/CHANGES_AND_FIXES.md §E`.
+`check` runs TypeScript type-checking and Vitest. `build` type-checks and
+produces the Vite production bundle. The tape recorder writes under `tapes/`;
+the layout exporter updates `docs/layout-slots.json`.
+Some Vitest integration tests contact hosted services and may require network
+access or valid provider configuration.
 
-## Documentation (read in this order)
-| File | What |
+## Source map
+
+| Path | Purpose |
 |---|---|
-| `docs/00_START_HERE.md` | **Handoff**: what the owner must provide (API keys!), verified state, phased build plan, rules |
-| `docs/ARCHITECTURE.md` | the whole system, idea→design mapping, worked example |
-| `docs/api-contract.md` | REST + WebSocket + 36 event types (v3) |
-| `docs/BRIDGE_SPEC.md` | the Bridge Server to build |
-| `docs/TRIAGE_AND_PLANNING.md` | classification, complexity score, decomposition, delegation, aggregation |
-| `docs/MODEL_ROUTING_AND_RATE_LIMITS.md` | role→model table, the Provider Gateway, rate-limit handling, single-key playbooks |
-| `docs/AUTONEX_INTEGRATION.md` | using AUTONEX as a black-box worker; discovery checklist; plugin |
-| `docs/ACCEPTANCE_TESTS.md` | B/T/G/S test matrix with status |
-| `docs/CHANGES_AND_FIXES.md` | every defect found in the original delivery and how it was fixed |
-| `docs/layout-slots.json` | desk coordinates for the Bridge |
-| `reference/autonex_reference/` | Architectural reference documentation |
+| `src/three/`, `src/swarm/` | 3D Office and Swarm Hall |
+| `src/ui/` | Workspace panels, permissions, reports, settings, and dialogs |
+| `src/state/`, `src/api/` | Event/state handling and API/event-stream clients |
+| `src/mock/`, `src/sim/` | Default local simulation and simulation helpers |
+| `src/nav/` | Office navigation and layout validation |
+| `src/services/` | Checkpoints, wallet, Arkiv, Swarm, and project bundle workflows |
+| `src/tests/` | Vitest integration, contract, layout, storage, and simulation tests |
+| `tools/mock-bridge/` | TypeScript HTTP/WebSocket server and execution runners |
 
-## Layout of the repo
-`src/` frontend (config/ nav/ sim/ three/ ui/ state/ api/ mock/ tests/) · `tools/mock-bridge/` contract server · `scripts/` tape + layout export · `bridge/` Gateway core + config templates · `docs/` · `tapes/` recorded runs.
+## Documentation
 
-## Name
-The project is officially named **AUTONEX**.
+| Document | Scope |
+|---|---|
+| `docs/ARCHITECTURE.md` | Current component boundaries and execution modes |
+| `docs/api-contract.md` | Frontend event and API contract reference; not every proposed event is emitted by every backend |
+| `docs/BRIDGE_SPEC.md` | Target design, not a guarantee of current bridge behavior |
+| `docs/ACCEPTANCE_TESTS.md` | Acceptance scenarios and their coverage |
+| `docs/ARKIV_SWARM_ARCHITECTURE.md` | Optional checkpoint and storage integration |
+| `docs/00_START_HERE.md` | Current integration orientation |
 
-## License
-MIT — see `LICENSE` (`docs/LICENSES.md` for dependencies and models).
+The default simulator is not a live model run. Do not interpret its events,
+generated files, or safety prompts as proof of live backend behavior.

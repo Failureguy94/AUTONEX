@@ -1,6 +1,6 @@
 # Arkiv Developer Friction & Feedback Report
 
-This document records the genuine developer experience, hurdles, edge cases, and constructive recommendations encountered while building **GravityDesk (`AUTONEX`)** on the **Arkiv Rabdi DB-Chain Testnet** (`Chain ID: 7794095`) using `@arkiv-network/sdk` v1.0.1.
+This document records the developer experience, hurdles, edge cases, and constructive recommendations encountered while building **AUTONEX** on the **Arkiv Rabdi DB-Chain Testnet** (`Chain ID: 7794095`) using `@arkiv-network/sdk` v1.0.1.
 
 ---
 
@@ -49,7 +49,7 @@ This document records the genuine developer experience, hurdles, edge cases, and
 ## 2. What Features Are Missing That Would Make Building Easier?
 
 1. **Native Blob / Multi-file Packaging Helpers:**
-   - Many applications (including GravityDesk) store multi-file codebases, artifacts, or JSON graphs. Having a first-class utility in `@arkiv-network/sdk` like `ArkivBundle.encode(files)` and `ArkivBundle.decode(entity.bundle_bytes)` would save developers from writing repetitive encoding logic.
+   - Many applications (including AUTONEX) store multi-file codebases, artifacts, or JSON graphs. Having a first-class utility in `@arkiv-network/sdk` like `ArkivBundle.encode(files)` and `ArkivBundle.decode(entity.bundle_bytes)` would save developers from writing repetitive encoding logic.
 2. **Built-in Balance & Gas Estimator:**
    - Developers currently query balance via standard `eth_getBalance` or Viem `client.getBalance(address)`. Adding a `client.getTglmBalance(address)` and `client.estimateEntityStorageCost(bytes, expiration)` helper would allow frontends to display precise storage cost estimates before triggering the user's wallet signature.
 3. **Paginated Cursor Support in Queries:**
@@ -77,4 +77,3 @@ Despite minor friction around type ergonomics, the core Arkiv experience is exce
 - **Zero-gas public reads** remove all onboarding friction for users wanting to verify and download codebase deliverables.
 - **SQL-like entity filtering** (`eq`, `and`) provides expressive querying capabilities that are impossible on standard smart contract storage without running an external indexer (like The Graph).
 - Combining decentralized database storage with native wallet authentication makes Arkiv an ideal fit for verifiable autonomous AI workflows.
-

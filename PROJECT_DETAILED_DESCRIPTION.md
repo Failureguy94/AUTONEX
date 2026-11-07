@@ -1,190 +1,223 @@
-# AUTONEX (Autonomous Multi-Agent Engineering Floor)
-## Master Presentation, Technical Architecture & Defense Dossier
+# AUTONEX - Project Description
 
----
+## Overview
 
-## 1. Executive Overview (Non-Technical Pitch)
+AUTONEX is a collection of cooperating prototypes for AI-assisted software
+engineering. It combines an observable 3D workspace, a TypeScript live-run
+bridge, a Python multi-agent swarm service and gateway core, decentralized
+checkpoint/storage integrations, and an independent terminal coding runner
+called PAG.
 
-### 1.1 The One-Liner
-> **AUTONEX is the world’s first spatially-grounded, multi-agent autonomous software engineering floor — transforming isolated AI coding into a living 3D collaborative nexus where specialized agent swarms deliberate, architect, and deliver verified production software in real time.**
+The repository does not currently have one unified runtime that connects every
+component end to end. The browser simulator, TypeScript live bridge, Python
+service, PAG runner, and optional web3 storage features have separate entry
+points and integration boundaries.
 
-### 1.2 The Core Problem
-When software engineering teams or individual developers use current AI coding tools (ChatGPT, Claude, Cursor, Copilot), they hit three systemic walls:
-1. **The "Single-Brain" Bottleneck:** A single prompt trying to architect, write backend code, craft frontend CSS, write unit tests, and review security inevitably suffers from context drift, hallucination, and superficial output.
-2. **The "Black Box" Problem:** Traditional autonomous agent harnesses (AutoGPT, Devin, SWE-agent) dump endless walls of terminal text. Nobody knows which agent is stuck, what they are debating, or why a decision was made until 20 minutes and $50 of API credits are wasted.
-3. **The Rate-Limit Meltdown:** Orchestrating multiple AI agents triggers constant HTTP 429 rate limits, crashing simulations or causing silent drops.
+## Goals
 
-### 1.3 The AUTONEX Breakthrough
-AUTONEX solves this by modeling autonomous engineering as a **physical, human-observable office floor and grand deliberation hall**:
-- **Dual Working Modes:**
-  - **AUTONEX Office (Collaborative Execution):** A dedicated 4-agent core team (Diya as Manager, Rohan on Backend, Kabir on Frontend, Nisha on QA) working through hierarchical task DAGs, walking to meetings, and writing code.
-  - **Swarm Hall (Massive Consensus Synthesis):** A 10, 20, or 50-agent autonomous council sitting at a grand oval conference table, debating complex architectural trade-offs through multi-phase consensus rounds before writing unified code.
-- **Cognitive Spatial Observability:** Instead of reading terminal logs, human managers see agents walking, debating, holding standups, taking coffee breaks during API cooldowns, and raising explicit permission modals before risky operations.
+- Make simulated or live agent activity easier to inspect through a 3D office,
+  task views, agent details, event logs, and reports.
+- Experiment with multi-agent engineering workflows, including swarm
+  deliberation, proposal clustering, critique, voting, and verification.
+- Provide resilient model-routing primitives and configurable 0G model
+  catalogues.
+- Explore operator controls, permissions, privacy/egress handling, and
+  checkpoint persistence.
+- Provide PAG as a separate terminal-based coding assistant with configurable
+  safety profiles and an optional container sandbox.
 
----
+## System overview
 
-## 2. Technical Architecture & System Anatomy
+```text
+                              AUTONEX repository
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │ Frontend (React / Three.js / Zustand)                              │
+ │  Default: local simulator      Live mode: TypeScript Bridge         │
+ └───────────────────┬──────────────────────────┬─────────────────────┘
+                     │ REST + WebSocket          │ optional storage
+                     ▼                           ▼
+ ┌───────────────────────────────┐       ┌─────────────────────────────┐
+ │ TypeScript live bridge        │       │ Arkiv / Ethereum Swarm       │
+ │ Office and Swarm run paths    │       │ checkpoint/report workflows │
+ └───────────────┬───────────────┘       └─────────────────────────────┘
+                 │ configured 0G inference
+                 ▼
+        0G Private Computer Router
 
-### 2.1 Three-Tier System Diagram
-```
-                     +---------------------------------------+
-                     |         HUMAN OPERATOR / LEAD         |
-                     +---------------------------------------+
-                                         |
-                   Interactive Directives & Security Approvals
-                                         v
-+---------------------------------------------------------------------------------+
-| TIER 1: 3D SPATIAL PRESENTATION ENGINE (Vite + React 18 + Three.js + Zustand)   |
-|                                                                                 |
-|  * 3D Office Floor (96m x 70m, 14 Zones, A* NavMesh, Kinematic Rigs)             |
-|  * 3D Swarm Hall (Grand Oval Table, Inward Executive Seating, Idea Board)        |
-|  * State Machine: Monotonic Event Reducer, Virtual Clock Pacemaker (60 FPS)     |
-|  * Human-in-the-Loop Permission Modal & Emergency Kill Switch                   |
-+---------------------------------------------------------------------------------+
-                                         ^
-                        WebSocket (/ws/events, seq-tracked)
-                        REST API (/api/tasks, /api/llm/chat)
-                                         v
-+---------------------------------------------------------------------------------+
-| TIER 2: ASYNCHRONOUS MEDIATION BRIDGE (Node.js / TypeScript / Express / WS)    |
-|                                                                                 |
-|  * Real-Time Event Bus with Reconnection Replay (`since_seq` buffer)            |
-|  * Dynamic Swarm Deliberation Engine (6-Phase Protocol)                        |
-|  * Autonomous File System Delivery & Code Extraction Pipeline                   |
-|  * Virtual Clock Synchronization & Advisory Pacing Controller                   |
-+---------------------------------------------------------------------------------+
-                                         ^
-                               Multi-Model Routing
-                                         v
-+---------------------------------------------------------------------------------+
-| TIER 3: MULTI-MODEL INFERENCE MESH & RESILIENCE RUNNER                          |
-|                                                                                 |
-|  * Primary Reasoning: DeepSeek-R1 (CoT Thinking Trace, 65s timeout)             |
-|  * General Swarm Debate: DeepSeek-Chat (V3), Qwen-2.5-Coder-32B                 |
-|  * High-Throughput Routing: Groq (Llama-3.3-70B, GPT-OSS-120B)                  |
-|  * Resilience Layer: Exponential Jittered Backoff + 3D Coffee Break Trigger     |
-+---------------------------------------------------------------------------------+
+ ┌───────────────────────────────┐       ┌─────────────────────────────┐
+ │ Python FastAPI service        │       │ PAG terminal runner          │
+ │ Swarm API + Python engine     │       │ OpenCode profiles/plugins    │
+ │ Gateway core primitives       │       │ Native or optional Docker    │
+ └───────────────────────────────┘       └─────────────────────────────┘
 ```
 
----
+The Python FastAPI service is separate from the TypeScript server. The
+`bridge/autonex_bridge/gateway/` package implements gateway primitives; the
+current FastAPI app does not expose that package as an OpenAI-compatible proxy.
+PAG is also a separate application and is not automatically launched by a
+frontend task.
 
-## 3. The 6-Phase Swarm Consensus Lifecycle
+## Components
 
-When a complex architectural objective is fed to Swarm Mode, it executes a mathematically bounded consensus protocol:
+### 1. Frontend and 3D workspace
 
+The Vite application is under `frontend/`. It uses React, TypeScript,
+Three.js/React Three Fiber, Zustand, and Vitest.
+
+The UI includes:
+
+- Office and Swarm modes, with landing/configuration screens.
+- Procedural 3D agents, office and conference layouts, navigation, and
+  interaction panels.
+- Task/event views such as the DAG, blackboard, inspector, event log,
+  permissions panel, compute drawer, and report view.
+- Checkpoint, wallet, Arkiv, and Swarm storage interfaces.
+- A local event-driven simulator used by default when `VITE_USE_MOCK` is not
+  set to `false`.
+
+The simulator is useful for exploring the UI without a running model service.
+Its generated activity is simulated and must not be presented as evidence that
+a live agent performed those actions.
+
+### 2. TypeScript live bridge
+
+`frontend/tools/mock-bridge/` contains the Node/TypeScript HTTP and WebSocket
+server used by the frontend's live mode. It handles frontend run requests,
+emits sequenced events, and contains Office and Swarm execution paths. The
+Office runner includes manager/worker roles, model calls, file/context
+handling, and permission requests; the Swarm runner emits deliberation and
+synthesis activity.
+
+The scripts `bridge` and `bridge:mock` in `frontend/package.json` start the
+same server. The latter name is historical. In ordinary execution the server
+uses the real-run paths; its test behavior is driven by the test environment.
+Live model calls require valid 0G configuration. UI fallback behavior and
+server-side run completion should be evaluated separately.
+
+### 3. Python swarm service and gateway core
+
+`bridge/autonex_bridge/` contains a FastAPI application and Python swarm
+implementation. The swarm package is organized around:
+
+- Run control, planning, agent roles, message bus, and blackboard.
+- Persona/seat allocation, phase execution, clustering, assignment, and
+  capacity/admission scheduling.
+- Privacy classification, redaction, pseudonymization, trust checks, and
+  egress audit records.
+- Watchdogs and supervision, verification/scoring, and SQLite-backed
+  repository state.
+- REST routes for estimates, runs, steering, events, provider status, and
+  checkpoint operations, plus a WebSocket event endpoint.
+
+The gateway package provides model validation/routing, context-aware fallback
+selection, token estimation, queued/concurrent lanes, rate-limit handling,
+retry behavior, and circuit breakers. Current provider configuration is in
+`bridge/config/`. The presence of these components does not imply they are all
+wired into the TypeScript live bridge or into a single production execution
+pipeline.
+
+### 4. PAG terminal runner
+
+`backend/` contains the separate PAG coding runtime, based on OpenCode. It has
+Windows PowerShell launchers, JSON model/security profiles, plugins for audit,
+context handling, limits, search, headers, and AUTONEX integration, plus
+evaluation tasks and Docker configuration.
+
+On Windows, `backend/bin/pag.ps1` launches Native mode by default.
+`--docker` selects the optional WSL/Docker path. The default profile and model
+catalogue are defined in `backend/profiles/`; the bridge package's YAML model
+catalogue is a separate configuration.
+
+### 5. Checkpoint and decentralized storage services
+
+Frontend service modules implement checkpoint packaging/restoration, wallet
+connection/auth flows, Arkiv entity operations, and Ethereum Swarm uploads and
+downloads. These features require the relevant wallet, network, endpoint, and
+optional local workspace configuration. They are not required to run the
+simulator.
+
+The Python API includes placeholder wallet-authentication and iAI
+status/usage responses. Do not treat those endpoints as production
+authentication, staking verification, or billing.
+
+## Typical workflows
+
+### UI simulation
+
+1. Install frontend dependencies.
+2. Run the Vite app.
+3. Use Office or Swarm mode; the local simulator emits the events consumed by
+   the UI.
+
+### TypeScript live run
+
+1. Start `frontend/tools/mock-bridge/server.ts`.
+2. Set `VITE_USE_MOCK=false` and `VITE_API_URL` for the frontend.
+3. Provide a `ZG_API_KEY` to the bridge process.
+4. Submit a task and inspect events/permissions/reports in the UI.
+
+This path is distinct from the Python FastAPI service.
+
+### Python swarm API
+
+Install `bridge/` with its development dependencies, run
+`autonex_bridge.main:app` with Uvicorn, and use the `/api/swarm/...` endpoints
+and `/ws/events`. Configuration is supplied by the YAML files in `bridge/config`.
+
+### PAG
+
+Run `backend/bin/pag.ps1 <project-path> <profile>` on Windows. The optional
+Docker mode requires WSL2, Docker, and the supporting tools described in
+`backend/README.md`.
+
+## Development and verification
+
+From the repository root:
+
+```powershell
+npm run install:frontend
+npm run check
+npm run build
 ```
-[ Objective Submitted ]
-          |
-          v
-   +--------------+
-   |   PHASE 1    |  --> Moderator Diya frames the problem & decomposes constraints
-   |   FRAMING    |
-   +--------------+
-          |
-          v
-   +--------------+
-   |   PHASE 2    |  --> 10/20/50 Specialized Agents independently formulate proposals
-   |  DIVERGENCE  |      (Zero cross-contamination; maximum creative diversity)
-   +--------------+
-          |
-          v
-   +--------------+
-   |   PHASE 3    |  --> Proposals are clustered into orthogonal architectural tiers
-   |  CLUSTERING  |      (Reduces O(N^2) communication explosion to O(N * K))
-   +--------------+
-          |
-          v
-   +--------------+
-   |   PHASE 4    |  --> Peer Critique: Agents cross-examine ideas with explicit
-   |   CRITIQUE   |      stances ("Support" vs. "Challenge")
-   +--------------+
-          |
-          v
-   +--------------+
-   |   PHASE 5    |  --> Weighted Borda / Quadratic Voting reaches quorum agreement
-   |    VOTING    |
-   +--------------+
-          |
-          v
-   +--------------+
-   |   PHASE 6    |  --> Synthesis & Code Generation: Dynamic multi-file project
-   |  SYNTHESIS   |      generated directly into output/<AutoSlug>_Swarm/
-   +--------------+
+
+For Python:
+
+```powershell
+cd bridge
+python -m pip install -e ".[dev]"
+python -m pytest -q
 ```
 
----
+These commands cover the frontend type-check/test/build and Python service
+tests, respectively. PAG has its own context-plugin test and evaluation
+harness; those do not run as part of the root npm scripts.
 
-## 4. Key USPs (Unique Selling Propositions)
+## Configuration and privacy
 
-| # | Unique Feature | How Competitors Do It | How AUTONEX Does It | Why It Wins |
-|---|---|---|---|---|
-| **1** | **Spatial Grounding** | Text logs or static node graphs. | Full 3D WebGL isometric office & swarm hall with procedural avatars, walking trajectories, and zone interactions. | **10x higher cognitive observability.** The human brain processes spatial movement 60,000x faster than reading log streams. |
-| **2** | **Zero Hardcoding** | Hardcoded scripts or canned mock workflows. | **100% prompt-driven dynamic LLM generation.** Every proposal, critique, and code file is created live via DeepSeek-R1 / OpenRouter. | Real, verifiable engineering work on any domain (cryptography, matching engines, compilers). |
-| **3** | **Rate-Limit Failover & Coffee Breaks** | Crashes on HTTP 429, drops messages, or silently freezes. | **Automatic state-machine transition.** When a provider rate-limits, agents walk to the pantry, grab coffee, and resume seamlessly once the cooldown ends. | Eliminates simulation halts and turns API latency into an intuitive visual behavior. |
-| **4** | **Quadratic Swarm Scalability** | All-to-all communication explodes tokens ($O(N^2)$ costs). | **Semantic Clustering & Wave Dispatch.** Proposals are clustered into $K$ design archetypes, bounding deliberation to $O(N \cdot K)$. | Enables running 50 specialized agents without context saturation or bankrupting token budgets. |
-| **5** | **Deep Reasoning Preservation** | 10-30s timeout aborts deep reasoning models. | **Extended 65s CoT window.** DeepSeek-R1 can output thousands of reasoning tokens before final emission. | Unlocks the full analytical depth of state-of-the-art reasoning models. |
-| **6** | **Human-in-the-Loop Safety Gate** | Full autonomous file access (dangerous) OR manual confirm every step (annoying). | **Granular permission escalation modal** for `file.write`, `bash.exec`, and `git.merge` with 1-click audit and "Emergency Stop" kill-switch. | Enterprise-grade safety compliance without halting agent autonomy. |
-| **7** | **Zero Data Leakage** | All secrets pushed to git / leaked in logs. | Tracked files sanitized, `.gitignore` strictly enforced, `.env` isolated, and historic commits filtered. | Safe for enterprise repositories and sensitive proprietary models. |
+- Keep API keys out of source control and use local environment files or
+  process environment variables.
+- Live inference transmits prompts and any included context to the configured
+  hosted model service. Review its terms before using proprietary data.
+- Browser wallet signing should remain in the user's wallet; do not enter or
+  store private keys in the application.
+- Treat simulated events as simulation, and review the current implementation
+  before relying on any permission, identity, privacy, or persistence feature
+  as a security boundary.
 
----
+## Repository map
 
-## 5. Tough Questions Defense Guide (For Judges & Reviewers)
+```text
+frontend/src/                    UI, simulation, state, navigation, services
+frontend/tools/mock-bridge/      TypeScript REST/WebSocket bridge
+frontend/docs/                   Frontend, API, integration, and target specs
+bridge/autonex_bridge/gateway/    Python gateway primitives
+bridge/autonex_bridge/swarm/      Python swarm engine and API
+bridge/config/                    Python service model/provider configuration
+backend/                          PAG terminal runner and sandbox
+scripts/                          Root development launch helpers
+```
 
-### Q1: "Isn't the 3D office just a visual gimmick? Why not just use a dashboard?"
-> **Defense:**  
-> "A 2D dashboard shows you metrics after the fact; our 3D spatial floor provides **real-time spatial situational awareness**. In multi-agent systems, human cognitive load is the primary bottleneck. If 20 agents are debating and 2 deadlocked on a dependency, reading 100,000 log lines takes 10 minutes. In AUTONEX, you immediately see the agents clustered at a specific desk or whiteboard with a visual warning aura. Furthermore, spatial grounding enforces physical concurrency limits—agents must be at their desks or in conference rooms to take action, preventing invisible thread explosions."
-
-### Q2: "How do you prevent agents in the 50-agent Swarm from hallucinating and agreeing with each other's mistakes (Groupthink)?"
-> **Defense:**  
-> "We explicitly prevent groupthink through our **3-tier anti-echo chamber protocol**:  
-> 1. **Divergent Independence:** In Phase 2, agents generate proposals in isolation without seeing peer outputs.  
-> 2. **Adversarial Critique Stance:** In Phase 4, the engine programmatically forces agents into polarized review stances (`challenge` vs. `support`). Critics are penalized for generic agreement and instructed to find boundary failures, race conditions, and single points of failure.  
-> 3. **Verification Quorum:** The final code generation requires cross-examination consensus. If agreement falls below 70%, the swarm triggers a re-frame round."
-
-### Q3: "How do you handle API cost and context explosion when running 50 agents?"
-> **Defense:**  
-> "Naive multi-agent systems run all-to-all communication ($N^2$ complexity), which for 50 agents is 2,500 interactions per round. AUTONEX uses **Semantic Clustering and Wave Dispatch**:  
-> - Proposals are posted to an Idea Blackboard ($O(N)$).  
-> - Diya/Clustering algorithms compress them into $K=4$ orthogonal architectural schools of thought.  
-> - Critiques and voting happen per cluster ($O(N \cdot K)$).  
-> In addition, we use a **Heterogeneous Inference Mesh**: fast, lightweight models (Groq Llama-3.3-70B) handle classification and peer voting, while reasoning heavyweights (DeepSeek-R1) only handle architectural framing and synthesis."
-
-### Q4: "How do I know this isn't just pre-recorded or hardcoded data?"
-> **Defense:**  
-> "You can submit any arbitrary, highly specific technical prompt right now—for example, *'Build a zero-copy lock-free ring buffer in Rust'* or *'Architect an FPGA FIX protocol decoder'*. Watch the event stream in DevTools: you will see live WebSocket packets with unique timestamps, OpenRouter API completion IDs, live dynamic folder creation under `output/`, and authentic chain-of-thought tokens from DeepSeek-R1 streamed live to disk."
-
-### Q5: "What happens if an agent writes malicious code or attempts to delete system files?"
-> **Defense:**  
-> "AUTONEX enforces an **Asynchronous Security Sandbox**:  
-> 1. No tool execution (`file.write`, `bash.exec`, `git.push`) can execute autonomously without clearing the permission engine.  
-> 2. The Bridge halts the calling agent's Promise and sends a `permission.requested` event to the frontend.  
-> 3. The human operator is presented with a diff and explanation modal to approve (`once`, `always`, or `reject`).  
-> 4. If an anomaly is spotted, the operator can hit the **Emergency Stop** button, which broadcasts a `system.halted` signal, terminates child processes, and forces all agents into IDLE."
-
-### Q6: "How do you maintain 60 FPS in Three.js with 50 animated characters and an entire office building?"
-> **Defense:**  
-> "The 3D engine is built on **Instanced Mesh rendering, procedural kinematics, and state-driven lerping**:  
-> - We avoid heavy skeletal skinning rigs in favor of procedural geometric hierarchies animated via quaternion rotation and forward kinematics.  
-> - Furniture and static architectural elements share geometry buffers and low-draw-call PBR materials.  
-> - The Three.js render loop is decoupled from the WebSocket event stream: agents smoothly interpolate (lerp) toward target waypoints calculated via A* navmesh grids, maintaining a silky 60 FPS even during heavy LLM network traffic."
-
----
-
-## 6. Slide-by-Slide Presentation Structure (Pitch Deck)
-
-- **Slide 1: Title & Hook**  
-  *AUTONEX: The Autonomous 3D Multi-Agent Engineering Floor.*  
-  "What if your AI coding assistant wasn't a single chatbox, but an entire 50-person engineering department you could watch, guide, and collaborate with in real-time?"
-- **Slide 2: The Three Failures of Modern AI Coding**  
-  Single-brain saturation, zero visual transparency, and brittle rate-limit handling.
-- **Slide 3: The Architecture (Spatial Grounding + Consensus Mesh)**  
-  Three.js WebGL Floor + Event Bridge + Multi-Model Routing Mesh.
-- **Slide 4: Dual Working Modes**  
-  - *AUTONEX Office:* Agile sprint execution (PM, Backend, Frontend, QA).  
-  - *Swarm Hall:* 50-agent council for deep architectural synthesis.
-- **Slide 5: Live Demo & Walkthrough**  
-  Submit a complex prompt -> Watch framing -> 3D agent walk to table -> Idea board clustering -> Live critique -> Realistic coffee break during rate limit -> Generated production project in `output/`.
-- **Slide 6: Enterprise Safety & Observability**  
-  Permission gates, Emergency Stop killswitch, zero secret leakage, monotonic audit log.
-- **Slide 7: Roadmap & Next Steps**  
-  Multi-repo git integration, autonomous PR review, VR/Spatial Computing support, and self-hosting enterprise deployment.
+For setup commands, see [`README.md`](README.md). For implementation-specific
+information, see [`frontend/README.md`](frontend/README.md),
+[`bridge/README.md`](bridge/README.md), and
+[`backend/README.md`](backend/README.md).
