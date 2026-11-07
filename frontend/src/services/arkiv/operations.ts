@@ -80,6 +80,11 @@ export interface SaveContextRefInput {
   summary?: string;
 }
 
+export interface SaveArkivIdentityInput {
+  user?: RegisterUserInput;
+  project?: CreateProjectInput;
+}
+
 export interface SaveCheckpointInput {
   checkpointId: string;
   projectId: string;
@@ -1015,7 +1020,8 @@ export async function saveArkivCheckpoint(
 export async function saveArkivCheckpointBundle(
   walletClient: WalletClient,
   contextInputs: [SaveContextRefInput, SaveContextRefInput],
-  checkpoint: SaveCheckpointInput
+  checkpoint: SaveCheckpointInput,
+  identity: SaveArkivIdentityInput = {}
 ) {
   if (!walletClient.account) throw new Error('Wallet not connected.');
   const userAddress = getAddress(walletClient.account.address);
@@ -1066,18 +1072,76 @@ export async function saveArkivCheckpointBundle(
     ...(checkpoint.description ? { description: checkpoint.description.slice(0, 120) } : {}),
     ...(checkpoint.manifestJson ? { manifest_json: encoder.encode(checkpoint.manifestJson.slice(0, 120000)) } : {}),
   };
-  const result = await arkivWallet.executeBatch({
-    creates: [
-      { schema: ContextRefSchema, values: contextValues[0], expiration: ExpirationTime.fromDays(90) },
-      { schema: ContextRefSchema, values: contextValues[1], expiration: ExpirationTime.fromDays(90) },
-      { schema: CheckpointV2Schema, values: checkpointValues, expiration: ExpirationTime.fromDays(90) },
-    ],
+  const creates: Array<{ schema: any; values: any; expiration: ReturnType<typeof ExpirationTime.fromDays> }> = [];
+  const createdEntityIndexes = {
+    user: undefined as number | undefined,
+    project: undefined as number | undefined,
+    archiveContext: 0,
+    context: 1,
+    checkpoint: 2,
+  };
+  if (identity.user) {
+    createdEntityIndexes.user = creates.length;
+    creates.push({
+      schema: UserSchema,
+      values: {
+        user_id: identity.user.userId.slice(0, 64),
+        wallet: addr(userAddress),
+        display_name: identity.user.displayName.slice(0, 100),
+        created_at: now,
+      },
+      expiration: ExpirationTime.fromDays(90),
+    });
+  }
+  if (identity.project) {
+    createdEntityIndexes.project = creates.length;
+    creates.push({
+      schema: ProjectSchema,
+      values: {
+        project_id: identity.project.projectId.slice(0, 64),
+        user_id: identity.project.userId.slice(0, 64),
+        owner: addr(userAddress),
+        name: identity.project.name.slice(0, 100),
+        status: 'ACTIVE',
+        created_at: now,
+        ...(identity.project.description
+          ? { description: identity.project.description.slice(0, 120) }
+          : {}),
+      },
+      expiration: ExpirationTime.fromDays(90),
+    });
+  }
+  createdEntityIndexes.archiveContext = creates.length;
+  creates.push({
+    schema: ContextRefSchema,
+    values: contextValues[0],
+    expiration: ExpirationTime.fromDays(90),
   });
+  createdEntityIndexes.context = creates.length;
+  creates.push({
+    schema: ContextRefSchema,
+    values: contextValues[1],
+    expiration: ExpirationTime.fromDays(90),
+  });
+  createdEntityIndexes.checkpoint = creates.length;
+  creates.push({
+    schema: CheckpointV2Schema,
+    values: checkpointValues,
+    expiration: ExpirationTime.fromDays(90),
+  });
+
+  const result = await arkivWallet.executeBatch({ creates });
   return {
     txHash: result.txHash as Hex,
-    contextEntityKey: result.createdEntities[1] as Hex,
-    archiveContextEntityKey: result.createdEntities[0] as Hex,
-    checkpointEntityKey: result.createdEntities[2] as Hex,
+    contextEntityKey: result.createdEntities[createdEntityIndexes.context] as Hex,
+    archiveContextEntityKey: result.createdEntities[createdEntityIndexes.archiveContext] as Hex,
+    checkpointEntityKey: result.createdEntities[createdEntityIndexes.checkpoint] as Hex,
+    userEntityKey: createdEntityIndexes.user === undefined
+      ? undefined
+      : result.createdEntities[createdEntityIndexes.user] as Hex,
+    projectEntityKey: createdEntityIndexes.project === undefined
+      ? undefined
+      : result.createdEntities[createdEntityIndexes.project] as Hex,
   };
 }
 
